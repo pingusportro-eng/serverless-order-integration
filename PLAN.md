@@ -180,7 +180,7 @@ For every step, the review should answer:
 
 ## Phase 2: TypeScript application foundation
 
-- [ ] **2.1 — Scaffold the Node.js/TypeScript project**
+- [x] **2.1 — Scaffold the Node.js/TypeScript project**
   - Add package scripts, strict TypeScript configuration, linting, and formatting.
   - Keep production dependencies minimal.
   - Verification: type-check and lint pass.

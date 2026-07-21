@@ -5,8 +5,8 @@ and asynchronous third-party integration with Node.js, TypeScript, and AWS.
 
 ## Status
 
-The project is in **Phase 0: safety and local prerequisites**. There is no
-application code or deployed AWS infrastructure yet.
+The project is in **Phase 2: TypeScript application foundation**. The local
+TypeScript toolchain is configured; no AWS infrastructure has been deployed.
 
 Work is divided into small reviewable steps. See [PLAN.md](PLAN.md) for the
 current checklist, architecture, verification criteria, and definition of done.
@@ -47,6 +47,28 @@ concurrency, and customer-managed KMS keys.
 
 Directories will gain content only when their corresponding plan step begins.
 
+## Local development
+
+Install the exact dependency versions recorded in `package-lock.json`:
+
+```bash
+npm ci
+```
+
+Run every local quality check:
+
+```bash
+npm run check
+```
+
+The individual commands are:
+
+- `npm run format:check` — verify formatting
+- `npm run lint` — run ESLint
+- `npm run typecheck` — type-check without emitting files
+- `npm run build` — compile TypeScript into `dist/`
+- `npm run format` — apply Prettier formatting
+
 ## Working agreement
 
 - Complete and review one numbered plan step at a time.
@@ -54,4 +76,3 @@ Directories will gain content only when their corresponding plan step begins.
 - Prefer local tests over cloud iterations.
 - Never commit credentials, secrets, or local environment files.
 - Do not deploy AWS resources before an explicit cost review.
-

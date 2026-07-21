@@ -4,6 +4,7 @@ dist/
 coverage/
 .aws-sam/
 *.tsbuildinfo
+.eslintcache
 
 # Local configuration and secrets
 .env
@@ -22,4 +23,3 @@ npm-debug.log*
 .vscode/
 .DS_Store
 Thumbs.db
-

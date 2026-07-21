@@ -1,0 +1,10 @@
+.aws-sam/
+coverage/
+dist/
+node_modules/
+package-lock.json
+
+# Existing prose is intentionally outside this code-formatting step.
+docs/
+PLAN.md
+README.md
