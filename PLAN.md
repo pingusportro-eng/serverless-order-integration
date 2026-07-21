@@ -113,12 +113,16 @@ For every step, the review should answer:
   - Verification: inspect the initial Git diff/status.
   - AWS cost: $0.
 
-- [ ] **0.3 — Configure AWS cost alerts**
-  - Create a $5 monthly AWS Budget.
-  - Add actual-spend alerts at $2.50, $4.00, and $5.00.
-  - Confirm the notification email.
-  - Verification: budget and subscribers are visible in AWS Billing.
-  - AWS cost: expected $0.
+- [x] **0.3 — Confirm AWS cost alerts**
+  - Retain the existing AWS Zero-Spend Budget instead of creating a second
+    budget for now. This provides an earlier warning when usage exceeds Free
+    Tier limits.
+  - Keep $5 as the project's maximum intended monthly spend and require a cost
+    review before every deployment.
+  - Verification on 2026-07-21: the AWS Budgets dashboard showed the existing
+    budget as healthy with $0 used. Verify its notification recipient again as
+    part of the first pre-deployment cost review.
+  - AWS cost: $0.
 
 - [ ] **0.4 — Verify AWS account safety**
   - Confirm root-user MFA and avoid using root credentials for development.
