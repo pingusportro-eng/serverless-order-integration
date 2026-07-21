@@ -7,3 +7,4 @@ Current specifications:
 
 - [Business requirements](business-requirements.md)
 - [Domain model](domain-model.md)
+- [OpenAPI contract](openapi.yaml)

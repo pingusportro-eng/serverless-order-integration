@@ -1,0 +1,10 @@
+extends:
+  - recommended
+
+rules:
+  # The contract intentionally exposes only a local server until deployment.
+  no-server-example.com: off
+
+  # The learning repository does not yet declare a distribution license.
+  info-license: off
+

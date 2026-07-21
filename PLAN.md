@@ -159,7 +159,7 @@ For every step, the review should answer:
   - Verification: domain examples cover successful and invalid transitions.
   - AWS cost: $0.
 
-- [ ] **1.3 — Define the HTTP API**
+- [x] **1.3 — Define the HTTP API**
   - Create an OpenAPI specification for:
     - `POST /orders`
     - `GET /orders/{orderId}`
