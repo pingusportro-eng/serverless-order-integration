@@ -84,11 +84,28 @@ For every step, the review should answer:
 
 ## Phase 0: Safety and local prerequisites
 
-- [ ] **0.1 — Verify local tools**
+- [x] **0.1 — Verify local tools**
   - Check Git, Node.js, npm, Docker, AWS CLI, and AWS SAM CLI.
   - Document required versions and installation gaps.
   - Verification: each installed tool reports its version.
   - AWS cost: $0.
+
+  Review recorded on 2026-07-21:
+
+  | Tool | Project requirement | Detected version | Status |
+  | --- | --- | --- | --- |
+  | Git | Git 2.x | 2.53.0 | Ready |
+  | Node.js | Node.js 24.x, matching the Lambda `nodejs24.x` runtime | 24.12.0 | Ready |
+  | npm | Version compatible with Node.js 24 | 11.6.2 | Ready |
+  | Docker Engine | Working Docker Engine | 29.5.2 | Ready; daemon reachable |
+  | Docker Compose | Compose v2 through `docker compose` | 2.3.3 | Ready |
+  | AWS CLI | AWS CLI v2 | 2.7.14 | Ready |
+  | AWS SAM CLI | Latest stable release | 1.163.0 | Ready |
+
+  AWS SAM CLI was installed for the current user at
+  `/home/costel/.local/aws-sam-cli`, with its executable available through the
+  existing PATH at `/home/costel/.local/bin/sam`. The installation was verified
+  with `sam --version`.
 
 - [ ] **0.2 — Establish the repository baseline**
   - Initialize Git if necessary.
