@@ -146,7 +146,7 @@ For every step, the review should answer:
 
 ## Phase 1: Requirements and API contract
 
-- [ ] **1.1 — Write the business requirements**
+- [x] **1.1 — Write the business requirements**
   - Describe order creation, delivery submission, and status updates.
   - State assumptions and explicitly identify ambiguous requirements.
   - Add acceptance criteria for the first vertical slice.

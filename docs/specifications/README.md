@@ -1,5 +1,8 @@
 # Specifications
 
-This directory will contain the business requirements, acceptance criteria,
-domain model, event contracts, and OpenAPI specification.
+This directory contains the project's reviewed specifications, including
+business requirements, domain and event contracts, and the OpenAPI definition.
 
+Current specifications:
+
+- [Business requirements](business-requirements.md)
