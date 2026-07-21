@@ -124,12 +124,25 @@ For every step, the review should answer:
     part of the first pre-deployment cost review.
   - AWS cost: $0.
 
-- [ ] **0.4 — Verify AWS account safety**
+- [x] **0.4 — Verify AWS account safety**
   - Confirm root-user MFA and avoid using root credentials for development.
   - Confirm the selected AWS region and inspect the account for forgotten
     chargeable resources.
   - Verification: record only the results, never credentials or account secrets.
   - AWS cost: $0 unless an existing resource is already generating charges.
+
+  Review recorded on 2026-07-21:
+
+  - Use the explicit local profile `pingusportro-admin` for every project AWS
+    command; do not rely on the machine's default profile.
+  - The selected project region is `eu-central-1`.
+  - The CLI identity is an IAM user, not the root user.
+  - Root-user MFA is enabled and the account reports no root access keys.
+  - The existing Zero-Spend Budget was confirmed in the selected account.
+  - The selected region had no EC2 instances, EBS volumes or snapshots, NAT
+    Gateways, Elastic IPs, load balancers, RDS instances or clusters, manual RDS
+    snapshots, or active CloudFormation stacks.
+  - No AWS resources or account configuration were changed.
 
 ## Phase 1: Requirements and API contract
 
