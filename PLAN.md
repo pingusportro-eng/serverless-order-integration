@@ -107,7 +107,7 @@ For every step, the review should answer:
   existing PATH at `/home/costel/.local/bin/sam`. The installation was verified
   with `sam --version`.
 
-- [ ] **0.2 — Establish the repository baseline**
+- [x] **0.2 — Establish the repository baseline**
   - Initialize Git if necessary.
   - Add `.gitignore`, `README.md`, and the initial directory structure.
   - Verification: inspect the initial Git diff/status.
