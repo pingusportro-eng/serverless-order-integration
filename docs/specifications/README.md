@@ -7,4 +7,5 @@ Current specifications:
 
 - [Business requirements](business-requirements.md)
 - [Domain model](domain-model.md)
+- [DynamoDB access patterns](dynamodb-access-patterns.md)
 - [OpenAPI contract](openapi.yaml)

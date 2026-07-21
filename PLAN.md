@@ -207,7 +207,7 @@ For every step, the review should answer:
   - Verification: DynamoDB Local responds without contacting AWS.
   - AWS cost: $0.
 
-- [ ] **3.2 — Create the local table**
+- [x] **3.2 — Create the local table**
   - Add a repeatable table bootstrap command.
   - Document the partition key, indexes, and access patterns first.
   - Verification: the command can create the table from a clean local database.

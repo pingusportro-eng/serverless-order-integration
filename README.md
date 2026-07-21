@@ -99,6 +99,15 @@ npm run dynamodb:start
 The start command waits until the local HTTP endpoint is healthy before it
 returns.
 
+Create the local table and its indexes. This command is safe to repeat:
+
+```bash
+npm run dynamodb:bootstrap
+```
+
+The key design and supported queries are documented in the
+[DynamoDB access patterns](docs/specifications/dynamodb-access-patterns.md).
+
 Verify the local endpoint with deliberately fake credentials:
 
 ```bash

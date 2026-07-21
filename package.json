@@ -12,6 +12,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run build",
+    "dynamodb:bootstrap": "npm run dynamodb:start && bash scripts/dynamodb/bootstrap-local.sh",
     "dynamodb:reset": "docker compose down --volumes",
     "dynamodb:start": "docker compose up --detach --wait dynamodb-local",
     "dynamodb:stop": "docker compose stop dynamodb-local",
