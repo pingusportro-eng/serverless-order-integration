@@ -120,9 +120,9 @@ decision.
 
 | ID | Open question | Planned resolution |
 | --- | --- | --- |
-| Q-001 | Which fields are required to create an order? | Define the domain model in step 1.2. |
-| Q-002 | Which statuses and transitions are valid? | Define the state model in step 1.2. |
-| Q-003 | How long does an idempotency reference remain valid? | Decide with the idempotency rules in step 1.2. |
+| Q-001 | Which fields are required to create an order? | Resolved in the [domain model](domain-model.md#order-aggregate). |
+| Q-002 | Which statuses and transitions are valid? | Resolved in the [domain state model](domain-model.md#order-status). |
+| Q-003 | How long does an idempotency reference remain valid? | Resolved in the [idempotency rules](domain-model.md#create-order-idempotency). |
 | Q-004 | How are client and operator calls authenticated? | Decide during API and architecture design in steps 1.3 and 1.4. |
 | Q-005 | What is the provider request, authentication, and rate-limit contract? | Define the mock provider contract before phase 4 implementation. |
 | Q-006 | Which provider failures are temporary versus permanent? | Define the vendor client and retry policy in phase 4. |
@@ -158,4 +158,3 @@ This document is the reviewed MVP baseline, not a permanent contract. When an
 ambiguity is resolved or a requirement changes, update the relevant requirement,
 record the reason, and review its effect on the domain model, API contract,
 architecture, tests, and cost.
-

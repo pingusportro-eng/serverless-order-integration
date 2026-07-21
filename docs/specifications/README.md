@@ -6,3 +6,4 @@ business requirements, domain and event contracts, and the OpenAPI definition.
 Current specifications:
 
 - [Business requirements](business-requirements.md)
+- [Domain model](domain-model.md)

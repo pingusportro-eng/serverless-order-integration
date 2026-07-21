@@ -153,7 +153,7 @@ For every step, the review should answer:
   - Verification: requirements are understandable without reading source code.
   - AWS cost: $0.
 
-- [ ] **1.2 — Define the domain model**
+- [x] **1.2 — Define the domain model**
   - Define `Order`, order statuses, allowed transitions, and vendor references.
   - Define the idempotency and duplicate-event rules.
   - Verification: domain examples cover successful and invalid transitions.
