@@ -200,7 +200,7 @@ For every step, the review should answer:
 
 ## Phase 3: Local REST API and DynamoDB
 
-- [ ] **3.1 — Start DynamoDB Local**
+- [x] **3.1 — Start DynamoDB Local**
   - Add a Docker Compose service using the official DynamoDB Local image.
   - Persist local data in a project-specific Docker volume.
   - Add start, stop, and reset instructions.

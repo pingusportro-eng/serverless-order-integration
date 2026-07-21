@@ -5,8 +5,9 @@ and asynchronous third-party integration with Node.js, TypeScript, and AWS.
 
 ## Status
 
-The project is in **Phase 2: TypeScript application foundation**. The local
-TypeScript toolchain is configured; no AWS infrastructure has been deployed.
+The project is in **Phase 3: local REST API and DynamoDB**. The local TypeScript
+and DynamoDB development foundations are configured; no AWS infrastructure has
+been deployed.
 
 Work is divided into small reviewable steps. See [PLAN.md](PLAN.md) for the
 current checklist, architecture, verification criteria, and definition of done.
@@ -78,6 +79,51 @@ The individual commands are:
 - `npm run test:coverage` — run tests and enforce coverage thresholds
 - `npm run build` — compile TypeScript into `dist/`
 - `npm run format` — apply Prettier formatting
+
+## DynamoDB Local
+
+DynamoDB Local runs in Docker at `http://localhost:8000`. Its data is stored in
+the project-scoped `serverless-order-integration_dynamodb-data` Docker volume.
+No requests are sent to an AWS account and no AWS charges are incurred.
+
+The service runs as root inside this development-only container because fresh
+named volumes are root-owned. The port remains bound to loopback and this
+Compose service is not part of the deployable AWS infrastructure.
+
+Start the service in the background:
+
+```bash
+npm run dynamodb:start
+```
+
+The start command waits until the local HTTP endpoint is healthy before it
+returns.
+
+Verify the local endpoint with deliberately fake credentials:
+
+```bash
+npm run dynamodb:verify
+```
+
+The verification command supplies the dummy values required by DynamoDB Local
+and pins the endpoint to `127.0.0.1`; it does not read either configured AWS
+profile.
+
+Stop the container while preserving local data:
+
+```bash
+npm run dynamodb:stop
+```
+
+Reset the service and permanently delete its local database volume:
+
+```bash
+npm run dynamodb:reset
+```
+
+The reset command affects only resources belonging to this Compose project.
+Always include the local `--endpoint-url` when using the AWS CLI here; omitting
+it would select the real AWS DynamoDB endpoint instead.
 
 ## Working agreement
 
