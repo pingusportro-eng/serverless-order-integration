@@ -192,7 +192,7 @@ For every step, the review should answer:
   - Verification: tests and coverage run locally.
   - AWS cost: $0.
 
-- [ ] **2.3 — Add HTTP and observability primitives**
+- [x] **2.3 — Add HTTP and observability primitives**
   - Add typed responses, consistent errors, request IDs, and structured logs.
   - Ensure sensitive values and full request bodies are not logged.
   - Verification: unit tests cover success and error responses.

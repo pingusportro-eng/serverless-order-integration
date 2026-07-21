@@ -1,2 +1,24 @@
 export { isTerminalOrderStatus } from './domain/order-status.js';
 export type { OrderStatus } from './domain/order-status.js';
+export { problemResponse } from './http/problem-details.js';
+export type {
+  ProblemCode,
+  ProblemDetails,
+  ProblemInput,
+  ProblemStatus,
+  ValidationIssue,
+} from './http/problem-details.js';
+export { successResponse } from './http/response.js';
+export type { HttpHeaders, HttpResponse, SuccessStatus } from './http/response.js';
+export { createLogger } from './observability/logger.js';
+export type {
+  LogContext,
+  LogEntry,
+  LogLevel,
+  Logger,
+  LoggerOptions,
+  LogSink,
+  SafeLogFields,
+} from './observability/logger.js';
+export { createRequestId } from './observability/request-id.js';
+export type { IdGenerator } from './observability/request-id.js';

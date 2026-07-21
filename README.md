@@ -32,6 +32,13 @@ The initial architecture deliberately excludes NAT Gateway, VPC-attached
 Lambda functions, API Gateway caching, WAF, custom domains, provisioned
 concurrency, and customer-managed KMS keys.
 
+## Logging safety
+
+Application logs use stable event names and an allow-list of operational fields.
+Do not log authorization values, secrets, full request bodies, delivery addresses,
+or raw third-party responses. Request and correlation IDs provide traceability
+without requiring sensitive payloads.
+
 ## Repository layout
 
 ```text
