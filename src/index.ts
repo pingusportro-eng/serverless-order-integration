@@ -1,4 +1,2 @@
-/**
- * Application modules will be added in later plan steps.
- */
-export {};
+export { isTerminalOrderStatus } from './domain/order-status.js';
+export type { OrderStatus } from './domain/order-status.js';

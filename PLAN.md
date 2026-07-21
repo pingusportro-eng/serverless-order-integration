@@ -186,7 +186,7 @@ For every step, the review should answer:
   - Verification: type-check and lint pass.
   - AWS cost: $0.
 
-- [ ] **2.2 — Add the test foundation**
+- [x] **2.2 — Add the test foundation**
   - Configure Vitest and coverage reporting.
   - Add one example unit test.
   - Verification: tests and coverage run locally.

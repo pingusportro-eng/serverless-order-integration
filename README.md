@@ -66,6 +66,9 @@ The individual commands are:
 - `npm run format:check` — verify formatting
 - `npm run lint` — run ESLint
 - `npm run typecheck` — type-check without emitting files
+- `npm test` — run the unit tests once
+- `npm run test:watch` — rerun relevant tests while developing
+- `npm run test:coverage` — run tests and enforce coverage thresholds
 - `npm run build` — compile TypeScript into `dist/`
 - `npm run format` — apply Prettier formatting
 
