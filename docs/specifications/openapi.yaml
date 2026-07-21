@@ -287,8 +287,9 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: |
-        Bearer token that identifies the merchant or operator. The issuer,
-        audience, claims, and AWS authorizer are architecture decisions.
+        Cognito access token validated by an API Gateway HTTP API JWT authorizer.
+        Application logic maps the approved merchant identity to the fixed MVP
+        tenant and requires the `operators` group for operator routes.
     webhookSignature:
       type: apiKey
       in: header

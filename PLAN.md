@@ -170,7 +170,7 @@ For every step, the review should answer:
   - Verification: validate the OpenAPI document locally.
   - AWS cost: $0.
 
-- [ ] **1.4 — Record initial architecture decisions**
+- [x] **1.4 — Record initial architecture decisions**
   - Explain HTTP API versus API Gateway REST API.
   - Explain DynamoDB on-demand capacity.
   - Explain DynamoDB Streams, SNS, and SQS responsibilities.

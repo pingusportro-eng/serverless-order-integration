@@ -123,7 +123,7 @@ decision.
 | Q-001 | Which fields are required to create an order? | Resolved in the [domain model](domain-model.md#order-aggregate). |
 | Q-002 | Which statuses and transitions are valid? | Resolved in the [domain state model](domain-model.md#order-status). |
 | Q-003 | How long does an idempotency reference remain valid? | Resolved in the [idempotency rules](domain-model.md#create-order-idempotency). |
-| Q-004 | How are client and operator calls authenticated? | The [API contract](openapi.yaml) requires bearer authentication; issuer, claims, and AWS enforcement remain for step 1.4. |
+| Q-004 | How are client and operator calls authenticated? | Resolved by the [Cognito and JWT authorizer decision](../decisions/0005-use-cognito-jwt-authentication.md). |
 | Q-005 | What is the provider request, authentication, and rate-limit contract? | Define the mock provider contract before phase 4 implementation. |
 | Q-006 | Which provider failures are temporary versus permanent? | Define the vendor client and retry policy in phase 4. |
 | Q-007 | How long must orders and operational records be retained? | Use environment lifetime for the MVP; revisit before any production claim. |
