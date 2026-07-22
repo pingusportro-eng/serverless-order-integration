@@ -230,7 +230,7 @@ For every step, the review should answer:
   - Verification: unit and integration tests pass.
   - AWS cost: $0.
 
-- [ ] **3.6 — Implement paginated `GET /orders`**
+- [x] **3.6 — Implement paginated `GET /orders`**
   - Use a bounded page size and an opaque continuation token.
   - Do not expose raw internal keys to clients.
   - Verification: pagination tests cover first, middle, and final pages.

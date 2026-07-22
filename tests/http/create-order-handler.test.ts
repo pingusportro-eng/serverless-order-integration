@@ -95,6 +95,7 @@ describe('POST /orders handler', () => {
     const repository: OrderRepository = {
       create,
       get: vi.fn<OrderRepository['get']>(),
+      list: vi.fn<OrderRepository['list']>(),
       saveStatusChange: vi.fn<OrderRepository['saveStatusChange']>(),
     };
 
@@ -133,6 +134,7 @@ describe('POST /orders handler', () => {
     const repository: OrderRepository = {
       create: vi.fn<OrderRepository['create']>().mockRejectedValue(new OrderAlreadyExistsError()),
       get: vi.fn<OrderRepository['get']>(),
+      list: vi.fn<OrderRepository['list']>(),
       saveStatusChange: vi.fn<OrderRepository['saveStatusChange']>(),
     };
 

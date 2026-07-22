@@ -73,6 +73,7 @@ describe('GET /orders/{orderId} handler', () => {
     const dependency: OrderRepository = {
       create: vi.fn<OrderRepository['create']>(),
       get,
+      list: vi.fn<OrderRepository['list']>(),
       saveStatusChange: vi.fn<OrderRepository['saveStatusChange']>(),
     };
 

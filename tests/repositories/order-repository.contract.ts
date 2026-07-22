@@ -7,7 +7,7 @@ import {
   OrderNotFoundError,
   type OrderRepository,
 } from '../../src/application/order-repository.js';
-import type { Order } from '../../src/domain/order.js';
+import { asMerchantId, asOrderId, type Order } from '../../src/domain/order.js';
 import { createOrderFixture } from '../fixtures/order.js';
 
 type RepositoryFactory = () => OrderRepository | Promise<OrderRepository>;
@@ -169,6 +169,120 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       const order = createOrderFixture({ version: 3 });
 
       await expect(repository.saveStatusChange(order, 1)).rejects.toBeInstanceOf(RangeError);
+    });
+
+    it('paginates first, middle, and final pages newest-first within one merchant', async () => {
+      const merchantId = asMerchantId(`mrc_list_${crypto.randomUUID().replaceAll('-', '')}`);
+      const orderIds = [
+        asOrderId('ord_00000001'),
+        asOrderId('ord_00000002'),
+        asOrderId('ord_00000003'),
+        asOrderId('ord_00000004'),
+      ];
+      const orders = orderIds.map((orderId, index) =>
+        createOrderFixture({
+          orderId,
+          merchantId,
+          merchantOrderReference: `list-reference-${String(index)}`,
+          createdAt: `2026-07-21T12:3${String(index)}:00.000Z`,
+          updatedAt: `2026-07-21T12:3${String(index)}:00.000Z`,
+        }),
+      );
+
+      for (const [index, order] of orders.entries()) {
+        await repository.create({
+          order,
+          idempotencyKey: `list-idempotency-${String(index)}`,
+          requestFingerprint: `list-fingerprint-${String(index)}`,
+        });
+      }
+
+      const otherMerchantOrder = createOrderFixture({
+        createdAt: '2026-07-21T13:00:00.000Z',
+        updatedAt: '2026-07-21T13:00:00.000Z',
+      });
+      await repository.create({
+        order: otherMerchantOrder,
+        idempotencyKey: 'other-merchant-idempotency',
+        requestFingerprint: 'other-merchant-fingerprint',
+      });
+
+      const firstPage = await repository.list({ merchantId, limit: 2 });
+      expect(firstPage.orders.map((order) => order.orderId)).toEqual([orderIds[3], orderIds[2]]);
+      expect(firstPage.nextPosition).toEqual({
+        createdAt: orders[2]?.createdAt,
+        orderId: orderIds[2],
+      });
+      if (firstPage.nextPosition === undefined) {
+        throw new Error('Expected a middle-page position.');
+      }
+
+      const middlePage = await repository.list({
+        merchantId,
+        limit: 1,
+        position: firstPage.nextPosition,
+      });
+      expect(middlePage.orders.map((order) => order.orderId)).toEqual([orderIds[1]]);
+      expect(middlePage.nextPosition).toEqual({
+        createdAt: orders[1]?.createdAt,
+        orderId: orderIds[1],
+      });
+      if (middlePage.nextPosition === undefined) {
+        throw new Error('Expected a final-page position.');
+      }
+
+      const finalPage = await repository.list({
+        merchantId,
+        limit: 2,
+        position: middlePage.nextPosition,
+      });
+      expect(finalPage.orders.map((order) => order.orderId)).toEqual([orderIds[0]]);
+      expect(finalPage.nextPosition).toBeUndefined();
+    });
+
+    it('uses the status index and reflects status changes', async () => {
+      const merchantId = asMerchantId(`mrc_status_${crypto.randomUUID().replaceAll('-', '')}`);
+      const pendingOrder = createOrderFixture({
+        orderId: asOrderId('ord_status001'),
+        merchantId,
+        merchantOrderReference: 'status-reference-1',
+      });
+      const changedOrder = submittedOrder(pendingOrder);
+      const remainingPendingOrder = createOrderFixture({
+        orderId: asOrderId('ord_status002'),
+        merchantId,
+        merchantOrderReference: 'status-reference-2',
+      });
+
+      await repository.create({
+        order: pendingOrder,
+        idempotencyKey: 'status-idempotency-1',
+        requestFingerprint: 'status-fingerprint-1',
+      });
+      await repository.create({
+        order: remainingPendingOrder,
+        idempotencyKey: 'status-idempotency-2',
+        requestFingerprint: 'status-fingerprint-2',
+      });
+      await repository.saveStatusChange(changedOrder, 1);
+
+      const pendingPage = await repository.list({
+        merchantId,
+        status: 'PENDING_SUBMISSION',
+        limit: 100,
+      });
+      const submittedPage = await repository.list({ merchantId, status: 'SUBMITTED', limit: 100 });
+
+      expect(pendingPage.orders.map((order) => order.orderId)).toEqual([
+        remainingPendingOrder.orderId,
+      ]);
+      expect(submittedPage.orders.map((order) => order.orderId)).toEqual([changedOrder.orderId]);
+    });
+
+    it('rejects an unbounded page size', async () => {
+      const merchantId = createOrderFixture().merchantId;
+
+      await expect(repository.list({ merchantId, limit: 101 })).rejects.toBeInstanceOf(RangeError);
     });
   });
 }

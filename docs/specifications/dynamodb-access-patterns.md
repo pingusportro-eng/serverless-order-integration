@@ -70,8 +70,11 @@ provides deterministic ordering when two orders have the same creation time.
 | AP-07 | Resolve a provider webhook | `GetItem` using `PROVIDER#<providerCode>` and `ORDER#<providerOrderId>`. |
 | AP-08 | Deduplicate an event for a consumer | Conditional `PutItem` using consumer identity and event ID, normally in the same transaction as its state change. |
 
-List cursors will encode the complete DynamoDB `LastEvaluatedKey` as an opaque,
-versioned token. Clients will never receive raw key attributes.
+List cursors are versioned and HMAC-signed. They carry only the logical last
+position (`createdAt` and `orderId`) plus the merchant and optional status
+scope. The repository reconstructs DynamoDB's `ExclusiveStartKey`; clients
+never receive raw table or index key attribute names. Signing prevents a client
+from modifying a position or reusing a cursor for another merchant or filter.
 
 ## Index choices and consistency
 

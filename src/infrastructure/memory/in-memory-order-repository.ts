@@ -1,5 +1,6 @@
 import {
   assertNextOrderVersion,
+  assertOrderPageLimit,
   IdempotencyConflictError,
   MerchantReferenceConflictError,
   OrderAlreadyExistsError,
@@ -7,6 +8,8 @@ import {
   OrderVersionConflictError,
   type CreateOrderInput,
   type CreateOrderResult,
+  type ListOrdersInput,
+  type ListOrdersResult,
   type OrderRepository,
 } from '../../application/order-repository.js';
 import type { MerchantId, Order, OrderId } from '../../domain/order.js';
@@ -22,6 +25,10 @@ function tupleKey(...parts: readonly string[]): string {
 
 function cloneOrder(order: Order): Order {
   return structuredClone(order);
+}
+
+function orderListSortKey(order: Pick<Order, 'createdAt' | 'orderId'>): string {
+  return `ORDER#${order.createdAt}#${order.orderId}`;
 }
 
 export class InMemoryOrderRepository implements OrderRepository {
@@ -78,6 +85,34 @@ export class InMemoryOrderRepository implements OrderRepository {
 
     const order = this.orders.get(tupleKey(merchantId, orderId));
     return order ? cloneOrder(order) : undefined;
+  }
+
+  async list(input: ListOrdersInput): Promise<ListOrdersResult> {
+    await Promise.resolve();
+    assertOrderPageLimit(input.limit);
+
+    const positionKey = input.position ? orderListSortKey(input.position) : undefined;
+    const candidates = [...this.orders.values()]
+      .filter(
+        (order) =>
+          order.merchantId === input.merchantId &&
+          (input.status === undefined || order.status === input.status) &&
+          (positionKey === undefined || orderListSortKey(order) < positionKey),
+      )
+      .sort((left, right) => {
+        const leftKey = orderListSortKey(left);
+        const rightKey = orderListSortKey(right);
+        return leftKey === rightKey ? 0 : leftKey < rightKey ? 1 : -1;
+      });
+    const orders = candidates.slice(0, input.limit).map(cloneOrder);
+    const lastOrder = orders[orders.length - 1];
+
+    return {
+      orders,
+      ...(candidates.length > input.limit && lastOrder
+        ? { nextPosition: { createdAt: lastOrder.createdAt, orderId: lastOrder.orderId } }
+        : {}),
+    };
   }
 
   async saveStatusChange(order: Order, expectedVersion: number): Promise<void> {

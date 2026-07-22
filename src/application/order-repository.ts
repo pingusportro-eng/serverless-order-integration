@@ -1,4 +1,5 @@
 import type { MerchantId, Order, OrderId } from '../domain/order.js';
+import type { OrderStatus } from '../domain/order-status.js';
 
 export interface CreateOrderInput {
   readonly order: Order;
@@ -10,9 +11,27 @@ export type CreateOrderResult =
   | { readonly outcome: 'created'; readonly order: Order }
   | { readonly outcome: 'replayed'; readonly order: Order };
 
+export interface OrderListPosition {
+  readonly createdAt: string;
+  readonly orderId: OrderId;
+}
+
+export interface ListOrdersInput {
+  readonly merchantId: MerchantId;
+  readonly status?: OrderStatus;
+  readonly limit: number;
+  readonly position?: OrderListPosition;
+}
+
+export interface ListOrdersResult {
+  readonly orders: readonly Order[];
+  readonly nextPosition?: OrderListPosition;
+}
+
 export interface OrderRepository {
   create(input: CreateOrderInput): Promise<CreateOrderResult>;
   get(merchantId: MerchantId, orderId: OrderId): Promise<Order | undefined>;
+  list(input: ListOrdersInput): Promise<ListOrdersResult>;
   saveStatusChange(order: Order, expectedVersion: number): Promise<void>;
 }
 
@@ -59,5 +78,11 @@ export class OrderVersionConflictError extends Error {
 export function assertNextOrderVersion(order: Order, expectedVersion: number): void {
   if (order.version !== expectedVersion + 1) {
     throw new RangeError('A status change must increment the order version exactly once.');
+  }
+}
+
+export function assertOrderPageLimit(limit: number): void {
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new RangeError('An order page limit must be an integer from 1 through 100.');
   }
 }

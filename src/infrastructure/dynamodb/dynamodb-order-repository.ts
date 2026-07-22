@@ -4,6 +4,7 @@ import {
 } from '@aws-sdk/client-dynamodb';
 import {
   GetCommand,
+  QueryCommand,
   TransactWriteCommand,
   UpdateCommand,
   type DynamoDBDocumentClient,
@@ -11,6 +12,7 @@ import {
 
 import {
   assertNextOrderVersion,
+  assertOrderPageLimit,
   IdempotencyConflictError,
   MerchantReferenceConflictError,
   OrderAlreadyExistsError,
@@ -18,6 +20,9 @@ import {
   OrderVersionConflictError,
   type CreateOrderInput,
   type CreateOrderResult,
+  type ListOrdersInput,
+  type ListOrdersResult,
+  type OrderListPosition,
   type OrderRepository,
 } from '../../application/order-repository.js';
 import type { MerchantId, Order, OrderId } from '../../domain/order.js';
@@ -75,6 +80,10 @@ function merchantReferenceKey(value: string): string {
 
 function orderListSortKey(order: Order): string {
   return `ORDER#${order.createdAt}#${order.orderId}`;
+}
+
+function orderListPositionSortKey(position: OrderListPosition): string {
+  return `ORDER#${position.createdAt}#${position.orderId}`;
 }
 
 function toStoredOrder(order: Order): StoredOrderItem {
@@ -191,6 +200,50 @@ export class DynamoDbOrderRepository implements OrderRepository {
     );
 
     return result.Item === undefined ? undefined : readStoredOrder(result.Item);
+  }
+
+  async list(input: ListOrdersInput): Promise<ListOrdersResult> {
+    assertOrderPageLimit(input.limit);
+
+    const pk = merchantKey(input.merchantId);
+    const hasStatusFilter = input.status !== undefined;
+    const indexName = hasStatusFilter ? 'byMerchantStatusCreatedAt' : 'byMerchantCreatedAt';
+    const indexPkName = hasStatusFilter ? 'gsi2pk' : 'gsi1pk';
+    const indexSkName = hasStatusFilter ? 'gsi2sk' : 'gsi1sk';
+    const indexPk = hasStatusFilter ? `${pk}#STATUS#${input.status}` : pk;
+    const exclusiveStartKey = input.position
+      ? {
+          pk,
+          sk: orderKey(input.position.orderId),
+          [indexPkName]: indexPk,
+          [indexSkName]: orderListPositionSortKey(input.position),
+        }
+      : undefined;
+    const result = await this.client.send(
+      new QueryCommand({
+        TableName: this.tableName,
+        IndexName: indexName,
+        KeyConditionExpression: '#indexPk = :indexPk',
+        ExpressionAttributeNames: { '#indexPk': indexPkName },
+        ExpressionAttributeValues: { ':indexPk': indexPk },
+        ScanIndexForward: false,
+        Limit: input.limit,
+        ExclusiveStartKey: exclusiveStartKey,
+      }),
+    );
+    const orders = (result.Items ?? []).map(readStoredOrder);
+    const lastOrder = orders[orders.length - 1];
+
+    if (result.LastEvaluatedKey !== undefined && lastOrder === undefined) {
+      throw new Error('The paginated order query returned an invalid continuation position.');
+    }
+
+    return {
+      orders,
+      ...(result.LastEvaluatedKey !== undefined && lastOrder
+        ? { nextPosition: { createdAt: lastOrder.createdAt, orderId: lastOrder.orderId } }
+        : {}),
+    };
   }
 
   async saveStatusChange(order: Order, expectedVersion: number): Promise<void> {
