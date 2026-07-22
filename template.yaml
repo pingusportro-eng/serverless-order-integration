@@ -1,0 +1,83 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Local SAM API for the serverless order integration project
+
+Parameters:
+  OrdersTableName:
+    Type: String
+    Default: serverless-order-integration-local
+  MerchantId:
+    Type: String
+    Default: mrc_demo
+  DynamoDbEndpoint:
+    Type: String
+    Default: ''
+  CursorSigningSecret:
+    Type: String
+    NoEcho: true
+    Default: ''
+
+Globals:
+  Function:
+    Runtime: nodejs24.x
+    Architectures:
+      - x86_64
+    MemorySize: 128
+    Timeout: 10
+
+Resources:
+  LocalHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+
+  OrdersApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: orders-api.handler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref OrdersTableName
+          MERCHANT_ID: !Ref MerchantId
+          DYNAMODB_ENDPOINT: !Ref DynamoDbEndpoint
+          CURSOR_SIGNING_SECRET: !Ref CursorSigningSecret
+      Events:
+        CreateOrder:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref LocalHttpApi
+            Method: POST
+            Path: /orders
+        ListOrders:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref LocalHttpApi
+            Method: GET
+            Path: /orders
+        GetOrder:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref LocalHttpApi
+            Method: GET
+            Path: /orders/{orderId}
+        ChangeOrderStatus:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref LocalHttpApi
+            Method: PATCH
+            Path: /orders/{orderId}/status
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/lambda/orders-api.ts
+        Format: cjs
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+
+Outputs:
+  LocalApiUrl:
+    Description: URL used by sam local start-api; no API is deployed by this template step.
+    Value: http://127.0.0.1:3000

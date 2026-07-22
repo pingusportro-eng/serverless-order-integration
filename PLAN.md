@@ -241,7 +241,7 @@ For every step, the review should answer:
   - Verification: concurrent and invalid-transition tests pass.
   - AWS cost: $0.
 
-- [ ] **3.8 — Run the API locally with AWS SAM**
+- [x] **3.8 — Run the API locally with AWS SAM**
   - Define the local Lambda/API entry points.
   - Connect the SAM containers to DynamoDB Local.
   - Verification: exercise all current routes through local HTTP requests.

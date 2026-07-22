@@ -1,0 +1,6 @@
+{
+  "OrdersApiFunction": {
+    "CURSOR_SIGNING_SECRET": "LOCAL_ONLY_NOT_A_DEPLOYMENT_SECRET_0123456789",
+    "DYNAMODB_ENDPOINT": "http://dynamodb-local:8000"
+  }
+}
