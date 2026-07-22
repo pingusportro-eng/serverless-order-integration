@@ -1,0 +1,338 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/schemas/domain-event-v1.json",
+  "title": "Order domain event version 1",
+  "oneOf": [
+    { "$ref": "#/$defs/orderCreatedEvent" },
+    { "$ref": "#/$defs/orderSubmittedEvent" },
+    { "$ref": "#/$defs/orderSubmissionFailedEvent" },
+    { "$ref": "#/$defs/orderSubmissionRetryRequestedEvent" },
+    { "$ref": "#/$defs/orderCancelledEvent" },
+    { "$ref": "#/$defs/orderPickedUpEvent" },
+    { "$ref": "#/$defs/orderDeliveredEvent" },
+    { "$ref": "#/$defs/orderDeliveryFailedEvent" }
+  ],
+  "$defs": {
+    "timestamp": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-([0-2][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]\\.[0-9]{3}Z$"
+    },
+    "merchantId": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 64,
+      "pattern": "^mrc_[A-Za-z0-9]+$"
+    },
+    "providerOrderId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "submissionKey": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9._:-]+$"
+    },
+    "operatorReason": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 500
+    },
+    "failure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage", "reasonCode", "summary", "occurredAt"],
+      "properties": {
+        "stage": { "enum": ["SUBMISSION", "DELIVERY"] },
+        "reasonCode": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "summary": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "occurredAt": { "$ref": "#/$defs/timestamp" }
+      }
+    },
+    "baseEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "eventId",
+        "eventType",
+        "schemaVersion",
+        "aggregateType",
+        "aggregateId",
+        "aggregateVersion",
+        "occurredAt",
+        "correlationId",
+        "causationId",
+        "payload"
+      ],
+      "properties": {
+        "eventId": {
+          "type": "string",
+          "minLength": 20,
+          "maxLength": 132,
+          "pattern": "^evt_[A-Za-z0-9_-]{16,128}$"
+        },
+        "eventType": {
+          "enum": [
+            "order.created",
+            "order.submitted",
+            "order.submission_failed",
+            "order.submission_retry_requested",
+            "order.cancelled",
+            "order.picked_up",
+            "order.delivered",
+            "order.delivery_failed"
+          ]
+        },
+        "schemaVersion": { "const": 1 },
+        "aggregateType": { "const": "ORDER" },
+        "aggregateId": {
+          "type": "string",
+          "minLength": 12,
+          "maxLength": 64,
+          "pattern": "^ord_[A-Za-z0-9]+$"
+        },
+        "aggregateVersion": { "type": "integer", "minimum": 1 },
+        "occurredAt": { "$ref": "#/$defs/timestamp" },
+        "correlationId": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "causationId": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128,
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "payload": { "type": "object" }
+      }
+    },
+    "orderCreatedPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["merchantId", "status", "providerCode", "submissionKey"],
+      "properties": {
+        "merchantId": { "$ref": "#/$defs/merchantId" },
+        "status": { "const": "PENDING_SUBMISSION" },
+        "providerCode": { "const": "mock-delivery" },
+        "submissionKey": { "$ref": "#/$defs/submissionKey" }
+      }
+    },
+    "orderSubmittedPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["merchantId", "status", "providerCode", "providerOrderId", "acceptedAt"],
+      "properties": {
+        "merchantId": { "$ref": "#/$defs/merchantId" },
+        "status": { "const": "SUBMITTED" },
+        "providerCode": { "const": "mock-delivery" },
+        "providerOrderId": { "$ref": "#/$defs/providerOrderId" },
+        "acceptedAt": { "$ref": "#/$defs/timestamp" },
+        "reason": { "$ref": "#/$defs/operatorReason" }
+      }
+    },
+    "orderSubmissionFailedPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["merchantId", "status", "failure"],
+      "properties": {
+        "merchantId": { "$ref": "#/$defs/merchantId" },
+        "status": { "const": "SUBMISSION_FAILED" },
+        "failure": {
+          "allOf": [
+            { "$ref": "#/$defs/failure" },
+            { "type": "object", "properties": { "stage": { "const": "SUBMISSION" } } }
+          ]
+        }
+      }
+    },
+    "orderSubmissionRetryRequestedPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "merchantId",
+        "previousStatus",
+        "status",
+        "providerCode",
+        "submissionKey",
+        "reason"
+      ],
+      "properties": {
+        "merchantId": { "$ref": "#/$defs/merchantId" },
+        "previousStatus": { "const": "SUBMISSION_FAILED" },
+        "status": { "const": "PENDING_SUBMISSION" },
+        "providerCode": { "const": "mock-delivery" },
+        "submissionKey": { "$ref": "#/$defs/submissionKey" },
+        "reason": { "$ref": "#/$defs/operatorReason" }
+      }
+    },
+    "orderCancelledPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["merchantId", "previousStatus", "status"],
+      "properties": {
+        "merchantId": { "$ref": "#/$defs/merchantId" },
+        "previousStatus": {
+          "enum": ["PENDING_SUBMISSION", "SUBMISSION_FAILED", "SUBMITTED"]
+        },
+        "status": { "const": "CANCELLED" },
+        "reason": { "$ref": "#/$defs/operatorReason" }
+      }
+    },
+    "orderPickedUpPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["merchantId", "previousStatus", "status", "providerCode", "providerOrderId"],
+      "properties": {
+        "merchantId": { "$ref": "#/$defs/merchantId" },
+        "previousStatus": { "const": "SUBMITTED" },
+        "status": { "const": "PICKED_UP" },
+        "providerCode": { "const": "mock-delivery" },
+        "providerOrderId": { "$ref": "#/$defs/providerOrderId" },
+        "reason": { "$ref": "#/$defs/operatorReason" }
+      }
+    },
+    "orderDeliveredPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["merchantId", "previousStatus", "status", "providerCode", "providerOrderId"],
+      "properties": {
+        "merchantId": { "$ref": "#/$defs/merchantId" },
+        "previousStatus": { "enum": ["SUBMITTED", "PICKED_UP"] },
+        "status": { "const": "DELIVERED" },
+        "providerCode": { "const": "mock-delivery" },
+        "providerOrderId": { "$ref": "#/$defs/providerOrderId" },
+        "reason": { "$ref": "#/$defs/operatorReason" }
+      }
+    },
+    "orderDeliveryFailedPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "merchantId",
+        "previousStatus",
+        "status",
+        "providerCode",
+        "providerOrderId",
+        "failure"
+      ],
+      "properties": {
+        "merchantId": { "$ref": "#/$defs/merchantId" },
+        "previousStatus": { "enum": ["SUBMITTED", "PICKED_UP"] },
+        "status": { "const": "DELIVERY_FAILED" },
+        "providerCode": { "const": "mock-delivery" },
+        "providerOrderId": { "$ref": "#/$defs/providerOrderId" },
+        "reason": { "$ref": "#/$defs/operatorReason" },
+        "failure": {
+          "allOf": [
+            { "$ref": "#/$defs/failure" },
+            { "type": "object", "properties": { "stage": { "const": "DELIVERY" } } }
+          ]
+        }
+      }
+    },
+    "orderCreatedEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/baseEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "eventType": { "const": "order.created" },
+            "payload": { "$ref": "#/$defs/orderCreatedPayload" }
+          }
+        }
+      ]
+    },
+    "orderSubmittedEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/baseEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "eventType": { "const": "order.submitted" },
+            "payload": { "$ref": "#/$defs/orderSubmittedPayload" }
+          }
+        }
+      ]
+    },
+    "orderSubmissionFailedEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/baseEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "eventType": { "const": "order.submission_failed" },
+            "payload": { "$ref": "#/$defs/orderSubmissionFailedPayload" }
+          }
+        }
+      ]
+    },
+    "orderSubmissionRetryRequestedEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/baseEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "eventType": { "const": "order.submission_retry_requested" },
+            "payload": { "$ref": "#/$defs/orderSubmissionRetryRequestedPayload" }
+          }
+        }
+      ]
+    },
+    "orderCancelledEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/baseEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "eventType": { "const": "order.cancelled" },
+            "payload": { "$ref": "#/$defs/orderCancelledPayload" }
+          }
+        }
+      ]
+    },
+    "orderPickedUpEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/baseEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "eventType": { "const": "order.picked_up" },
+            "payload": { "$ref": "#/$defs/orderPickedUpPayload" }
+          }
+        }
+      ]
+    },
+    "orderDeliveredEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/baseEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "eventType": { "const": "order.delivered" },
+            "payload": { "$ref": "#/$defs/orderDeliveredPayload" }
+          }
+        }
+      ]
+    },
+    "orderDeliveryFailedEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/baseEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "eventType": { "const": "order.delivery_failed" },
+            "payload": { "$ref": "#/$defs/orderDeliveryFailedPayload" }
+          }
+        }
+      ]
+    }
+  }
+}

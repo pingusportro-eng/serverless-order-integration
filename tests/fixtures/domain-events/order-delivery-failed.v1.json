@@ -1,0 +1,24 @@
+{
+  "eventId": "evt_01JABCDEF0123456789C",
+  "eventType": "order.delivery_failed",
+  "schemaVersion": 1,
+  "aggregateType": "ORDER",
+  "aggregateId": "ord_01JABCDEF0123456789",
+  "aggregateVersion": 4,
+  "occurredAt": "2026-07-22T13:30:00.000Z",
+  "correlationId": "corr_01JABCDEF0123456789",
+  "causationId": "provider-event-1007",
+  "payload": {
+    "merchantId": "mrc_demo",
+    "previousStatus": "PICKED_UP",
+    "status": "DELIVERY_FAILED",
+    "providerCode": "mock-delivery",
+    "providerOrderId": "delivery-789",
+    "failure": {
+      "stage": "DELIVERY",
+      "reasonCode": "RECIPIENT_UNAVAILABLE",
+      "summary": "Mock recipient could not be reached.",
+      "occurredAt": "2026-07-22T13:30:00.000Z"
+    }
+  }
+}

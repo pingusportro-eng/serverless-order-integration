@@ -92,6 +92,28 @@ export type {
 } from './observability/logger.js';
 export { createRequestId } from './observability/request-id.js';
 export type { IdGenerator } from './observability/request-id.js';
+export { DOMAIN_EVENT_TYPES } from './events/domain-event.js';
+export type {
+  DomainEvent,
+  DomainEventEnvelope,
+  DomainEventType,
+  OrderCancelledEvent,
+  OrderCancelledPayload,
+  OrderCreatedEvent,
+  OrderCreatedPayload,
+  OrderDeliveredEvent,
+  OrderDeliveredPayload,
+  OrderDeliveryFailedEvent,
+  OrderDeliveryFailedPayload,
+  OrderPickedUpEvent,
+  OrderPickedUpPayload,
+  OrderSubmissionFailedEvent,
+  OrderSubmissionFailedPayload,
+  OrderSubmissionRetryRequestedEvent,
+  OrderSubmissionRetryRequestedPayload,
+  OrderSubmittedEvent,
+  OrderSubmittedPayload,
+} from './events/domain-event.js';
 export { createOrder, fingerprintCreateOrderRequest } from './application/create-order.js';
 export type {
   CreateOrderApplicationResult,

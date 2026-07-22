@@ -195,8 +195,8 @@ The names below describe domain intent, not HTTP endpoints or message schemas.
 | `RecordProviderDelivery` | `OrderDelivered` |
 | `RecordProviderFailure` | `OrderDeliveryFailed` |
 
-Exact domain event payloads and versioning will be specified before asynchronous
-implementation.
+Exact domain event payloads, envelope metadata, compatibility, and duplicate
+processing rules are defined in the [domain event contract](domain-events.md).
 
 ## Create-order idempotency
 

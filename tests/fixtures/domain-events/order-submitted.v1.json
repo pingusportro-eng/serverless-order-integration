@@ -1,0 +1,19 @@
+{
+  "eventId": "evt_01JABCDEF0123456789B",
+  "eventType": "order.submitted",
+  "schemaVersion": 1,
+  "aggregateType": "ORDER",
+  "aggregateId": "ord_01JABCDEF0123456789",
+  "aggregateVersion": 2,
+  "occurredAt": "2026-07-22T12:00:30.000Z",
+  "correlationId": "corr_01JABCDEF0123456789",
+  "causationId": "evt_01JABCDEF0123456789A",
+  "payload": {
+    "merchantId": "mrc_demo",
+    "status": "SUBMITTED",
+    "providerCode": "mock-delivery",
+    "providerOrderId": "delivery-789",
+    "acceptedAt": "2026-07-22T12:00:30.000Z",
+    "reason": "Provider acceptance was reconciled by an operator."
+  }
+}

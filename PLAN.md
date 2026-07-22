@@ -47,22 +47,53 @@ deployment process are the primary cost controls.
 Client
   |
   v
-API Gateway -> Lambda -> DynamoDB
-                         |
-                         | DynamoDB Stream
-                         v
-                    Publisher Lambda
-                         |
-                         v
-                        SNS
-                         |
-                         v
-                        SQS -> Worker Lambda -> Mock delivery vendor
-                         |
-                         v
-                        DLQ
-
-Mock vendor -> signed webhook -> API Gateway -> Lambda -> DynamoDB
+API Gateway -> Orders API Lambda -> DynamoDB orders table
+                                        |
+                                        | DynamoDB Stream
+                                        v
+                                  Publisher Lambda
+                                        |
+                                        | domain events
+                                        v
+                                    SNS topic
+                                        |
+                                        | filtered subscription:
+                                        | order.created or
+                                        | order.submission_retry_requested
+                                        v
+                                  Delivery SQS queue ------> DLQ
+                                        |
+                                        v
+                                  Worker Lambda
+                                        |
+                                        | submit order
+                                        v
+                               Mock delivery vendor
+                                        |
+                     +------------------+------------------+
+                     |                                     |
+                     | synchronous result                  | signed delivery-status
+                     v                                     | webhook
+              Worker updates order                         v
+                     |                            API Gateway webhook route
+                     v                                     |
+              DynamoDB orders table                        v
+                     |                              Webhook Lambda
+                     |                                     |
+                     +------------------+------------------+
+                                        |
+                                        v
+                              DynamoDB orders table
+                                        |
+                                        | DynamoDB Stream
+                                        v
+                                  Publisher Lambda
+                                        |
+                                        | for example: order.submitted,
+                                        | order.submission_failed,
+                                        | order.delivered
+                                        v
+                                    SNS topic
 ```
 
 ## How we will work
@@ -249,7 +280,7 @@ For every step, the review should answer:
 
 ## Phase 4: Asynchronous vendor integration
 
-- [ ] **4.1 — Define the event contract**
+- [x] **4.1 — Define the event contract**
   - Define event ID, type, version, timestamp, correlation ID, and payload.
   - Add compatibility and duplicate-processing rules.
   - Verification: event schema and representative fixtures are validated.
