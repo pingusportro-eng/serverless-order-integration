@@ -3,12 +3,12 @@ import { randomUUID } from 'node:crypto';
 import { asMerchantId, asOrderId, type Order } from '../../src/domain/order.js';
 
 export function createOrderFixture(overrides: Partial<Order> = {}): Order {
-  const suffix = randomUUID();
+  const suffix = randomUUID().replaceAll('-', '');
   const createdAt = '2026-07-21T12:30:00.000Z';
 
   return {
     orderId: asOrderId(`ord_${suffix}`),
-    merchantId: asMerchantId(`merchant_${suffix}`),
+    merchantId: asMerchantId(`mrc_${suffix}`),
     merchantOrderReference: `reference_${suffix}`,
     status: 'PENDING_SUBMISSION',
     items: [

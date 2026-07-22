@@ -219,7 +219,7 @@ For every step, the review should answer:
   - Verification: repository integration tests run against DynamoDB Local.
   - AWS cost: $0.
 
-- [ ] **3.4 — Implement `POST /orders`**
+- [x] **3.4 — Implement `POST /orders`**
   - Validate input and require an idempotency key.
   - Prevent duplicate order creation.
   - Verification: unit and local database integration tests pass.

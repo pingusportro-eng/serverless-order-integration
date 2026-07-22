@@ -24,6 +24,12 @@ export type {
 } from './domain/order.js';
 export { isTerminalOrderStatus } from './domain/order-status.js';
 export type { OrderStatus } from './domain/order-status.js';
+export { handleCreateOrder } from './http/create-order-handler.js';
+export type {
+  CreateOrderHttpRequest,
+  CreateOrderHttpResponse,
+  OrderRepresentation,
+} from './http/create-order-handler.js';
 export { problemResponse } from './http/problem-details.js';
 export type {
   ProblemCode,
@@ -46,3 +52,17 @@ export type {
 } from './observability/logger.js';
 export { createRequestId } from './observability/request-id.js';
 export type { IdGenerator } from './observability/request-id.js';
+export { createOrder, fingerprintCreateOrderRequest } from './application/create-order.js';
+export type {
+  CreateOrderApplicationResult,
+  CreateOrderCommand,
+  CreateOrderDependencies,
+} from './application/create-order.js';
+export {
+  calculateOrderTotal,
+  validateCreateOrderRequest,
+} from './application/create-order-validation.js';
+export type {
+  CreateOrderRequest,
+  ValidationResult,
+} from './application/create-order-validation.js';
