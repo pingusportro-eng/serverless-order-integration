@@ -286,7 +286,7 @@ For every step, the review should answer:
   - Verification: event schema and representative fixtures are validated.
   - AWS cost: $0.
 
-- [ ] **4.2 — Build the mock vendor**
+- [x] **4.2 — Build the mock vendor**
   - Implement a local HTTP server for the delivery provider.
   - Support success, timeout, `429`, `500`, and malformed-response scenarios.
   - Verification: automated contract tests exercise each response mode.

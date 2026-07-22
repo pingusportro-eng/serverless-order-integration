@@ -9,5 +9,6 @@ Current specifications:
 - [Domain model](domain-model.md)
 - [Domain event contract](domain-events.md)
 - [Domain event JSON Schema](domain-event.schema.json)
+- [Mock delivery provider contract](mock-delivery-provider.md)
 - [DynamoDB access patterns](dynamodb-access-patterns.md)
 - [OpenAPI contract](openapi.yaml)

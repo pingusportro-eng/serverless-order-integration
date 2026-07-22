@@ -5,9 +5,9 @@ and asynchronous third-party integration with Node.js, TypeScript, and AWS.
 
 ## Status
 
-The project is in **Phase 3: local REST API and DynamoDB**. The local TypeScript
-and DynamoDB development foundations are configured; no AWS infrastructure has
-been deployed.
+The project is in **Phase 4: asynchronous vendor integration**. The REST API,
+DynamoDB foundation, event contract, and local mock delivery provider are
+configured; no AWS infrastructure has been deployed.
 
 Work is divided into small reviewable steps. See [PLAN.md](PLAN.md) for the
 current checklist, architecture, verification criteria, and definition of done.
@@ -78,6 +78,7 @@ The individual commands are:
 - `npm run test:watch` — rerun relevant tests while developing
 - `npm run test:coverage` — run tests and enforce coverage thresholds
 - `npm run test:integration` — bootstrap DynamoDB Local and test its repository
+- `npm run test:mock-vendor` — exercise every mock provider response mode
 - `npm run sam:validate` — lint and validate the local SAM template
 - `npm run sam:build` — bundle the Lambda handler for the Node.js 24 runtime
 - `npm run test:sam` — exercise every current API route through local SAM HTTP
@@ -181,6 +182,30 @@ fixed `mrc_demo` learning tenant and permits the operator route locally. Cognito
 JWT validation, operator claims, IAM, and the deployable DynamoDB resource are
 part of the reviewed cloud-infrastructure phase; this local template must not
 be deployed as the cloud stack.
+
+## Local mock delivery vendor
+
+Build and start the mock provider on `http://127.0.0.1:4000`:
+
+```bash
+npm run mock-vendor:start
+```
+
+The default `local-development-token` is deliberately local test data. Override
+it with `MOCK_VENDOR_TOKEN` when practising configuration, and use
+`MOCK_VENDOR_PORT` to select another port. Stop the server with `Ctrl+C`.
+
+The provider contract documents `POST /deliveries`, idempotency, authentication,
+and the deterministic success, timeout, `429`, `500`, and malformed-response
+modes. Run all of its HTTP contract tests without starting the server manually:
+
+```bash
+npm run test:mock-vendor
+```
+
+See the [mock delivery provider contract](docs/specifications/mock-delivery-provider.md)
+for request examples and scenario controls. The server is local-only and does
+not contact AWS or incur AWS cost.
 
 ## Working agreement
 

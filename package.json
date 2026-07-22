@@ -21,6 +21,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "mock-vendor:start": "npm run build && node scripts/mock-vendor/start-local.mjs",
     "sam:build": "SAM_CLI_TELEMETRY=0 sam build",
     "sam:local": "npm run dynamodb:bootstrap && npm run sam:build && SAM_CLI_TELEMETRY=0 sam local start-api --docker-network serverless-order-integration_default --env-vars sam-local-fixture.json",
     "sam:validate": "SAM_CLI_TELEMETRY=0 sam validate --lint",
@@ -28,6 +29,7 @@
     "test:coverage": "vitest run --coverage",
     "test:contracts": "vitest run tests/contracts",
     "test:integration": "npm run dynamodb:bootstrap && vitest run --config vitest.integration.config.ts",
+    "test:mock-vendor": "vitest run tests/contracts/mock-delivery-vendor.test.ts",
     "test:sam": "bash scripts/sam/smoke-local.sh",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

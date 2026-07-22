@@ -128,3 +128,15 @@ export type {
   CreateOrderRequest,
   ValidationResult,
 } from './application/create-order-validation.js';
+export {
+  MOCK_VENDOR_SCENARIOS,
+  startMockDeliveryVendor,
+} from './mock-vendor/mock-delivery-vendor.js';
+export type {
+  MockDeliveryAcceptance,
+  MockDeliveryLine,
+  MockDeliverySubmission,
+  MockVendorScenario,
+  RunningMockDeliveryVendor,
+  StartMockDeliveryVendorOptions,
+} from './mock-vendor/mock-delivery-vendor.js';
