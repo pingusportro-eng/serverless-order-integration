@@ -225,7 +225,7 @@ For every step, the review should answer:
   - Verification: unit and local database integration tests pass.
   - AWS cost: $0.
 
-- [ ] **3.5 — Implement `GET /orders/{orderId}`**
+- [x] **3.5 — Implement `GET /orders/{orderId}`**
   - Return the order or the documented not-found response.
   - Verification: unit and integration tests pass.
   - AWS cost: $0.

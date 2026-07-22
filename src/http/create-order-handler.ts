@@ -4,7 +4,8 @@ import {
   MerchantReferenceConflictError,
   OrderAlreadyExistsError,
 } from '../application/order-repository.js';
-import type { MerchantId, Order } from '../domain/order.js';
+import type { MerchantId } from '../domain/order.js';
+import { toOrderRepresentation, type OrderRepresentation } from './order-representation.js';
 import { problemResponse, type ProblemDetails } from './problem-details.js';
 import { successResponse, type HttpResponse } from './response.js';
 
@@ -13,14 +14,6 @@ export interface CreateOrderHttpRequest {
   readonly requestId: string;
   readonly headers: Readonly<Record<string, string | undefined>>;
   readonly body: unknown;
-}
-
-export interface OrderRepresentation extends Omit<Order, 'provider'> {
-  readonly provider: {
-    readonly providerCode: 'mock-delivery';
-    readonly providerOrderId?: string;
-    readonly acceptedAt?: string;
-  };
 }
 
 export type CreateOrderHttpResponse = HttpResponse<OrderRepresentation | ProblemDetails>;
@@ -35,30 +28,6 @@ function readHeader(
     ([name, value]) => name.toLowerCase() === expectedName.toLowerCase() && value !== undefined,
   );
   return entry?.[1];
-}
-
-function toOrderRepresentation(order: Order): OrderRepresentation {
-  return {
-    orderId: order.orderId,
-    merchantId: order.merchantId,
-    merchantOrderReference: order.merchantOrderReference,
-    status: order.status,
-    items: order.items,
-    total: order.total,
-    pickup: order.pickup,
-    dropoff: order.dropoff,
-    provider: {
-      providerCode: order.provider.providerCode,
-      ...(order.provider.providerOrderId === undefined
-        ? {}
-        : { providerOrderId: order.provider.providerOrderId }),
-      ...(order.provider.acceptedAt === undefined ? {} : { acceptedAt: order.provider.acceptedAt }),
-    },
-    ...(order.failure === undefined ? {} : { failure: order.failure }),
-    createdAt: order.createdAt,
-    updatedAt: order.updatedAt,
-    version: order.version,
-  };
 }
 
 function conflictResponse(

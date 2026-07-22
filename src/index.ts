@@ -28,8 +28,15 @@ export { handleCreateOrder } from './http/create-order-handler.js';
 export type {
   CreateOrderHttpRequest,
   CreateOrderHttpResponse,
-  OrderRepresentation,
 } from './http/create-order-handler.js';
+export { handleGetOrder } from './http/get-order-handler.js';
+export type {
+  GetOrderDependencies,
+  GetOrderHttpRequest,
+  GetOrderHttpResponse,
+} from './http/get-order-handler.js';
+export { toOrderRepresentation } from './http/order-representation.js';
+export type { OrderRepresentation } from './http/order-representation.js';
 export { problemResponse } from './http/problem-details.js';
 export type {
   ProblemCode,
