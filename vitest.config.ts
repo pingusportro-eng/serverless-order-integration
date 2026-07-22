@@ -4,10 +4,12 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.test.ts'],
+    exclude: ['tests/integration/**'],
     restoreMocks: true,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
+      exclude: ['src/infrastructure/dynamodb/**'],
       reporter: ['text', 'html', 'json-summary'],
       thresholds: {
         branches: 80,

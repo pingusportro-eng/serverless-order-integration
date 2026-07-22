@@ -77,6 +77,7 @@ The individual commands are:
 - `npm test` — run the unit tests once
 - `npm run test:watch` — rerun relevant tests while developing
 - `npm run test:coverage` — run tests and enforce coverage thresholds
+- `npm run test:integration` — bootstrap DynamoDB Local and test its repository
 - `npm run build` — compile TypeScript into `dist/`
 - `npm run format` — apply Prettier formatting
 

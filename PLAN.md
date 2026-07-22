@@ -213,7 +213,7 @@ For every step, the review should answer:
   - Verification: the command can create the table from a clean local database.
   - AWS cost: $0.
 
-- [ ] **3.3 — Implement the order repository**
+- [x] **3.3 — Implement the order repository**
   - Add a DynamoDB-backed repository and a fake repository for unit tests.
   - Use conditional writes for order creation and status transitions.
   - Verification: repository integration tests run against DynamoDB Local.

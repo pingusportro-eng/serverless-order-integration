@@ -23,8 +23,13 @@
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
+    "test:integration": "npm run dynamodb:bootstrap && vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "3.1091.0",
+    "@aws-sdk/lib-dynamodb": "3.1091.0"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
