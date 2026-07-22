@@ -236,7 +236,7 @@ For every step, the review should answer:
   - Verification: pagination tests cover first, middle, and final pages.
   - AWS cost: $0.
 
-- [ ] **3.7 — Implement status updates**
+- [x] **3.7 — Implement status updates**
   - Enforce valid transitions and optimistic concurrency.
   - Verification: concurrent and invalid-transition tests pass.
   - AWS cost: $0.

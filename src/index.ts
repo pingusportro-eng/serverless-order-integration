@@ -28,6 +28,25 @@ export type {
 } from './domain/order.js';
 export { isTerminalOrderStatus } from './domain/order-status.js';
 export type { OrderStatus } from './domain/order-status.js';
+export {
+  applyOrderStatusChange,
+  InvalidOrderStatusDetailsError,
+  InvalidOrderStatusTransitionError,
+} from './domain/order-status-transition.js';
+export type { OrderStatusChange } from './domain/order-status-transition.js';
+export { changeOrderStatus } from './application/change-order-status.js';
+export type {
+  ChangeOrderStatusCommand,
+  ChangeOrderStatusDependencies,
+  ChangeOrderStatusResult,
+} from './application/change-order-status.js';
+export { validateChangeOrderStatusRequest } from './application/change-order-status-validation.js';
+export type { ChangeOrderStatusRequest } from './application/change-order-status-validation.js';
+export { handleChangeOrderStatus } from './http/change-order-status-handler.js';
+export type {
+  ChangeOrderStatusHttpRequest,
+  ChangeOrderStatusHttpResponse,
+} from './http/change-order-status-handler.js';
 export { handleCreateOrder } from './http/create-order-handler.js';
 export type {
   CreateOrderHttpRequest,
