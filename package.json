@@ -31,6 +31,7 @@
     "test:integration": "npm run dynamodb:bootstrap && vitest run --config vitest.integration.config.ts",
     "test:mock-vendor": "vitest run tests/contracts/mock-delivery-vendor.test.ts",
     "test:sam": "bash scripts/sam/smoke-local.sh",
+    "test:vendor-client": "vitest run tests/integrations/delivery-vendor-client.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },

@@ -125,7 +125,7 @@ decision.
 | Q-003 | How long does an idempotency reference remain valid? | Resolved in the [idempotency rules](domain-model.md#create-order-idempotency). |
 | Q-004 | How are client and operator calls authenticated? | Resolved by the [Cognito and JWT authorizer decision](../decisions/0005-use-cognito-jwt-authentication.md). |
 | Q-005 | What is the provider request, authentication, and rate-limit contract? | Resolved in the [mock delivery provider contract](mock-delivery-provider.md). |
-| Q-006 | Which provider failures are temporary versus permanent? | Define the vendor client and retry policy in phase 4. |
+| Q-006 | Which provider failures are temporary versus permanent? | Resolved in the [delivery vendor client policy](vendor-client.md#failure-classification). |
 | Q-007 | How long must orders and operational records be retained? | Use environment lifetime for the MVP; revisit before any production claim. |
 | Q-008 | What scale and service-level objectives are required? | Measure the learning implementation; a business owner must supply real targets. |
 

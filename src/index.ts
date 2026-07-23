@@ -140,3 +140,19 @@ export type {
   RunningMockDeliveryVendor,
   StartMockDeliveryVendorOptions,
 } from './mock-vendor/mock-delivery-vendor.js';
+export type {
+  DeliveryProviderAcceptance,
+  DeliveryProviderLine,
+  DeliveryProviderSubmission,
+} from './integrations/delivery-provider-contract.js';
+export {
+  createDeliveryVendorClient,
+  VendorSubmissionError,
+  VENDOR_SUBMISSION_FAILURE_CODES,
+} from './integrations/delivery-vendor-client.js';
+export type {
+  CreateDeliveryVendorClientOptions,
+  DeliveryVendorClient,
+  VendorSubmissionErrorOptions,
+  VendorSubmissionFailureCode,
+} from './integrations/delivery-vendor-client.js';

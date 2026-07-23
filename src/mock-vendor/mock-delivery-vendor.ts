@@ -1,7 +1,11 @@
 import { createHash } from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
-import type { DeliveryLocation } from '../domain/order.js';
+import type {
+  DeliveryProviderAcceptance,
+  DeliveryProviderLine,
+  DeliveryProviderSubmission,
+} from '../integrations/delivery-provider-contract.js';
 
 export const MOCK_VENDOR_SCENARIOS = [
   'success',
@@ -13,30 +17,16 @@ export const MOCK_VENDOR_SCENARIOS = [
 
 export type MockVendorScenario = (typeof MOCK_VENDOR_SCENARIOS)[number];
 
-export interface MockDeliveryLine {
-  readonly itemReference: string;
-  readonly quantity: number;
-}
-
-export interface MockDeliverySubmission {
-  readonly platformOrderId: string;
-  readonly merchantOrderReference: string;
-  readonly items: readonly MockDeliveryLine[];
-  readonly pickup: DeliveryLocation;
-  readonly dropoff: DeliveryLocation;
-}
-
-export interface MockDeliveryAcceptance {
-  readonly providerOrderId: string;
-  readonly status: 'ACCEPTED';
-  readonly acceptedAt: string;
-}
+export type MockDeliveryLine = DeliveryProviderLine;
+export type MockDeliverySubmission = DeliveryProviderSubmission;
+export type MockDeliveryAcceptance = DeliveryProviderAcceptance;
 
 export interface StartMockDeliveryVendorOptions {
   readonly authToken: string;
   readonly host?: string;
   readonly port?: number;
   readonly timeoutDelayMs?: number;
+  readonly defaultScenario?: MockVendorScenario;
   readonly now?: () => string;
 }
 
@@ -92,8 +82,11 @@ function problem(
   json(response, statusCode, { code, detail }, headers);
 }
 
-function scenarioFrom(request: IncomingMessage): MockVendorScenario {
-  const value = header(request, 'x-mock-vendor-scenario') ?? 'success';
+function scenarioFrom(
+  request: IncomingMessage,
+  defaultScenario: MockVendorScenario,
+): MockVendorScenario {
+  const value = header(request, 'x-mock-vendor-scenario') ?? defaultScenario;
   if (!SCENARIOS.has(value)) {
     throw new RequestError(400, 'INVALID_SCENARIO', 'Unknown mock vendor scenario.');
   }
@@ -177,7 +170,7 @@ export async function startMockDeliveryVendor(
           throw new RequestError(401, 'UNAUTHORIZED', 'A valid bearer token is required.');
         }
 
-        const selectedScenario = scenarioFrom(request);
+        const selectedScenario = scenarioFrom(request, options.defaultScenario ?? 'success');
         if (selectedScenario === 'rate-limit') {
           problem(response, 429, 'RATE_LIMITED', 'Mock provider rate limit exceeded.', {
             'Retry-After': '1',

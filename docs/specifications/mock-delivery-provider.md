@@ -89,5 +89,5 @@ usable confirmation. A retry with the unchanged `Idempotency-Key` recovers the
 original acceptance instead of creating a second delivery.
 
 Error responses are small JSON objects with a stable `code` and safe `detail`.
-The exact retry classification and bounded retry policy belong to the vendor
-client in step 4.3.
+The exact retry classification and bounded retry policy are defined by the
+[delivery vendor client policy](vendor-client.md).

@@ -292,7 +292,7 @@ For every step, the review should answer:
   - Verification: automated contract tests exercise each response mode.
   - AWS cost: $0.
 
-- [ ] **4.3 — Implement the vendor client**
+- [x] **4.3 — Implement the vendor client**
   - Add timeouts, safe error mapping, and bounded retry rules.
   - Keep retry ownership clear between code, Lambda, and SQS.
   - Verification: tests use the mock vendor and deterministic failures.

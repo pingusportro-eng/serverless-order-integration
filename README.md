@@ -79,6 +79,7 @@ The individual commands are:
 - `npm run test:coverage` — run tests and enforce coverage thresholds
 - `npm run test:integration` — bootstrap DynamoDB Local and test its repository
 - `npm run test:mock-vendor` — exercise every mock provider response mode
+- `npm run test:vendor-client` — verify provider error and retry classification
 - `npm run sam:validate` — lint and validate the local SAM template
 - `npm run sam:build` — bundle the Lambda handler for the Node.js 24 runtime
 - `npm run test:sam` — exercise every current API route through local SAM HTTP
