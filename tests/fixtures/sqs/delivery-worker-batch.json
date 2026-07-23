@@ -1,0 +1,68 @@
+{
+  "Records": [
+    {
+      "messageId": "message-success-001",
+      "receiptHandle": "receipt-success-001",
+      "body": "{\"eventId\":\"evt_01JABCDEF0123456789A\",\"eventType\":\"order.created\",\"schemaVersion\":1,\"aggregateType\":\"ORDER\",\"aggregateId\":\"ord_01JABCDEF0123456789\",\"aggregateVersion\":1,\"occurredAt\":\"2026-07-23T10:00:00.000Z\",\"correlationId\":\"corr_01JABCDEF0123456789\",\"causationId\":\"request_01JABCDEF0123456789\",\"payload\":{\"merchantId\":\"mrc_demo\",\"status\":\"PENDING_SUBMISSION\",\"providerCode\":\"mock-delivery\",\"submissionKey\":\"submission_01JABCDEF0123456789\"}}",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1784800800000",
+        "SenderId": "123456789012",
+        "ApproximateFirstReceiveTimestamp": "1784800800001"
+      },
+      "messageAttributes": {},
+      "md5OfBody": "00000000000000000000000000000001",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:eu-central-1:123456789012:delivery-queue",
+      "awsRegion": "eu-central-1"
+    },
+    {
+      "messageId": "message-poison-002",
+      "receiptHandle": "receipt-poison-002",
+      "body": "this is not JSON",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1784800800000",
+        "SenderId": "123456789012",
+        "ApproximateFirstReceiveTimestamp": "1784800800001"
+      },
+      "messageAttributes": {},
+      "md5OfBody": "00000000000000000000000000000002",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:eu-central-1:123456789012:delivery-queue",
+      "awsRegion": "eu-central-1"
+    },
+    {
+      "messageId": "message-duplicate-003",
+      "receiptHandle": "receipt-duplicate-003",
+      "body": "{\"eventId\":\"evt_01JABCDEF0123456789A\",\"eventType\":\"order.created\",\"schemaVersion\":1,\"aggregateType\":\"ORDER\",\"aggregateId\":\"ord_01JABCDEF0123456789\",\"aggregateVersion\":1,\"occurredAt\":\"2026-07-23T10:00:00.000Z\",\"correlationId\":\"corr_01JABCDEF0123456789\",\"causationId\":\"request_01JABCDEF0123456789\",\"payload\":{\"merchantId\":\"mrc_demo\",\"status\":\"PENDING_SUBMISSION\",\"providerCode\":\"mock-delivery\",\"submissionKey\":\"submission_01JABCDEF0123456789\"}}",
+      "attributes": {
+        "ApproximateReceiveCount": "2",
+        "SentTimestamp": "1784800800000",
+        "SenderId": "123456789012",
+        "ApproximateFirstReceiveTimestamp": "1784800800001"
+      },
+      "messageAttributes": {},
+      "md5OfBody": "00000000000000000000000000000001",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:eu-central-1:123456789012:delivery-queue",
+      "awsRegion": "eu-central-1"
+    },
+    {
+      "messageId": "message-transient-004",
+      "receiptHandle": "receipt-transient-004",
+      "body": "{\"eventId\":\"evt_01JABCDEF0123456789B\",\"eventType\":\"order.created\",\"schemaVersion\":1,\"aggregateType\":\"ORDER\",\"aggregateId\":\"ord_01JABCDEF0123456790\",\"aggregateVersion\":1,\"occurredAt\":\"2026-07-23T10:00:01.000Z\",\"correlationId\":\"corr_01JABCDEF0123456790\",\"causationId\":\"request_01JABCDEF0123456790\",\"payload\":{\"merchantId\":\"mrc_demo\",\"status\":\"PENDING_SUBMISSION\",\"providerCode\":\"mock-delivery\",\"submissionKey\":\"submission_01JABCDEF0123456790\"}}",
+      "attributes": {
+        "ApproximateReceiveCount": "1",
+        "SentTimestamp": "1784800801000",
+        "SenderId": "123456789012",
+        "ApproximateFirstReceiveTimestamp": "1784800801001"
+      },
+      "messageAttributes": {},
+      "md5OfBody": "00000000000000000000000000000004",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:eu-central-1:123456789012:delivery-queue",
+      "awsRegion": "eu-central-1"
+    }
+  ]
+}

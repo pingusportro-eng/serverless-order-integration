@@ -77,6 +77,7 @@ The individual commands are:
 - `npm test` — run the unit tests once
 - `npm run test:watch` — rerun relevant tests while developing
 - `npm run test:coverage` — run tests and enforce coverage thresholds
+- `npm run test:delivery-worker` — test SQS validation, idempotency, and partial failures
 - `npm run test:integration` — bootstrap DynamoDB Local and test its repository
 - `npm run test:mock-vendor` — exercise every mock provider response mode
 - `npm run test:vendor-client` — verify provider error and retry classification

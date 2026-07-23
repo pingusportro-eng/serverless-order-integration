@@ -28,7 +28,7 @@ addresses through its errors.
 | `409` | `IDEMPOTENCY_CONFLICT` | No | Repeating the request cannot repair conflicting provider data. |
 | Other `4xx` | `REQUEST_REJECTED` | No | The request or contract must be corrected. |
 
-Retryable means the future SQS worker may leave the message unacknowledged for
+Retryable means the SQS worker may leave the message unacknowledged for
 another delivery attempt. It does not mean the HTTP client loops internally.
 
 ## Retry ownership and bounds
@@ -36,7 +36,7 @@ another delivery attempt. It does not mean the HTTP client loops internally.
 The vendor client makes exactly one HTTP request per `submitDelivery` call. It
 does not sleep or retry inside the Lambda invocation, including for `429`.
 
-The future processing path owns retries as follows:
+The processing path owns retries as follows:
 
 1. The worker calls the client once and reports retryable SQS records as failed.
 2. The Lambda SQS event-source mapping makes the record available again after
@@ -48,9 +48,22 @@ The future processing path owns retries as follows:
    across every attempt, including uncertain timeout and malformed-response
    outcomes.
 
-Non-retryable provider failures are application outcomes for the future worker
+Non-retryable provider failures are application outcomes for the worker
 to record safely before acknowledging the SQS message. Unexpected worker or
 Lambda failures remain retryable through the same bounded queue mechanism.
 
 This division prevents nested client, Lambda, and queue retry loops from
 multiplying calls, Lambda duration, and cost.
+
+## Provider acceptance and database failure
+
+Provider acceptance and the DynamoDB order update cannot share one atomic
+transaction. If the provider accepts but the database write fails, the worker
+fails the SQS record. A later delivery calls the provider with the unchanged
+submission key, recovers the original acceptance, and retries the conditional
+database update.
+
+A conditional-write conflict is acknowledged only when the reloaded order
+proves that the intended provider outcome was already recorded. A newer but
+incompatible order state is a reconciliation failure and remains on the SQS
+failure path; it must not be treated as a successful duplicate.

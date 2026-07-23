@@ -304,7 +304,7 @@ For every step, the review should answer:
   - Verification: invoke the handler with saved AWS event fixtures.
   - AWS cost: $0.
 
-- [ ] **4.5 — Implement the SQS worker handler**
+- [x] **4.5 — Implement the SQS worker handler**
   - Submit orders to the vendor.
   - Make processing idempotent and return partial batch failures.
   - Verification: test successes, duplicates, transient failures, and poison

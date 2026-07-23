@@ -168,3 +168,19 @@ export type {
   StreamPublisherDependencies,
   StreamPublisherHandler,
 } from './lambda/stream-publisher.js';
+export { parseDeliveryRequestedEvent } from './events/delivery-requested-event.js';
+export type { DeliveryRequestedEvent } from './events/delivery-requested-event.js';
+export {
+  DeliveryReconciliationRequiredError,
+  processDeliveryEvent,
+} from './application/process-delivery-event.js';
+export type {
+  ProcessDeliveryEventDependencies,
+  ProcessDeliveryEventOutcome,
+} from './application/process-delivery-event.js';
+export { createDeliveryWorkerHandler } from './lambda/delivery-worker.js';
+export type {
+  DeliveryMessageProcessor,
+  DeliveryWorkerDependencies,
+  DeliveryWorkerHandler,
+} from './lambda/delivery-worker.js';

@@ -14,6 +14,7 @@ const ALLOWED_TRANSITIONS: Readonly<Record<OrderStatus, ReadonlySet<OrderStatus>
 export interface OrderStatusChange {
   readonly targetStatus: OrderStatus;
   readonly providerOrderId?: string;
+  readonly acceptedAt?: string;
   readonly failure?: FailureDetails;
 }
 
@@ -118,7 +119,7 @@ function providerForChange(
     return {
       ...order.provider,
       providerOrderId,
-      acceptedAt: order.provider.acceptedAt ?? changedAt,
+      acceptedAt: order.provider.acceptedAt ?? change.acceptedAt ?? changedAt,
     };
   }
 
