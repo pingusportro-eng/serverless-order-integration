@@ -1,7 +1,7 @@
 # DynamoDB access patterns
 
 Status: MVP baseline  
-Last reviewed: 2026-07-21
+Last reviewed: 2026-07-23
 
 ## Purpose
 
@@ -43,6 +43,12 @@ deduplication items are absent from the indexes.
 
 Each item also carries an `entityType` and a numeric `schemaVersion` so the
 repository can validate and evolve stored representations.
+
+Every order item also carries a `mutation` object written atomically with its
+latest aggregate state. It identifies an order creation or status change and
+preserves the correlation ID, causation ID, previous status, and optional
+operator reason needed by the DynamoDB Stream publisher. It is internal event
+source metadata and is not returned by the order API.
 
 An order has these sparse index keys:
 

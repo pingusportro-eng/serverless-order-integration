@@ -298,7 +298,7 @@ For every step, the review should answer:
   - Verification: tests use the mock vendor and deterministic failures.
   - AWS cost: $0.
 
-- [ ] **4.4 — Implement the stream publisher handler**
+- [x] **4.4 — Implement the stream publisher handler**
   - Convert DynamoDB Stream records into versioned domain events.
   - Handle partial batch failures and malformed records.
   - Verification: invoke the handler with saved AWS event fixtures.

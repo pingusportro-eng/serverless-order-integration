@@ -18,6 +18,11 @@ describe('GET /orders/{orderId} handler', () => {
     await repository.create({
       order,
       idempotencyKey: 'get-order-key-1',
+      mutation: {
+        kind: 'ORDER_CREATED',
+        correlationId: 'corr_test_123',
+        causationId: 'request_test_123',
+      },
       requestFingerprint: 'get-order-fingerprint-1',
     });
 
@@ -41,6 +46,11 @@ describe('GET /orders/{orderId} handler', () => {
     await repository.create({
       order,
       idempotencyKey: 'get-order-key-2',
+      mutation: {
+        kind: 'ORDER_CREATED',
+        correlationId: 'corr_test_123',
+        causationId: 'request_test_123',
+      },
       requestFingerprint: 'get-order-fingerprint-2',
     });
     const requestId = 'request-456';

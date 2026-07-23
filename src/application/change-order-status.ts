@@ -23,6 +23,8 @@ export interface ChangeOrderStatusCommand {
   readonly merchantId: MerchantId;
   readonly orderId: string;
   readonly expectedVersion: number;
+  readonly correlationId: string;
+  readonly causationId: string;
   readonly body: unknown;
 }
 
@@ -68,6 +70,12 @@ export async function changeOrderStatus(
     return { outcome: 'unchanged', order: currentOrder };
   }
 
-  await dependencies.repository.saveStatusChange(changedOrder, command.expectedVersion);
+  await dependencies.repository.saveStatusChange(changedOrder, command.expectedVersion, {
+    kind: 'ORDER_STATUS_CHANGED',
+    previousStatus: currentOrder.status,
+    correlationId: command.correlationId,
+    causationId: command.causationId,
+    reason: validation.value.reason,
+  });
   return { outcome: 'changed', order: changedOrder };
 }

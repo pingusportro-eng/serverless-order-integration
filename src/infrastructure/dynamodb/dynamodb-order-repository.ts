@@ -26,6 +26,7 @@ import {
   type OrderRepository,
 } from '../../application/order-repository.js';
 import type { MerchantId, Order, OrderId } from '../../domain/order.js';
+import type { OrderMutation, OrderStatusChangedMutation } from '../../events/order-mutation.js';
 
 const SCHEMA_VERSION = 1;
 
@@ -41,6 +42,7 @@ interface StoredOrderItem {
   readonly status: Order['status'];
   readonly version: number;
   readonly order: Order;
+  readonly mutation: OrderMutation;
 }
 
 interface StoredIdempotencyItem {
@@ -86,7 +88,7 @@ function orderListPositionSortKey(position: OrderListPosition): string {
   return `ORDER#${position.createdAt}#${position.orderId}`;
 }
 
-function toStoredOrder(order: Order): StoredOrderItem {
+function toStoredOrder(order: Order, mutation: OrderMutation): StoredOrderItem {
   const merchantPartitionKey = merchantKey(order.merchantId);
   const listSortKey = orderListSortKey(order);
 
@@ -102,6 +104,7 @@ function toStoredOrder(order: Order): StoredOrderItem {
     status: order.status,
     version: order.version,
     order: structuredClone(order),
+    mutation: structuredClone(mutation),
   };
 }
 
@@ -145,7 +148,7 @@ export class DynamoDbOrderRepository implements OrderRepository {
   async create(input: CreateOrderInput): Promise<CreateOrderResult> {
     const { order, idempotencyKey: inputIdempotencyKey, requestFingerprint } = input;
     const pk = merchantKey(order.merchantId);
-    const orderItem = toStoredOrder(order);
+    const orderItem = toStoredOrder(order, input.mutation);
     const idempotencyItem: StoredIdempotencyItem = {
       pk,
       sk: idempotencyKey(inputIdempotencyKey),
@@ -246,9 +249,13 @@ export class DynamoDbOrderRepository implements OrderRepository {
     };
   }
 
-  async saveStatusChange(order: Order, expectedVersion: number): Promise<void> {
+  async saveStatusChange(
+    order: Order,
+    expectedVersion: number,
+    mutation: OrderStatusChangedMutation,
+  ): Promise<void> {
     assertNextOrderVersion(order, expectedVersion);
-    const storedOrder = toStoredOrder(order);
+    const storedOrder = toStoredOrder(order, mutation);
 
     try {
       await this.client.send(
@@ -258,11 +265,12 @@ export class DynamoDbOrderRepository implements OrderRepository {
           ConditionExpression:
             'attribute_exists(pk) AND attribute_exists(sk) AND #version = :expectedVersion AND gsi2sk = :listSortKey',
           UpdateExpression:
-            'SET #order = :order, #status = :status, #version = :nextVersion, gsi2pk = :statusIndexKey',
+            'SET #order = :order, #status = :status, #version = :nextVersion, #mutation = :mutation, gsi2pk = :statusIndexKey',
           ExpressionAttributeNames: {
             '#order': 'order',
             '#status': 'status',
             '#version': 'version',
+            '#mutation': 'mutation',
           },
           ExpressionAttributeValues: {
             ':order': storedOrder.order,
@@ -271,6 +279,7 @@ export class DynamoDbOrderRepository implements OrderRepository {
             ':expectedVersion': expectedVersion,
             ':listSortKey': storedOrder.gsi2sk,
             ':statusIndexKey': storedOrder.gsi2pk,
+            ':mutation': storedOrder.mutation,
           },
         }),
       );

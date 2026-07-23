@@ -87,6 +87,8 @@ export async function handleChangeOrderStatus(
       merchantId: request.merchantId,
       orderId: request.orderId,
       expectedVersion,
+      correlationId: readHeader(request.headers, 'X-Correlation-Id') ?? request.requestId,
+      causationId: request.requestId,
       body: request.body,
     });
     if (result.outcome === 'invalid') {

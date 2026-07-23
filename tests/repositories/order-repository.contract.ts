@@ -26,6 +26,13 @@ function submittedOrder(order: Order): Order {
   };
 }
 
+const STATUS_MUTATION = {
+  kind: 'ORDER_STATUS_CHANGED',
+  previousStatus: 'PENDING_SUBMISSION',
+  correlationId: 'corr_repository_123',
+  causationId: 'request_repository_123',
+} as const;
+
 export function orderRepositoryContract(name: string, createRepository: RepositoryFactory): void {
   describe(name, () => {
     let repository: OrderRepository;
@@ -40,6 +47,11 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       const result = await repository.create({
         order,
         idempotencyKey: 'idempotency-key-1',
+        mutation: {
+          kind: 'ORDER_CREATED',
+          correlationId: 'corr_test_123',
+          causationId: 'request_test_123',
+        },
         requestFingerprint: 'fingerprint-1',
       });
 
@@ -52,6 +64,11 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       const input = {
         order,
         idempotencyKey: 'idempotency-key-2',
+        mutation: {
+          kind: 'ORDER_CREATED' as const,
+          correlationId: 'corr_test_123',
+          causationId: 'request_test_123',
+        },
         requestFingerprint: 'fingerprint-2',
       };
 
@@ -69,6 +86,11 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       await repository.create({
         order,
         idempotencyKey: 'idempotency-key-3',
+        mutation: {
+          kind: 'ORDER_CREATED',
+          correlationId: 'corr_test_123',
+          causationId: 'request_test_123',
+        },
         requestFingerprint: 'fingerprint-3',
       });
 
@@ -76,6 +98,11 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
         repository.create({
           order: createOrderFixture({ merchantId: order.merchantId }),
           idempotencyKey: 'idempotency-key-3',
+          mutation: {
+            kind: 'ORDER_CREATED',
+            correlationId: 'corr_test_123',
+            causationId: 'request_test_123',
+          },
           requestFingerprint: 'different-fingerprint',
         }),
       ).rejects.toBeInstanceOf(IdempotencyConflictError);
@@ -86,6 +113,11 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       await repository.create({
         order,
         idempotencyKey: 'idempotency-key-4',
+        mutation: {
+          kind: 'ORDER_CREATED',
+          correlationId: 'corr_test_123',
+          causationId: 'request_test_123',
+        },
         requestFingerprint: 'fingerprint-4',
       });
 
@@ -96,6 +128,11 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
             merchantOrderReference: order.merchantOrderReference,
           }),
           idempotencyKey: 'different-idempotency-key',
+          mutation: {
+            kind: 'ORDER_CREATED',
+            correlationId: 'corr_test_123',
+            causationId: 'request_test_123',
+          },
           requestFingerprint: 'different-request',
         }),
       ).rejects.toBeInstanceOf(MerchantReferenceConflictError);
@@ -106,6 +143,11 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       await repository.create({
         order,
         idempotencyKey: 'idempotency-key-5',
+        mutation: {
+          kind: 'ORDER_CREATED',
+          correlationId: 'corr_test_123',
+          causationId: 'request_test_123',
+        },
         requestFingerprint: 'fingerprint-5',
       });
 
@@ -116,6 +158,11 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
             merchantId: order.merchantId,
           }),
           idempotencyKey: 'different-idempotency-key',
+          mutation: {
+            kind: 'ORDER_CREATED',
+            correlationId: 'corr_test_123',
+            causationId: 'request_test_123',
+          },
           requestFingerprint: 'different-request',
         }),
       ).rejects.toBeInstanceOf(OrderAlreadyExistsError);
@@ -126,11 +173,16 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       await repository.create({
         order,
         idempotencyKey: 'idempotency-key-6',
+        mutation: {
+          kind: 'ORDER_CREATED',
+          correlationId: 'corr_test_123',
+          causationId: 'request_test_123',
+        },
         requestFingerprint: 'fingerprint-6',
       });
       const changedOrder = submittedOrder(order);
 
-      await repository.saveStatusChange(changedOrder, 1);
+      await repository.saveStatusChange(changedOrder, 1, STATUS_MUTATION);
 
       await expect(repository.get(order.merchantId, order.orderId)).resolves.toEqual(changedOrder);
     });
@@ -140,10 +192,15 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       await repository.create({
         order,
         idempotencyKey: 'idempotency-key-7',
+        mutation: {
+          kind: 'ORDER_CREATED',
+          correlationId: 'corr_test_123',
+          causationId: 'request_test_123',
+        },
         requestFingerprint: 'fingerprint-7',
       });
       const winningOrder = submittedOrder(order);
-      await repository.saveStatusChange(winningOrder, 1);
+      await repository.saveStatusChange(winningOrder, 1, STATUS_MUTATION);
 
       const staleOrder: Order = {
         ...order,
@@ -151,7 +208,7 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
         updatedAt: '2026-07-21T12:32:00.000Z',
         version: 2,
       };
-      const save = repository.saveStatusChange(staleOrder, 1);
+      const save = repository.saveStatusChange(staleOrder, 1, STATUS_MUTATION);
 
       await expect(save).rejects.toMatchObject({ actualVersion: 2 });
       await expect(repository.get(order.merchantId, order.orderId)).resolves.toEqual(winningOrder);
@@ -160,7 +217,7 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
     it('distinguishes a missing order from a version conflict', async () => {
       const order = submittedOrder(createOrderFixture());
 
-      await expect(repository.saveStatusChange(order, 1)).rejects.toBeInstanceOf(
+      await expect(repository.saveStatusChange(order, 1, STATUS_MUTATION)).rejects.toBeInstanceOf(
         OrderNotFoundError,
       );
     });
@@ -168,7 +225,9 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
     it('rejects a status change that does not increment exactly once', async () => {
       const order = createOrderFixture({ version: 3 });
 
-      await expect(repository.saveStatusChange(order, 1)).rejects.toBeInstanceOf(RangeError);
+      await expect(repository.saveStatusChange(order, 1, STATUS_MUTATION)).rejects.toBeInstanceOf(
+        RangeError,
+      );
     });
 
     it('paginates first, middle, and final pages newest-first within one merchant', async () => {
@@ -193,6 +252,11 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
         await repository.create({
           order,
           idempotencyKey: `list-idempotency-${String(index)}`,
+          mutation: {
+            kind: 'ORDER_CREATED',
+            correlationId: 'corr_test_123',
+            causationId: 'request_test_123',
+          },
           requestFingerprint: `list-fingerprint-${String(index)}`,
         });
       }
@@ -204,6 +268,11 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       await repository.create({
         order: otherMerchantOrder,
         idempotencyKey: 'other-merchant-idempotency',
+        mutation: {
+          kind: 'ORDER_CREATED',
+          correlationId: 'corr_test_123',
+          causationId: 'request_test_123',
+        },
         requestFingerprint: 'other-merchant-fingerprint',
       });
 
@@ -257,14 +326,24 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       await repository.create({
         order: pendingOrder,
         idempotencyKey: 'status-idempotency-1',
+        mutation: {
+          kind: 'ORDER_CREATED',
+          correlationId: 'corr_test_123',
+          causationId: 'request_test_123',
+        },
         requestFingerprint: 'status-fingerprint-1',
       });
       await repository.create({
         order: remainingPendingOrder,
         idempotencyKey: 'status-idempotency-2',
+        mutation: {
+          kind: 'ORDER_CREATED',
+          correlationId: 'corr_test_123',
+          causationId: 'request_test_123',
+        },
         requestFingerprint: 'status-fingerprint-2',
       });
-      await repository.saveStatusChange(changedOrder, 1);
+      await repository.saveStatusChange(changedOrder, 1, STATUS_MUTATION);
 
       const pendingPage = await repository.list({
         merchantId,

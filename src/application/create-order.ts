@@ -18,6 +18,8 @@ export interface CreateOrderDependencies {
 export interface CreateOrderCommand {
   readonly merchantId: MerchantId;
   readonly idempotencyKey: string;
+  readonly correlationId: string;
+  readonly causationId: string;
   readonly body: unknown;
 }
 
@@ -95,6 +97,11 @@ export async function createOrder(
     order,
     idempotencyKey: command.idempotencyKey,
     requestFingerprint: fingerprintCreateOrderRequest(validation.value),
+    mutation: {
+      kind: 'ORDER_CREATED',
+      correlationId: command.correlationId,
+      causationId: command.causationId,
+    },
   });
 
   return result;

@@ -31,13 +31,16 @@
     "test:integration": "npm run dynamodb:bootstrap && vitest run --config vitest.integration.config.ts",
     "test:mock-vendor": "vitest run tests/contracts/mock-delivery-vendor.test.ts",
     "test:sam": "bash scripts/sam/smoke-local.sh",
+    "test:stream-publisher": "vitest run tests/events/order-stream-event.test.ts tests/lambda/stream-publisher.test.ts",
     "test:vendor-client": "vitest run tests/integrations/delivery-vendor-client.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@aws-sdk/client-dynamodb": "3.1091.0",
-    "@aws-sdk/lib-dynamodb": "3.1091.0"
+    "@aws-sdk/client-sns": "3.1091.0",
+    "@aws-sdk/lib-dynamodb": "3.1091.0",
+    "@aws-sdk/util-dynamodb": "3.996.7"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -32,6 +32,11 @@ describe('handleListOrders', () => {
       await repository.create({
         order,
         idempotencyKey: `handler-idempotency-${String(index)}`,
+        mutation: {
+          kind: 'ORDER_CREATED',
+          correlationId: 'corr_test_123',
+          causationId: 'request_test_123',
+        },
         requestFingerprint: `handler-fingerprint-${String(index)}`,
       });
     }
@@ -111,6 +116,12 @@ describe('handleListOrders', () => {
         version: 2,
       },
       1,
+      {
+        kind: 'ORDER_STATUS_CHANGED',
+        previousStatus: 'PENDING_SUBMISSION',
+        correlationId: 'corr_list_123',
+        causationId: 'request_list_123',
+      },
     );
 
     const response = await handleListOrders(

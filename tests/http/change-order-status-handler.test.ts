@@ -19,6 +19,11 @@ describe('PATCH /orders/{orderId}/status handler', () => {
     await repository.create({
       order,
       idempotencyKey: 'change-status-key-1',
+      mutation: {
+        kind: 'ORDER_CREATED',
+        correlationId: 'corr_test_123',
+        causationId: 'request_test_123',
+      },
       requestFingerprint: 'change-status-fingerprint-1',
     });
 
@@ -73,6 +78,11 @@ describe('PATCH /orders/{orderId}/status handler', () => {
     await repository.create({
       order,
       idempotencyKey: 'change-status-key-2',
+      mutation: {
+        kind: 'ORDER_CREATED',
+        correlationId: 'corr_test_123',
+        causationId: 'request_test_123',
+      },
       requestFingerprint: 'change-status-fingerprint-2',
     });
 
@@ -107,6 +117,11 @@ describe('PATCH /orders/{orderId}/status handler', () => {
     await repository.create({
       order,
       idempotencyKey: 'change-status-key-3',
+      mutation: {
+        kind: 'ORDER_CREATED',
+        correlationId: 'corr_test_123',
+        causationId: 'request_test_123',
+      },
       requestFingerprint: 'change-status-fingerprint-3',
     });
 
@@ -133,6 +148,11 @@ describe('PATCH /orders/{orderId}/status handler', () => {
     await repository.create({
       order,
       idempotencyKey: 'change-status-key-4',
+      mutation: {
+        kind: 'ORDER_CREATED',
+        correlationId: 'corr_test_123',
+        causationId: 'request_test_123',
+      },
       requestFingerprint: 'change-status-fingerprint-4',
     });
     const saveStatusChange = vi.spyOn(repository, 'saveStatusChange');
@@ -161,6 +181,11 @@ describe('PATCH /orders/{orderId}/status handler', () => {
     await repository.create({
       order,
       idempotencyKey: 'change-status-key-5',
+      mutation: {
+        kind: 'ORDER_CREATED',
+        correlationId: 'corr_test_123',
+        causationId: 'request_test_123',
+      },
       requestFingerprint: 'change-status-fingerprint-5',
     });
     const request = {

@@ -26,6 +26,11 @@ describe('PATCH /orders/{orderId}/status with DynamoDB Local', () => {
     await repository.create({
       order,
       idempotencyKey: `concurrent-${order.orderId}`,
+      mutation: {
+        kind: 'ORDER_CREATED',
+        correlationId: 'corr_test_123',
+        causationId: 'request_test_123',
+      },
       requestFingerprint: `concurrent-fingerprint-${order.orderId}`,
     });
     const request = {
@@ -76,6 +81,11 @@ describe('PATCH /orders/{orderId}/status with DynamoDB Local', () => {
     await repository.create({
       order,
       idempotencyKey: `terminal-${order.orderId}`,
+      mutation: {
+        kind: 'ORDER_CREATED',
+        correlationId: 'corr_test_123',
+        causationId: 'request_test_123',
+      },
       requestFingerprint: `terminal-fingerprint-${order.orderId}`,
     });
 

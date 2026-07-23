@@ -12,6 +12,11 @@ describe('changeOrderStatus', () => {
     await repository.create({
       order,
       idempotencyKey: 'concurrent-status-key',
+      mutation: {
+        kind: 'ORDER_CREATED',
+        correlationId: 'corr_test_123',
+        causationId: 'request_test_123',
+      },
       requestFingerprint: 'concurrent-status-fingerprint',
     });
     const dependencies = {
@@ -24,6 +29,8 @@ describe('changeOrderStatus', () => {
         merchantId: order.merchantId,
         orderId: order.orderId,
         expectedVersion: 1,
+        correlationId: 'corr_concurrent_123',
+        causationId: 'request_concurrent_1',
         body: {
           targetStatus: 'SUBMITTED',
           reason: 'Provider acceptance was reconciled.',
@@ -34,6 +41,8 @@ describe('changeOrderStatus', () => {
         merchantId: order.merchantId,
         orderId: order.orderId,
         expectedVersion: 1,
+        correlationId: 'corr_concurrent_123',
+        causationId: 'request_concurrent_2',
         body: { targetStatus: 'CANCELLED', reason: 'Operator cancelled the order.' },
       }),
     ]);

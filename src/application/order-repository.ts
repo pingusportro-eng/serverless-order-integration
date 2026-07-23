@@ -1,10 +1,12 @@
 import type { MerchantId, Order, OrderId } from '../domain/order.js';
 import type { OrderStatus } from '../domain/order-status.js';
+import type { OrderCreatedMutation, OrderStatusChangedMutation } from '../events/order-mutation.js';
 
 export interface CreateOrderInput {
   readonly order: Order;
   readonly idempotencyKey: string;
   readonly requestFingerprint: string;
+  readonly mutation: OrderCreatedMutation;
 }
 
 export type CreateOrderResult =
@@ -32,7 +34,11 @@ export interface OrderRepository {
   create(input: CreateOrderInput): Promise<CreateOrderResult>;
   get(merchantId: MerchantId, orderId: OrderId): Promise<Order | undefined>;
   list(input: ListOrdersInput): Promise<ListOrdersResult>;
-  saveStatusChange(order: Order, expectedVersion: number): Promise<void>;
+  saveStatusChange(
+    order: Order,
+    expectedVersion: number,
+    mutation: OrderStatusChangedMutation,
+  ): Promise<void>;
 }
 
 export class IdempotencyConflictError extends Error {

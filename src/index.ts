@@ -156,3 +156,15 @@ export type {
   VendorSubmissionErrorOptions,
   VendorSubmissionFailureCode,
 } from './integrations/delivery-vendor-client.js';
+export { domainEventFromOrderStreamRecord } from './events/order-stream-event.js';
+export type {
+  OrderCreatedMutation,
+  OrderMutation,
+  OrderStatusChangedMutation,
+} from './events/order-mutation.js';
+export { createStreamPublisherHandler } from './lambda/stream-publisher.js';
+export type {
+  DomainEventPublisher,
+  StreamPublisherDependencies,
+  StreamPublisherHandler,
+} from './lambda/stream-publisher.js';

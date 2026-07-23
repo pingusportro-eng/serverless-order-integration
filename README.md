@@ -83,6 +83,7 @@ The individual commands are:
 - `npm run sam:validate` — lint and validate the local SAM template
 - `npm run sam:build` — bundle the Lambda handler for the Node.js 24 runtime
 - `npm run test:sam` — exercise every current API route through local SAM HTTP
+- `npm run test:stream-publisher` — map saved DynamoDB Stream records and test partial failures
 - `npm run build` — compile TypeScript into `dist/`
 - `npm run format` — apply Prettier formatting
 

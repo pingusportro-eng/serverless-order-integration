@@ -13,6 +13,7 @@ import {
   type OrderRepository,
 } from '../../application/order-repository.js';
 import type { MerchantId, Order, OrderId } from '../../domain/order.js';
+import type { OrderStatusChangedMutation } from '../../events/order-mutation.js';
 
 interface IdempotencyEntry {
   readonly requestFingerprint: string;
@@ -115,8 +116,13 @@ export class InMemoryOrderRepository implements OrderRepository {
     };
   }
 
-  async saveStatusChange(order: Order, expectedVersion: number): Promise<void> {
+  async saveStatusChange(
+    order: Order,
+    expectedVersion: number,
+    mutation: OrderStatusChangedMutation,
+  ): Promise<void> {
     await Promise.resolve();
+    void mutation;
 
     assertNextOrderVersion(order, expectedVersion);
 

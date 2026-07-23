@@ -68,6 +68,8 @@ export async function handleCreateOrder(
     const result = await createOrder(dependencies, {
       merchantId: request.merchantId,
       idempotencyKey,
+      correlationId: readHeader(request.headers, 'X-Correlation-Id') ?? request.requestId,
+      causationId: request.requestId,
       body: request.body,
     });
 

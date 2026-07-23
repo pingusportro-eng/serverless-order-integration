@@ -1,0 +1,67 @@
+{
+  "Records": [
+    {
+      "eventID": "order-created-record-001",
+      "eventName": "INSERT",
+      "eventVersion": "1.1",
+      "eventSource": "aws:dynamodb",
+      "awsRegion": "eu-central-1",
+      "eventSourceARN": "arn:aws:dynamodb:eu-central-1:123456789012:table/orders/stream/2026-07-23T07:00:00.000",
+      "dynamodb": {
+        "ApproximateCreationDateTime": 1784790000,
+        "SequenceNumber": "100000000000000000001",
+        "SizeBytes": 800,
+        "StreamViewType": "NEW_AND_OLD_IMAGES",
+        "NewImage": {
+          "pk": { "S": "MERCHANT#mrc_demo" },
+          "sk": { "S": "ORDER#ord_01JABCDEF0123456789" },
+          "entityType": { "S": "ORDER" },
+          "schemaVersion": { "N": "1" },
+          "order": {
+            "M": {
+              "orderId": { "S": "ord_01JABCDEF0123456789" },
+              "merchantId": { "S": "mrc_demo" },
+              "merchantOrderReference": { "S": "merchant-order-123" },
+              "status": { "S": "PENDING_SUBMISSION" },
+              "version": { "N": "1" },
+              "createdAt": { "S": "2026-07-23T07:00:00.000Z" },
+              "updatedAt": { "S": "2026-07-23T07:00:00.000Z" },
+              "provider": {
+                "M": {
+                  "providerCode": { "S": "mock-delivery" },
+                  "submissionKey": { "S": "submission_01JABCDEF0123456789" }
+                }
+              }
+            }
+          },
+          "mutation": {
+            "M": {
+              "kind": { "S": "ORDER_CREATED" },
+              "correlationId": { "S": "corr_01JABCDEF0123456789" },
+              "causationId": { "S": "request_01JABCDEF0123456789" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "eventID": "idempotency-record-001",
+      "eventName": "INSERT",
+      "eventVersion": "1.1",
+      "eventSource": "aws:dynamodb",
+      "awsRegion": "eu-central-1",
+      "eventSourceARN": "arn:aws:dynamodb:eu-central-1:123456789012:table/orders/stream/2026-07-23T07:00:00.000",
+      "dynamodb": {
+        "SequenceNumber": "100000000000000000002",
+        "SizeBytes": 200,
+        "StreamViewType": "NEW_AND_OLD_IMAGES",
+        "NewImage": {
+          "pk": { "S": "MERCHANT#mrc_demo" },
+          "sk": { "S": "IDEMPOTENCY#order-create-123" },
+          "entityType": { "S": "IDEMPOTENCY" },
+          "schemaVersion": { "N": "1" }
+        }
+      }
+    }
+  ]
+}

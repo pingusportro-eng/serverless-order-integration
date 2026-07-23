@@ -26,6 +26,11 @@ describe('GET /orders/{orderId} with DynamoDB Local', () => {
     await repository.create({
       order,
       idempotencyKey: `get-${order.orderId}`,
+      mutation: {
+        kind: 'ORDER_CREATED',
+        correlationId: 'corr_test_123',
+        causationId: 'request_test_123',
+      },
       requestFingerprint: `fingerprint-${order.orderId}`,
     });
 
