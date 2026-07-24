@@ -184,3 +184,41 @@ export type {
   DeliveryWorkerDependencies,
   DeliveryWorkerHandler,
 } from './lambda/delivery-worker.js';
+export {
+  PROVIDER_WEBHOOK_CONSUMER,
+  ProviderEventIdConflictError,
+  ProviderOrderConflictError,
+} from './application/provider-webhook-repository.js';
+export type {
+  ProviderWebhookRepository,
+  RecordProviderWebhookInput,
+  RecordProviderWebhookResult,
+} from './application/provider-webhook-repository.js';
+export { validateProviderWebhookEvent } from './application/provider-webhook-validation.js';
+export type {
+  ProviderWebhookEvent,
+  ProviderWebhookEventType,
+} from './application/provider-webhook-validation.js';
+export { processProviderWebhook } from './application/process-provider-webhook.js';
+export type {
+  ProcessProviderWebhookCommand,
+  ProcessProviderWebhookDependencies,
+  ProcessProviderWebhookResult,
+} from './application/process-provider-webhook.js';
+export { handleProviderWebhook } from './http/provider-webhook-handler.js';
+export type {
+  ProviderWebhookHandlerDependencies,
+  ProviderWebhookHttpRequest,
+  ProviderWebhookHttpResponse,
+} from './http/provider-webhook-handler.js';
+export {
+  InvalidWebhookSignatureError,
+  signWebhook,
+  verifyWebhookSignature,
+} from './http/webhook-signature.js';
+export type { VerifyWebhookSignatureInput } from './http/webhook-signature.js';
+export { createVendorWebhookLambdaHandler } from './lambda/vendor-webhook.js';
+export type {
+  VendorWebhookLambdaDependencies,
+  VendorWebhookLambdaHandler,
+} from './lambda/vendor-webhook.js';

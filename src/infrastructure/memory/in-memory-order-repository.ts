@@ -12,12 +12,23 @@ import {
   type ListOrdersResult,
   type OrderRepository,
 } from '../../application/order-repository.js';
+import {
+  ProviderEventIdConflictError,
+  ProviderOrderConflictError,
+  type ProviderWebhookRepository,
+  type RecordProviderWebhookInput,
+  type RecordProviderWebhookResult,
+} from '../../application/provider-webhook-repository.js';
 import type { MerchantId, Order, OrderId } from '../../domain/order.js';
 import type { OrderStatusChangedMutation } from '../../events/order-mutation.js';
 
 interface IdempotencyEntry {
   readonly requestFingerprint: string;
   readonly orderId: OrderId;
+}
+
+interface ProcessedProviderEvent {
+  readonly fingerprint: string;
 }
 
 function tupleKey(...parts: readonly string[]): string {
@@ -32,10 +43,12 @@ function orderListSortKey(order: Pick<Order, 'createdAt' | 'orderId'>): string {
   return `ORDER#${order.createdAt}#${order.orderId}`;
 }
 
-export class InMemoryOrderRepository implements OrderRepository {
+export class InMemoryOrderRepository implements OrderRepository, ProviderWebhookRepository {
   private readonly orders = new Map<string, Order>();
   private readonly idempotencyEntries = new Map<string, IdempotencyEntry>();
   private readonly merchantReferences = new Map<string, OrderId>();
+  private readonly providerOrders = new Map<string, { merchantId: MerchantId; orderId: OrderId }>();
+  private readonly processedProviderEvents = new Map<string, ProcessedProviderEvent>();
 
   async create(input: CreateOrderInput): Promise<CreateOrderResult> {
     await Promise.resolve();
@@ -88,6 +101,20 @@ export class InMemoryOrderRepository implements OrderRepository {
     return order ? cloneOrder(order) : undefined;
   }
 
+  async getByProviderOrderId(
+    providerCode: Order['provider']['providerCode'],
+    providerOrderId: string,
+  ): Promise<Order | undefined> {
+    await Promise.resolve();
+
+    const mapping = this.providerOrders.get(tupleKey(providerCode, providerOrderId));
+    if (mapping === undefined) {
+      return undefined;
+    }
+    const order = this.orders.get(tupleKey(mapping.merchantId, mapping.orderId));
+    return order === undefined ? undefined : cloneOrder(order);
+  }
+
   async list(input: ListOrdersInput): Promise<ListOrdersResult> {
     await Promise.resolve();
     assertOrderPageLimit(input.limit);
@@ -137,6 +164,24 @@ export class InMemoryOrderRepository implements OrderRepository {
       throw new OrderVersionConflictError(existingOrder.version);
     }
 
+    const providerOrderId =
+      mutation.previousStatus === 'PENDING_SUBMISSION' && order.status === 'SUBMITTED'
+        ? order.provider.providerOrderId
+        : undefined;
+    const providerMapKey =
+      providerOrderId === undefined
+        ? undefined
+        : tupleKey(order.provider.providerCode, providerOrderId);
+    const existingProviderOrder =
+      providerMapKey === undefined ? undefined : this.providerOrders.get(providerMapKey);
+    if (
+      existingProviderOrder !== undefined &&
+      (existingProviderOrder.merchantId !== order.merchantId ||
+        existingProviderOrder.orderId !== order.orderId)
+    ) {
+      throw new ProviderOrderConflictError();
+    }
+
     const updatedOrder: Order = {
       orderId: existingOrder.orderId,
       merchantId: existingOrder.merchantId,
@@ -154,5 +199,45 @@ export class InMemoryOrderRepository implements OrderRepository {
     };
 
     this.orders.set(orderMapKey, updatedOrder);
+    if (providerMapKey !== undefined) {
+      this.providerOrders.set(providerMapKey, {
+        merchantId: order.merchantId,
+        orderId: order.orderId,
+      });
+    }
+  }
+
+  async recordProviderWebhook(
+    input: RecordProviderWebhookInput,
+  ): Promise<RecordProviderWebhookResult> {
+    await Promise.resolve();
+
+    const eventMapKey = tupleKey('provider-webhook', input.eventId);
+    const existingEvent = this.processedProviderEvents.get(eventMapKey);
+    if (existingEvent !== undefined) {
+      if (existingEvent.fingerprint === input.eventFingerprint) {
+        return 'duplicate';
+      }
+      throw new ProviderEventIdConflictError();
+    }
+
+    const orderMapKey = tupleKey(input.currentOrder.merchantId, input.currentOrder.orderId);
+    const storedOrder = this.orders.get(orderMapKey);
+    if (storedOrder === undefined) {
+      throw new OrderNotFoundError();
+    }
+    if (storedOrder.version !== input.currentOrder.version) {
+      throw new OrderVersionConflictError(storedOrder.version);
+    }
+    if ((input.changedOrder === undefined) !== (input.mutation === undefined)) {
+      throw new TypeError('A changed webhook order and its mutation must be supplied together.');
+    }
+
+    if (input.changedOrder !== undefined) {
+      assertNextOrderVersion(input.changedOrder, input.currentOrder.version);
+      this.orders.set(orderMapKey, cloneOrder(input.changedOrder));
+    }
+    this.processedProviderEvents.set(eventMapKey, { fingerprint: input.eventFingerprint });
+    return 'recorded';
   }
 }

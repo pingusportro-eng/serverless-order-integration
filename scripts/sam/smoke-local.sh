@@ -78,4 +78,33 @@ change_status="$(curl --silent --output "$temporary_directory/change.json" --wri
 
 node -e "const fs=require('node:fs');const value=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));if(value.status!=='SUBMITTED'||value.version!==2)process.exit(1);" "$temporary_directory/change.json"
 
-echo "SAM local smoke test passed: POST, GET item, GET list, and PATCH status."
+webhook_timestamp="$(date +%s)"
+webhook_occurred_at="$(date -u +'%Y-%m-%dT%H:%M:%S.000Z')"
+webhook_body="{\"eventId\":\"provider-event-$suffix\",\"eventType\":\"DELIVERY_DELIVERED\",\"occurredAt\":\"$webhook_occurred_at\",\"providerOrderId\":\"provider-$suffix\"}"
+webhook_signature="$(node -e "const crypto=require('node:crypto');const [secret,timestamp,body]=process.argv.slice(1);process.stdout.write('sha256='+crypto.createHmac('sha256',secret).update(timestamp+'.'+body,'utf8').digest('hex'));" \
+  'LOCAL_ONLY_WEBHOOK_SECRET_0123456789' "$webhook_timestamp" "$webhook_body")"
+
+webhook_status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+  --request POST \
+  --header 'Content-Type: application/json' \
+  --header "X-Webhook-Timestamp: $webhook_timestamp" \
+  --header "X-Webhook-Signature: $webhook_signature" \
+  --data "$webhook_body" \
+  'http://127.0.0.1:3000/webhooks/vendor')"
+[[ "$webhook_status" == '204' ]]
+
+duplicate_webhook_status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+  --request POST \
+  --header 'Content-Type: application/json' \
+  --header "X-Webhook-Timestamp: $webhook_timestamp" \
+  --header "X-Webhook-Signature: $webhook_signature" \
+  --data "$webhook_body" \
+  'http://127.0.0.1:3000/webhooks/vendor')"
+[[ "$duplicate_webhook_status" == '204' ]]
+
+delivered_status="$(curl --silent --output "$temporary_directory/delivered.json" --write-out '%{http_code}' \
+  "http://127.0.0.1:3000/orders/$order_id")"
+[[ "$delivered_status" == '200' ]]
+node -e "const fs=require('node:fs');const value=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));if(value.status!=='DELIVERED'||value.version!==3)process.exit(1);" "$temporary_directory/delivered.json"
+
+echo "SAM local smoke test passed: REST routes and signed duplicate-safe vendor webhook."

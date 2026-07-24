@@ -1,12 +1,8 @@
-import {
-  ConditionalCheckFailedException,
-  TransactionCanceledException,
-} from '@aws-sdk/client-dynamodb';
+import { TransactionCanceledException } from '@aws-sdk/client-dynamodb';
 import {
   GetCommand,
   QueryCommand,
   TransactWriteCommand,
-  UpdateCommand,
   type DynamoDBDocumentClient,
 } from '@aws-sdk/lib-dynamodb';
 
@@ -25,6 +21,14 @@ import {
   type OrderListPosition,
   type OrderRepository,
 } from '../../application/order-repository.js';
+import {
+  PROVIDER_WEBHOOK_CONSUMER,
+  ProviderEventIdConflictError,
+  ProviderOrderConflictError,
+  type ProviderWebhookRepository,
+  type RecordProviderWebhookInput,
+  type RecordProviderWebhookResult,
+} from '../../application/provider-webhook-repository.js';
 import type { MerchantId, Order, OrderId } from '../../domain/order.js';
 import type { OrderMutation, OrderStatusChangedMutation } from '../../events/order-mutation.js';
 
@@ -64,6 +68,26 @@ interface StoredMerchantReferenceItem {
   readonly createdAt: string;
 }
 
+interface StoredProviderOrderItem {
+  readonly pk: string;
+  readonly sk: string;
+  readonly entityType: 'PROVIDER_ORDER';
+  readonly schemaVersion: typeof SCHEMA_VERSION;
+  readonly merchantId: MerchantId;
+  readonly orderId: OrderId;
+  readonly createdAt: string;
+}
+
+interface StoredProcessedEventItem {
+  readonly pk: string;
+  readonly sk: string;
+  readonly entityType: 'PROCESSED_EVENT';
+  readonly schemaVersion: typeof SCHEMA_VERSION;
+  readonly eventFingerprint: string;
+  readonly providerOrderId: string;
+  readonly processedAt: string;
+}
+
 function merchantKey(merchantId: MerchantId): string {
   return `MERCHANT#${merchantId}`;
 }
@@ -78,6 +102,18 @@ function idempotencyKey(value: string): string {
 
 function merchantReferenceKey(value: string): string {
   return `ORDER_REFERENCE#${value}`;
+}
+
+function providerKey(providerCode: Order['provider']['providerCode']): string {
+  return `PROVIDER#${providerCode}`;
+}
+
+function processedEventConsumerKey(): string {
+  return `CONSUMER#${PROVIDER_WEBHOOK_CONSUMER}`;
+}
+
+function eventKey(eventId: string): string {
+  return `EVENT#${eventId}`;
 }
 
 function orderListSortKey(order: Order): string {
@@ -139,7 +175,60 @@ function readStoredIdempotency(item: unknown): StoredIdempotencyItem | undefined
   return item as unknown as StoredIdempotencyItem;
 }
 
-export class DynamoDbOrderRepository implements OrderRepository {
+function readStoredProviderOrder(item: unknown): StoredProviderOrderItem | undefined {
+  if (
+    !isRecord(item) ||
+    item['entityType'] !== 'PROVIDER_ORDER' ||
+    item['schemaVersion'] !== SCHEMA_VERSION ||
+    typeof item['merchantId'] !== 'string' ||
+    typeof item['orderId'] !== 'string'
+  ) {
+    return undefined;
+  }
+
+  return item as unknown as StoredProviderOrderItem;
+}
+
+function readStoredProcessedEvent(item: unknown): StoredProcessedEventItem | undefined {
+  if (
+    !isRecord(item) ||
+    item['entityType'] !== 'PROCESSED_EVENT' ||
+    item['schemaVersion'] !== SCHEMA_VERSION ||
+    typeof item['eventFingerprint'] !== 'string'
+  ) {
+    return undefined;
+  }
+
+  return item as unknown as StoredProcessedEventItem;
+}
+
+function statusUpdate(tableName: string, order: StoredOrderItem, expectedVersion: number) {
+  return {
+    TableName: tableName,
+    Key: { pk: order.pk, sk: order.sk },
+    ConditionExpression:
+      'attribute_exists(pk) AND attribute_exists(sk) AND #version = :expectedVersion AND gsi2sk = :listSortKey',
+    UpdateExpression:
+      'SET #order = :order, #status = :status, #version = :nextVersion, #mutation = :mutation, gsi2pk = :statusIndexKey',
+    ExpressionAttributeNames: {
+      '#order': 'order',
+      '#status': 'status',
+      '#version': 'version',
+      '#mutation': 'mutation',
+    },
+    ExpressionAttributeValues: {
+      ':order': order.order,
+      ':status': order.status,
+      ':nextVersion': order.version,
+      ':expectedVersion': expectedVersion,
+      ':listSortKey': order.gsi2sk,
+      ':statusIndexKey': order.gsi2pk,
+      ':mutation': order.mutation,
+    },
+  };
+}
+
+export class DynamoDbOrderRepository implements OrderRepository, ProviderWebhookRepository {
   constructor(
     private readonly client: DynamoDBDocumentClient,
     private readonly tableName: string,
@@ -205,6 +294,21 @@ export class DynamoDbOrderRepository implements OrderRepository {
     return result.Item === undefined ? undefined : readStoredOrder(result.Item);
   }
 
+  async getByProviderOrderId(
+    providerCode: Order['provider']['providerCode'],
+    providerOrderId: string,
+  ): Promise<Order | undefined> {
+    const result = await this.client.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: { pk: providerKey(providerCode), sk: orderKey(providerOrderId as OrderId) },
+        ConsistentRead: true,
+      }),
+    );
+    const mapping = readStoredProviderOrder(result.Item);
+    return mapping === undefined ? undefined : this.get(mapping.merchantId, mapping.orderId);
+  }
+
   async list(input: ListOrdersInput): Promise<ListOrdersResult> {
     assertOrderPageLimit(input.limit);
 
@@ -256,35 +360,44 @@ export class DynamoDbOrderRepository implements OrderRepository {
   ): Promise<void> {
     assertNextOrderVersion(order, expectedVersion);
     const storedOrder = toStoredOrder(order, mutation);
+    const providerOrderId =
+      mutation.previousStatus === 'PENDING_SUBMISSION' && order.status === 'SUBMITTED'
+        ? order.provider.providerOrderId
+        : undefined;
 
     try {
       await this.client.send(
-        new UpdateCommand({
-          TableName: this.tableName,
-          Key: { pk: storedOrder.pk, sk: storedOrder.sk },
-          ConditionExpression:
-            'attribute_exists(pk) AND attribute_exists(sk) AND #version = :expectedVersion AND gsi2sk = :listSortKey',
-          UpdateExpression:
-            'SET #order = :order, #status = :status, #version = :nextVersion, #mutation = :mutation, gsi2pk = :statusIndexKey',
-          ExpressionAttributeNames: {
-            '#order': 'order',
-            '#status': 'status',
-            '#version': 'version',
-            '#mutation': 'mutation',
-          },
-          ExpressionAttributeValues: {
-            ':order': storedOrder.order,
-            ':status': storedOrder.status,
-            ':nextVersion': storedOrder.version,
-            ':expectedVersion': expectedVersion,
-            ':listSortKey': storedOrder.gsi2sk,
-            ':statusIndexKey': storedOrder.gsi2pk,
-            ':mutation': storedOrder.mutation,
-          },
+        new TransactWriteCommand({
+          TransactItems: [
+            {
+              Update: {
+                ...statusUpdate(this.tableName, storedOrder, expectedVersion),
+              },
+            },
+            ...(providerOrderId === undefined
+              ? []
+              : [
+                  {
+                    Put: {
+                      TableName: this.tableName,
+                      Item: {
+                        pk: providerKey(order.provider.providerCode),
+                        sk: orderKey(providerOrderId as OrderId),
+                        entityType: 'PROVIDER_ORDER',
+                        schemaVersion: SCHEMA_VERSION,
+                        merchantId: order.merchantId,
+                        orderId: order.orderId,
+                        createdAt: order.updatedAt,
+                      } satisfies StoredProviderOrderItem,
+                      ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
+                    },
+                  },
+                ]),
+          ],
         }),
       );
     } catch (error) {
-      if (!(error instanceof ConditionalCheckFailedException)) {
+      if (!(error instanceof TransactionCanceledException)) {
         throw error;
       }
 
@@ -292,7 +405,104 @@ export class DynamoDbOrderRepository implements OrderRepository {
       if (!currentOrder) {
         throw new OrderNotFoundError();
       }
+      if (currentOrder.version !== expectedVersion) {
+        throw new OrderVersionConflictError(currentOrder.version);
+      }
+      if (providerOrderId !== undefined) {
+        throw new ProviderOrderConflictError();
+      }
+      throw new OrderVersionConflictError(currentOrder.version);
+    }
+  }
 
+  async recordProviderWebhook(
+    input: RecordProviderWebhookInput,
+  ): Promise<RecordProviderWebhookResult> {
+    const changedOrder = input.changedOrder;
+    if ((changedOrder === undefined) !== (input.mutation === undefined)) {
+      throw new TypeError('A changed webhook order and its mutation must be supplied together.');
+    }
+    if (changedOrder !== undefined) {
+      assertNextOrderVersion(changedOrder, input.currentOrder.version);
+    }
+
+    const eventItem: StoredProcessedEventItem = {
+      pk: processedEventConsumerKey(),
+      sk: eventKey(input.eventId),
+      entityType: 'PROCESSED_EVENT',
+      schemaVersion: SCHEMA_VERSION,
+      eventFingerprint: input.eventFingerprint,
+      providerOrderId: input.providerOrderId,
+      processedAt: input.processedAt,
+    };
+    const orderKeyValue = {
+      pk: merchantKey(input.currentOrder.merchantId),
+      sk: orderKey(input.currentOrder.orderId),
+    };
+
+    try {
+      await this.client.send(
+        new TransactWriteCommand({
+          TransactItems: [
+            changedOrder === undefined
+              ? {
+                  ConditionCheck: {
+                    TableName: this.tableName,
+                    Key: orderKeyValue,
+                    ConditionExpression: '#version = :expectedVersion',
+                    ExpressionAttributeNames: { '#version': 'version' },
+                    ExpressionAttributeValues: {
+                      ':expectedVersion': input.currentOrder.version,
+                    },
+                  },
+                }
+              : {
+                  Update: {
+                    ...statusUpdate(
+                      this.tableName,
+                      toStoredOrder(changedOrder, input.mutation as OrderStatusChangedMutation),
+                      input.currentOrder.version,
+                    ),
+                  },
+                },
+            {
+              Put: {
+                TableName: this.tableName,
+                Item: eventItem,
+                ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
+              },
+            },
+          ],
+        }),
+      );
+      return 'recorded';
+    } catch (error: unknown) {
+      if (!(error instanceof TransactionCanceledException)) {
+        throw error;
+      }
+
+      const eventResult = await this.client.send(
+        new GetCommand({
+          TableName: this.tableName,
+          Key: { pk: eventItem.pk, sk: eventItem.sk },
+          ConsistentRead: true,
+        }),
+      );
+      const existingEvent = readStoredProcessedEvent(eventResult.Item);
+      if (existingEvent !== undefined) {
+        if (existingEvent.eventFingerprint === input.eventFingerprint) {
+          return 'duplicate';
+        }
+        throw new ProviderEventIdConflictError();
+      }
+
+      const currentOrder = await this.get(
+        input.currentOrder.merchantId,
+        input.currentOrder.orderId,
+      );
+      if (currentOrder === undefined) {
+        throw new OrderNotFoundError();
+      }
       throw new OrderVersionConflictError(currentOrder.version);
     }
   }

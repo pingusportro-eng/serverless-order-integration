@@ -7,10 +7,17 @@ import {
   OrderNotFoundError,
   type OrderRepository,
 } from '../../src/application/order-repository.js';
+import {
+  ProviderEventIdConflictError,
+  ProviderOrderConflictError,
+  type ProviderWebhookRepository,
+} from '../../src/application/provider-webhook-repository.js';
+import { applyOrderStatusChange } from '../../src/domain/order-status-transition.js';
 import { asMerchantId, asOrderId, type Order } from '../../src/domain/order.js';
 import { createOrderFixture } from '../fixtures/order.js';
 
-type RepositoryFactory = () => OrderRepository | Promise<OrderRepository>;
+type TestedRepository = OrderRepository & ProviderWebhookRepository;
+type RepositoryFactory = () => TestedRepository | Promise<TestedRepository>;
 
 function submittedOrder(order: Order): Order {
   return {
@@ -18,7 +25,7 @@ function submittedOrder(order: Order): Order {
     status: 'SUBMITTED',
     provider: {
       ...order.provider,
-      providerOrderId: `provider-${order.orderId}`,
+      providerOrderId: `provider-${order.merchantId}-${order.orderId}`,
       acceptedAt: '2026-07-21T12:31:00.000Z',
     },
     updatedAt: '2026-07-21T12:31:00.000Z',
@@ -35,7 +42,7 @@ const STATUS_MUTATION = {
 
 export function orderRepositoryContract(name: string, createRepository: RepositoryFactory): void {
   describe(name, () => {
-    let repository: OrderRepository;
+    let repository: TestedRepository;
 
     beforeEach(async () => {
       repository = await createRepository();
@@ -185,6 +192,113 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       await repository.saveStatusChange(changedOrder, 1, STATUS_MUTATION);
 
       await expect(repository.get(order.merchantId, order.orderId)).resolves.toEqual(changedOrder);
+    });
+
+    it('resolves a submitted order by its provider reference', async () => {
+      const order = createOrderFixture();
+      const changedOrder = submittedOrder(order);
+      await repository.create({
+        order,
+        idempotencyKey: 'provider-reference-idempotency',
+        mutation: {
+          kind: 'ORDER_CREATED',
+          correlationId: 'corr_test_123',
+          causationId: 'request_test_123',
+        },
+        requestFingerprint: 'provider-reference-fingerprint',
+      });
+      await repository.saveStatusChange(changedOrder, order.version, STATUS_MUTATION);
+
+      await expect(
+        repository.getByProviderOrderId(
+          changedOrder.provider.providerCode,
+          changedOrder.provider.providerOrderId ?? '',
+        ),
+      ).resolves.toEqual(changedOrder);
+    });
+
+    it('rejects a provider reference already assigned to another order atomically', async () => {
+      const firstOrder = createOrderFixture();
+      const secondOrder = createOrderFixture();
+      const firstAccepted = submittedOrder(firstOrder);
+      const sharedProviderOrderId = firstAccepted.provider.providerOrderId;
+      if (sharedProviderOrderId === undefined) {
+        throw new Error('Expected a submitted provider reference.');
+      }
+      const secondAccepted: Order = {
+        ...submittedOrder(secondOrder),
+        provider: {
+          ...secondOrder.provider,
+          providerOrderId: sharedProviderOrderId,
+          acceptedAt: '2026-07-21T12:31:00.000Z',
+        },
+      };
+      for (const [index, order] of [firstOrder, secondOrder].entries()) {
+        await repository.create({
+          order,
+          idempotencyKey: `provider-conflict-idempotency-${String(index)}`,
+          mutation: {
+            kind: 'ORDER_CREATED',
+            correlationId: 'corr_test_123',
+            causationId: 'request_test_123',
+          },
+          requestFingerprint: `provider-conflict-fingerprint-${String(index)}`,
+        });
+      }
+
+      await repository.saveStatusChange(firstAccepted, firstOrder.version, STATUS_MUTATION);
+      await expect(
+        repository.saveStatusChange(secondAccepted, secondOrder.version, STATUS_MUTATION),
+      ).rejects.toBeInstanceOf(ProviderOrderConflictError);
+      await expect(repository.get(secondOrder.merchantId, secondOrder.orderId)).resolves.toEqual(
+        secondOrder,
+      );
+    });
+
+    it('atomically records provider event deduplication with a status change', async () => {
+      const order = createOrderFixture();
+      const accepted = submittedOrder(order);
+      const pickedUp = applyOrderStatusChange(
+        accepted,
+        { targetStatus: 'PICKED_UP' },
+        '2026-07-21T12:32:00.000Z',
+      );
+      await repository.create({
+        order,
+        idempotencyKey: 'provider-event-idempotency',
+        mutation: {
+          kind: 'ORDER_CREATED',
+          correlationId: 'corr_test_123',
+          causationId: 'request_test_123',
+        },
+        requestFingerprint: 'provider-event-fingerprint',
+      });
+      await repository.saveStatusChange(accepted, order.version, STATUS_MUTATION);
+      const providerEventId = `provider-event-contract-${order.orderId}`;
+      const input = {
+        eventId: providerEventId,
+        eventFingerprint: 'event-fingerprint-1',
+        providerOrderId: accepted.provider.providerOrderId ?? '',
+        processedAt: '2026-07-21T12:35:00.000Z',
+        currentOrder: accepted,
+        changedOrder: pickedUp,
+        mutation: {
+          kind: 'ORDER_STATUS_CHANGED' as const,
+          previousStatus: accepted.status,
+          correlationId: 'corr_provider_123',
+          causationId: providerEventId,
+        },
+      };
+
+      await expect(repository.recordProviderWebhook(input)).resolves.toBe('recorded');
+      await expect(repository.recordProviderWebhook(input)).resolves.toBe('duplicate');
+      await expect(
+        repository.recordProviderWebhook({
+          ...input,
+          eventFingerprint: 'different-event-fingerprint',
+        }),
+      ).rejects.toBeInstanceOf(ProviderEventIdConflictError);
+      await expect(repository.get(order.merchantId, order.orderId)).resolves.toEqual(pickedUp);
     });
 
     it('rejects a stale status write and preserves the winning version', async () => {

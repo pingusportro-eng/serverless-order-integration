@@ -1,7 +1,7 @@
 # Mock delivery provider contract
 
 Status: MVP baseline  
-Last reviewed: 2026-07-22
+Last reviewed: 2026-07-23
 
 ## Purpose
 
@@ -91,3 +91,36 @@ original acceptance instead of creating a second delivery.
 Error responses are small JSON objects with a stable `code` and safe `detail`.
 The exact retry classification and bounded retry policy are defined by the
 [delivery vendor client policy](vendor-client.md).
+
+## Delivery-status webhook
+
+The provider sends status events to `POST /webhooks/vendor`. Each event has a
+stable `eventId`, `providerOrderId`, occurrence time, and one of the event types
+defined by the OpenAPI `ProviderWebhookRequest` schema.
+
+The provider sends:
+
+| Header | Rule |
+| --- | --- |
+| `X-Webhook-Timestamp` | Ten-digit Unix time in seconds. |
+| `X-Webhook-Signature` | `sha256=<lowercase hex HMAC>`. |
+| `X-Correlation-Id` | Optional trace reference propagated into the resulting order event. |
+
+The signed UTF-8 value is the timestamp, one literal period, and the unmodified
+HTTP request body:
+
+```text
+<X-Webhook-Timestamp>.<raw request body>
+```
+
+HMAC-SHA256 uses the configured webhook secret. Verification uses a
+constant-time comparison and happens before JSON parsing. The local tolerance
+is 300 seconds in either direction; an absent, malformed, invalid, or expired
+signature returns `401` without changing an order.
+
+The timestamp limits captured-request replay, while the stable provider event
+ID supplies durable business deduplication. A successfully processed duplicate
+returns `204` without incrementing the order version. Reusing an event ID with
+different validated event values returns `409 EVENT_ID_CONFLICT`. A delayed
+event that would move the order backward is recorded as stale and returns `204`
+without changing the aggregate.

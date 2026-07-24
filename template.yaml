@@ -77,6 +77,34 @@ Resources:
         Sourcemap: true
         Target: es2022
 
+  VendorWebhookFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: vendor-webhook.handler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref OrdersTableName
+          DYNAMODB_ENDPOINT: !Ref DynamoDbEndpoint
+          WEBHOOK_SIGNING_SECRET: ''
+          WEBHOOK_TOLERANCE_SECONDS: '300'
+      Events:
+        VendorWebhook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref LocalHttpApi
+            Method: POST
+            Path: /webhooks/vendor
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/lambda/vendor-webhook.ts
+        Format: cjs
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+
 Outputs:
   LocalApiUrl:
     Description: URL used by sam local start-api; no API is deployed by this template step.

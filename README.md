@@ -81,6 +81,7 @@ The individual commands are:
 - `npm run test:integration` — bootstrap DynamoDB Local and test its repository
 - `npm run test:mock-vendor` — exercise every mock provider response mode
 - `npm run test:vendor-client` — verify provider error and retry classification
+- `npm run test:webhook` — verify webhook signatures, replay protection, and status changes
 - `npm run sam:validate` — lint and validate the local SAM template
 - `npm run sam:build` — bundle the Lambda handler for the Node.js 24 runtime
 - `npm run test:sam` — exercise every current API route through local SAM HTTP
@@ -144,13 +145,14 @@ it would select the real AWS DynamoDB endpoint instead.
 
 ## Local API with AWS SAM
 
-The SAM template runs the four current operations through a Node.js 24 Lambda
-container:
+The SAM template runs the current REST operations and signed vendor webhook
+through Node.js 24 Lambda containers:
 
 - `POST /orders`
 - `GET /orders`
 - `GET /orders/{orderId}`
 - `PATCH /orders/{orderId}/status`
+- `POST /webhooks/vendor`
 
 Start DynamoDB Local, build the Lambda bundle, and serve the API at
 `http://127.0.0.1:3000`:
@@ -168,16 +170,18 @@ Run the repeatable smoke test instead when you want a non-interactive check:
 npm run test:sam
 ```
 
-The smoke test creates an order, retrieves it, lists orders, and changes its
-status over HTTP. It starts and stops the SAM API automatically and writes local
-runtime output under the ignored `.aws-sam/` directory.
+The smoke test creates an order, retrieves it, lists orders, reconciles provider
+acceptance, and sends the same signed delivery webhook twice. It verifies that
+the duplicate changes the order only once. The script starts and stops the SAM
+API automatically and writes local runtime output under the ignored
+`.aws-sam/` directory.
 
 SAM containers join the project Compose network and reach DynamoDB at
 `http://dynamodb-local:8000`. The checked-in
 [SAM local fixture](sam-local-fixture.json) contains only an explicit DynamoDB
-Local endpoint and a known local-only cursor signing value; it is test data, not
-a configuration file for real credentials. The Lambda adapter uses fixed dummy
-credentials whenever that endpoint is present, so it does not load an AWS
+Local endpoint and known local-only signing values; it is test data, not a
+configuration file for real credentials. The Lambda adapters use fixed dummy
+credentials whenever that endpoint is present, so they do not load an AWS
 profile or contact the DynamoDB service in an AWS account.
 
 Local SAM does not reproduce the planned API Gateway JWT authorizer. It uses the

@@ -311,7 +311,7 @@ For every step, the review should answer:
     messages using SQS event fixtures.
   - AWS cost: $0.
 
-- [ ] **4.6 — Implement the vendor webhook**
+- [x] **4.6 — Implement the vendor webhook**
   - Verify the HMAC signature and timestamp.
   - Reject replayed requests and invalid status transitions.
   - Verification: test valid, invalid, expired, and duplicate webhooks.
@@ -425,6 +425,6 @@ For every step, the review should answer:
 
 ## Next step
 
-Start with **0.1 — Verify local tools**. Report what is already installed and
-identify only the missing prerequisites; do not install or deploy anything until
-that review is complete.
+Continue with **5.1 — Define the synchronous cloud slice**. Define and validate
+the infrastructure locally without deploying; deployment still requires the
+separate cost review and explicit approval in step 5.3.
