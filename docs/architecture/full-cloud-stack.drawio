@@ -1,59 +1,101 @@
 <mxfile host="65bd71144e">
     <diagram id="full-cloud-stack" name="Full cloud stack">
-        <mxGraphModel dx="2573" dy="1223" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2400" pageHeight="1050" math="0" shadow="0">
+        <mxGraphModel dx="2058" dy="2178" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="4000" pageHeight="1200" math="0" shadow="0">
             <root>
                 <mxCell id="0"/>
                 <mxCell id="1" parent="0"/>
                 <mxCell id="title" value="Serverless Order Integration — Full AWS Cloud Stack" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=26;fontStyle=1;fontColor=#172B4D;" parent="1" vertex="1">
-                    <mxGeometry x="20" y="10" width="900" height="40" as="geometry"/>
+                    <mxGeometry x="930" y="-70" width="900" height="40" as="geometry"/>
                 </mxCell>
-                <mxCell id="aws-boundary" value="AWS Cloud — one disposable SAM / CloudFormation stack" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#147EBA;strokeWidth=3;fillColor=#F7FBFE;verticalAlign=top;align=left;fontSize=20;fontStyle=1;fontColor=#174A6E;spacingTop=12;spacingLeft=16;" parent="1" vertex="1">
-                    <mxGeometry x="230" y="65" width="3320" height="1025" as="geometry"/>
+                <mxCell id="aws-boundary" value="AWS Cloud — one disposable SAM / CloudFormation stack" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#147EBA;strokeWidth=3;fillColor=#F7FBFE;verticalAlign=top;align=left;fontSize=20;fontStyle=1;fontColor=#174A6E;spacingTop=12;spacingLeft=58;arcSize=14;" parent="1" vertex="1">
+                    <mxGeometry x="230" y="10" width="2930" height="1080" as="geometry"/>
+                </mxCell>
+                <mxCell id="aws-boundary-cloudformation-icon" value="" style="shape=mxgraph.aws4.cloudformation;fillColor=#E7157B;strokeColor=none;html=1;aspect=fixed;" parent="aws-boundary" vertex="1" connectable="0">
+                    <mxGeometry x="12.355421686746988" y="10.536585365853659" width="30.00602409638554" height="30.00602409638554" as="geometry"/>
+                </mxCell>
+                <mxCell id="worker" value="&lt;b&gt;Delivery Worker Lambda&lt;/b&gt;&lt;br&gt;Sequential small batches&lt;br&gt;Partial batch failures&lt;br&gt;Bounded concurrency + HTTP timeout" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#ED7100;strokeWidth=2;fillColor=#FFF3E0;fontColor=#713600;fontSize=13;verticalAlign=bottom;spacingBottom=6;" parent="aws-boundary" vertex="1">
+                    <mxGeometry x="2410" y="203.75" width="200" height="142.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="worker-icon" value="" style="shape=mxgraph.aws4.lambda;fillColor=#ED7100;strokeColor=none;html=1;aspect=fixed;" parent="worker" vertex="1" connectable="0">
+                    <mxGeometry x="75" y="7.388888888888889" width="50" height="50" as="geometry"/>
                 </mxCell>
                 <mxCell id="client" value="&lt;b&gt;Client&lt;/b&gt;&lt;br&gt;Merchant / operator" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#59636E;strokeWidth=2;fillColor=#F4F5F7;fontColor=#172B4D;fontSize=15;" parent="1" vertex="1">
                     <mxGeometry x="20" y="180" width="170" height="80" as="geometry"/>
                 </mxCell>
                 <mxCell id="vendor" value="&lt;b&gt;Delivery vendor&lt;/b&gt;&lt;br&gt;Public HTTPS mock&lt;br&gt;(deployment input)" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#59636E;strokeWidth=2;fillColor=#F4F5F7;fontColor=#172B4D;fontSize=15;" parent="1" vertex="1">
-                    <mxGeometry x="3620" y="565" width="200" height="100" as="geometry"/>
+                    <mxGeometry x="3330" y="247.5" width="200" height="100" as="geometry"/>
                 </mxCell>
-                <mxCell id="cognito" value="&lt;b&gt;Amazon Cognito&lt;/b&gt;&lt;br&gt;Lite user pool&lt;br&gt;operators group" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#C9256E;strokeWidth=2;fillColor=#FFF0F6;fontColor=#5A1736;fontSize=14;" parent="1" vertex="1">
+                <mxCell id="cognito" value="&lt;b&gt;Amazon Cognito&lt;/b&gt;&lt;br&gt;Lite user pool&lt;br&gt;operators group" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#C9256E;strokeWidth=2;fillColor=#FFF0F6;fontColor=#5A1736;fontSize=13;verticalAlign=bottom;spacingBottom=5;" parent="1" vertex="1">
                     <mxGeometry x="290" y="105" width="190" height="90" as="geometry"/>
                 </mxCell>
-                <mxCell id="api" value="&lt;b&gt;API Gateway HTTP API&lt;/b&gt;&lt;br&gt;JWT-protected order routes&lt;br&gt;Public HMAC webhook route&lt;br&gt;Throttling + access log" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#5A30B5;strokeWidth=2;fillColor=#F0EDFF;fontColor=#321B68;fontSize=14;" parent="1" vertex="1">
+                <mxCell id="cognito-icon" value="" style="shape=mxgraph.aws4.cognito;fillColor=#DD344C;strokeColor=none;html=1;aspect=fixed;" parent="cognito" vertex="1" connectable="0">
+                    <mxGeometry x="77" y="5" width="36" height="36" as="geometry"/>
+                </mxCell>
+                <mxCell id="api" value="&lt;b&gt;API Gateway HTTP API&lt;/b&gt;&lt;br&gt;JWT-protected order routes&lt;br&gt;Public HMAC webhook route&lt;br&gt;Throttling + access log" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#5A30B5;strokeWidth=2;fillColor=#F0EDFF;fontColor=#321B68;fontSize=13;verticalAlign=bottom;spacingBottom=5;" parent="1" vertex="1">
                     <mxGeometry x="275" y="300" width="220" height="120" as="geometry"/>
                 </mxCell>
-                <mxCell id="orders-lambda" value="&lt;b&gt;Orders API Lambda&lt;/b&gt;&lt;br&gt;Node.js 24 / TypeScript&lt;br&gt;128 MB, access token checks" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#ED7100;strokeWidth=2;fillColor=#FFF3E0;fontColor=#713600;fontSize=14;" parent="1" vertex="1">
+                <mxCell id="api-icon" value="" style="shape=mxgraph.aws4.api_gateway;fillColor=#8C4FFF;strokeColor=none;html=1;aspect=fixed;" parent="api" vertex="1" connectable="0">
+                    <mxGeometry x="89" y="6" width="42" height="42" as="geometry"/>
+                </mxCell>
+                <mxCell id="orders-lambda" value="&lt;b&gt;Orders API Lambda&lt;/b&gt;&lt;br&gt;Node.js 24 / TypeScript&lt;br&gt;128 MB, access token checks" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#ED7100;strokeWidth=2;fillColor=#FFF3E0;fontColor=#713600;fontSize=13;verticalAlign=bottom;spacingBottom=5;" parent="1" vertex="1">
                     <mxGeometry x="570" y="200" width="220" height="100" as="geometry"/>
                 </mxCell>
-                <mxCell id="webhook-lambda" value="&lt;b&gt;Webhook Lambda&lt;/b&gt;&lt;br&gt;HMAC + replay window&lt;br&gt;durable event deduplication" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#ED7100;strokeWidth=2;fillColor=#FFF3E0;fontColor=#713600;fontSize=14;" parent="1" vertex="1">
+                <mxCell id="orders-lambda-icon" value="" style="shape=mxgraph.aws4.lambda;fillColor=#ED7100;strokeColor=none;html=1;aspect=fixed;" parent="orders-lambda" vertex="1" connectable="0">
+                    <mxGeometry x="91" y="6" width="38" height="38" as="geometry"/>
+                </mxCell>
+                <mxCell id="webhook-lambda" value="&lt;b&gt;Webhook Lambda&lt;/b&gt;&lt;br&gt;HMAC + replay window&lt;br&gt;durable event deduplication" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#ED7100;strokeWidth=2;fillColor=#FFF3E0;fontColor=#713600;fontSize=13;verticalAlign=bottom;spacingBottom=5;" parent="1" vertex="1">
                     <mxGeometry x="580" y="475" width="220" height="100" as="geometry"/>
                 </mxCell>
-                <mxCell id="dynamodb" value="&lt;b&gt;Amazon DynamoDB&lt;/b&gt;&lt;br&gt;Orders + idempotency items&lt;br&gt;On-demand, 2 sparse GSIs&lt;br&gt;SQS-consumer deduplication" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#2E73B8;strokeWidth=2;fillColor=#EAF3FF;fontColor=#174A6E;fontSize=14;" parent="1" vertex="1">
+                <mxCell id="webhook-lambda-icon" value="" style="shape=mxgraph.aws4.lambda;fillColor=#ED7100;strokeColor=none;html=1;aspect=fixed;" parent="webhook-lambda" vertex="1" connectable="0">
+                    <mxGeometry x="91" y="6" width="38" height="38" as="geometry"/>
+                </mxCell>
+                <mxCell id="dynamodb" value="&lt;b&gt;Amazon DynamoDB&lt;/b&gt;&lt;br&gt;Orders + idempotency items&lt;br&gt;On-demand, 2 sparse GSIs&lt;br&gt;SQS-consumer deduplication" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#2E73B8;strokeWidth=2;fillColor=#EAF3FF;fontColor=#174A6E;fontSize=13;verticalAlign=bottom;spacingBottom=6;" parent="1" vertex="1">
                     <mxGeometry x="850" y="230" width="230" height="130" as="geometry"/>
                 </mxCell>
-                <mxCell id="stream" value="&lt;b&gt;DynamoDB Stream&lt;/b&gt;&lt;br&gt;NEW_IMAGE&lt;br&gt;INSERT + MODIFY order items" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#2E73B8;strokeWidth=2;fillColor=#EAF3FF;fontColor=#174A6E;fontSize=14;" parent="1" vertex="1">
+                <mxCell id="dynamodb-icon" value="" style="shape=mxgraph.aws4.dynamodb;fillColor=#C925D1;strokeColor=none;html=1;aspect=fixed;" parent="dynamodb" vertex="1" connectable="0">
+                    <mxGeometry x="91" y="7" width="48" height="48" as="geometry"/>
+                </mxCell>
+                <mxCell id="stream" value="&lt;b&gt;DynamoDB Stream&lt;/b&gt;&lt;br&gt;NEW_IMAGE&lt;br&gt;INSERT + MODIFY order items" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#2E73B8;strokeWidth=2;fillColor=#EAF3FF;fontColor=#174A6E;fontSize=13;verticalAlign=bottom;spacingBottom=5;" parent="1" vertex="1">
                     <mxGeometry x="1140" y="240" width="190" height="105" as="geometry"/>
                 </mxCell>
-                <mxCell id="publisher" value="&lt;b&gt;Publisher Lambda&lt;/b&gt;&lt;br&gt;Maps stream records&lt;br&gt;Versioned domain events&lt;br&gt;Partial batch failures" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#ED7100;strokeWidth=2;fillColor=#FFF3E0;fontColor=#713600;fontSize=14;" parent="1" vertex="1">
+                <mxCell id="stream-icon" value="" style="shape=mxgraph.aws4.dynamodb_stream;fillColor=#C925D1;strokeColor=none;html=1;aspect=fixed;" parent="stream" vertex="1" connectable="0">
+                    <mxGeometry x="75" y="6" width="40" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="publisher" value="&lt;b&gt;Publisher Lambda&lt;/b&gt;&lt;br&gt;Maps stream records&lt;br&gt;Versioned domain events&lt;br&gt;Partial batch failures" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#ED7100;strokeWidth=2;fillColor=#FFF3E0;fontColor=#713600;fontSize=13;verticalAlign=bottom;spacingBottom=6;" parent="1" vertex="1">
                     <mxGeometry x="1450" y="220" width="210" height="130" as="geometry"/>
                 </mxCell>
-                <mxCell id="delivery-queue" value="&lt;b&gt;Delivery SQS queue&lt;/b&gt;&lt;br&gt;Standard + SQS-managed SSE&lt;br&gt;Visibility timeout + redrive" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#C9256E;strokeWidth=2;fillColor=#FFF0F6;fontColor=#5A1736;fontSize=14;" parent="1" vertex="1">
+                <mxCell id="publisher-icon" value="" style="shape=mxgraph.aws4.lambda;fillColor=#ED7100;strokeColor=none;html=1;aspect=fixed;" parent="publisher" vertex="1" connectable="0">
+                    <mxGeometry x="81" y="7" width="48" height="48" as="geometry"/>
+                </mxCell>
+                <mxCell id="delivery-queue" value="&lt;b&gt;Delivery SQS queue&lt;/b&gt;&lt;br&gt;Standard + SQS-managed SSE&lt;br&gt;Visibility timeout + redrive" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#C9256E;strokeWidth=2;fillColor=#FFF0F6;fontColor=#5A1736;fontSize=13;verticalAlign=bottom;spacingBottom=6;" parent="1" vertex="1">
                     <mxGeometry x="2250" y="225" width="200" height="120" as="geometry"/>
                 </mxCell>
-                <mxCell id="worker" value="&lt;b&gt;Delivery Worker Lambda&lt;/b&gt;&lt;br&gt;Sequential small batches&lt;br&gt;Partial batch failures&lt;br&gt;Bounded concurrency + HTTP timeout" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#ED7100;strokeWidth=2;fillColor=#FFF3E0;fontColor=#713600;fontSize=14;" parent="1" vertex="1">
-                    <mxGeometry x="2640" y="230" width="200" height="135" as="geometry"/>
+                <mxCell id="delivery-queue-icon" value="" style="shape=mxgraph.aws4.sqs;fillColor=#E7157B;strokeColor=none;html=1;aspect=fixed;" parent="delivery-queue" vertex="1" connectable="0">
+                    <mxGeometry x="76" y="7" width="48" height="48" as="geometry"/>
                 </mxCell>
-                <mxCell id="publisher-failure-queue" value="&lt;b&gt;Publisher failure queue&lt;/b&gt;&lt;br&gt;Discarded / aged stream records&lt;br&gt;Manual investigation + replay" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#D04437;strokeWidth=2;fillColor=#FFEBE6;fontColor=#7A1F17;fontSize=14;" parent="1" vertex="1">
+                <mxCell id="publisher-failure-queue" value="&lt;b&gt;Publisher failure queue&lt;/b&gt;&lt;br&gt;Discarded / aged stream records&lt;br&gt;Manual investigation + replay" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#D04437;strokeWidth=2;fillColor=#FFEBE6;fontColor=#7A1F17;fontSize=13;verticalAlign=bottom;spacingBottom=5;" parent="1" vertex="1">
                     <mxGeometry x="1435" y="455" width="240" height="110" as="geometry"/>
                 </mxCell>
-                <mxCell id="delivery-dlq" value="&lt;b&gt;Delivery worker DLQ&lt;/b&gt;&lt;br&gt;Messages exceeding maxReceiveCount&lt;br&gt;Manual investigation + replay" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#D04437;strokeWidth=2;fillColor=#FFEBE6;fontColor=#7A1F17;fontSize=14;" parent="1" vertex="1">
+                <mxCell id="publisher-failure-queue-icon" value="" style="shape=mxgraph.aws4.sqs;fillColor=#E7157B;strokeColor=none;html=1;aspect=fixed;" parent="publisher-failure-queue" vertex="1" connectable="0">
+                    <mxGeometry x="98" y="6" width="44" height="44" as="geometry"/>
+                </mxCell>
+                <mxCell id="delivery-dlq" value="&lt;b&gt;Delivery worker DLQ&lt;/b&gt;&lt;br&gt;Messages exceeding maxReceiveCount&lt;br&gt;Manual investigation + replay" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#D04437;strokeWidth=2;fillColor=#FFEBE6;fontColor=#7A1F17;fontSize=13;verticalAlign=bottom;spacingBottom=5;" parent="1" vertex="1">
                     <mxGeometry x="2232.5" y="465" width="235" height="110" as="geometry"/>
                 </mxCell>
-                <mxCell id="logs" value="&lt;b&gt;Amazon CloudWatch Logs&lt;/b&gt;&lt;br&gt;API access log + 4 Lambda log groups&lt;br&gt;Explicit reviewed retention" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#1F845A;strokeWidth=2;fillColor=#E3FCEF;fontColor=#164B35;fontSize=14;" parent="1" vertex="1">
+                <mxCell id="delivery-dlq-icon" value="" style="shape=mxgraph.aws4.sqs;fillColor=#E7157B;strokeColor=none;html=1;aspect=fixed;" parent="delivery-dlq" vertex="1" connectable="0">
+                    <mxGeometry x="95.5" y="6" width="44" height="44" as="geometry"/>
+                </mxCell>
+                <mxCell id="logs" value="&lt;b&gt;Amazon CloudWatch Logs&lt;/b&gt;&lt;br&gt;API access log + 4 Lambda log groups&lt;br&gt;Explicit reviewed retention" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#1F845A;strokeWidth=2;fillColor=#E3FCEF;fontColor=#164B35;fontSize=13;verticalAlign=bottom;spacingBottom=5;" parent="1" vertex="1">
                     <mxGeometry x="780" y="855" width="270" height="105" as="geometry"/>
                 </mxCell>
-                <mxCell id="iam" value="&lt;b&gt;IAM execution roles&lt;/b&gt;&lt;br&gt;Per-function least privilege&lt;br&gt;Scoped table, stream, topic, and queue access" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#8F4E00;strokeWidth=2;fillColor=#FFF7D6;fontColor=#5F3811;fontSize=14;" parent="1" vertex="1">
+                <mxCell id="logs-icon" value="" style="shape=mxgraph.aws4.cloudwatch_logs;fillColor=#E7157B;strokeColor=none;html=1;aspect=fixed;" parent="logs" vertex="1" connectable="0">
+                    <mxGeometry x="114" y="5" width="42" height="42" as="geometry"/>
+                </mxCell>
+                <mxCell id="iam" value="&lt;b&gt;IAM execution roles&lt;/b&gt;&lt;br&gt;Per-function least privilege&lt;br&gt;Scoped table, stream, topic, and queue access" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#8F4E00;strokeWidth=2;fillColor=#FFF7D6;fontColor=#5F3811;fontSize=13;verticalAlign=bottom;spacingBottom=5;" parent="1" vertex="1">
                     <mxGeometry x="1100" y="855" width="270" height="105" as="geometry"/>
+                </mxCell>
+                <mxCell id="iam-icon" value="" style="shape=mxgraph.aws4.identity_and_access_management;fillColor=#DD344C;strokeColor=none;html=1;aspect=fixed;" parent="iam" vertex="1" connectable="0">
+                    <mxGeometry x="114" y="5" width="42" height="42" as="geometry"/>
                 </mxCell>
                 <mxCell id="cost-note" value="&lt;b&gt;Cost and exposure boundaries&lt;/b&gt;&lt;br&gt;No VPC or NAT Gateway • no provisioned concurrency&lt;br&gt;No custom KMS key • required cost parameters have no defaults" style="shape=note;whiteSpace=wrap;html=1;strokeColor=#B38600;strokeWidth=2;fillColor=#FFF7D6;fontColor=#5F4B00;fontSize=14;" parent="1" vertex="1">
                     <mxGeometry x="290" y="850" width="470" height="110" as="geometry"/>
@@ -123,12 +165,14 @@
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
                 <mxCell id="edge-queue-worker" value="SQS event-source mapping&lt;br&gt;partial batch response" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C9256E;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#FFFFFF;" parent="1" source="delivery-queue" target="worker" edge="1">
-                    <mxGeometry x="-0.0075" y="5" relative="1" as="geometry">
+                    <mxGeometry x="0.0526" y="35" relative="1" as="geometry">
                         <mxPoint as="offset"/>
                     </mxGeometry>
                 </mxCell>
                 <mxCell id="edge-worker-vendor" value="POST /deliveries&lt;br&gt;Bearer + idempotency key" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#42526E;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#FFFFFF;" parent="1" source="worker" target="vendor" edge="1">
-                    <mxGeometry relative="1" as="geometry"/>
+                    <mxGeometry x="-0.6688" y="28" relative="1" as="geometry">
+                        <mxPoint y="1" as="offset"/>
+                    </mxGeometry>
                 </mxCell>
                 <mxCell id="edge-worker-ddb" value="Load order + record provider outcome" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2E73B8;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#FFFFFF;" parent="1" source="worker" target="dynamodb" edge="1">
                     <mxGeometry relative="1" as="geometry">
@@ -159,8 +203,11 @@
                 <mxCell id="legend" value="&lt;b&gt;Legend:&lt;/b&gt; solid arrows = runtime flow &amp;nbsp; • &amp;nbsp; dashed arrows/boxes = authorization, observability, or future extension &amp;nbsp; • &amp;nbsp; red = retained failure path" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;fontSize=13;fontColor=#42526E;" parent="1" vertex="1">
                     <mxGeometry x="250" y="1010" width="1500" height="30" as="geometry"/>
                 </mxCell>
-                <mxCell id="sns" value="&lt;b&gt;Amazon SNS&lt;/b&gt;&lt;br&gt;Standard domain-events topic&lt;br&gt;All order event types" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#C9256E;strokeWidth=2;fillColor=#FFF0F6;fontColor=#5A1736;fontSize=14;" parent="1" vertex="1">
+                <mxCell id="sns" value="&lt;b&gt;Amazon SNS&lt;/b&gt;&lt;br&gt;Standard domain-events topic&lt;br&gt;All order event types" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#C9256E;strokeWidth=2;fillColor=#FFF0F6;fontColor=#5A1736;fontSize=13;verticalAlign=bottom;spacingBottom=5;" parent="1" vertex="1">
                     <mxGeometry x="1830" y="230" width="190" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="sns-icon" value="" style="shape=mxgraph.aws4.sns;fillColor=#E7157B;strokeColor=none;html=1;aspect=fixed;" parent="sns" vertex="1" connectable="0">
+                    <mxGeometry x="73.5" y="6" width="43" height="43" as="geometry"/>
                 </mxCell>
             </root>
         </mxGraphModel>
