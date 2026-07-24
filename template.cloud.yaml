@@ -1,0 +1,390 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Deployable synchronous slice for the serverless order integration project
+
+Parameters:
+  EnvironmentName:
+    Type: String
+    Default: dev
+    AllowedPattern: '^[a-z][a-z0-9-]{1,15}$'
+    Description: Short environment label used in tags and resource descriptions.
+  MerchantId:
+    Type: String
+    Default: mrc_demo
+    AllowedPattern: '^mrc_[A-Za-z0-9]+$'
+    Description: Fixed learning tenant mapped from authenticated test identities.
+  CursorSigningSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: HMAC secret for opaque order-list cursors; never commit its deployed value.
+  WebhookSigningSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: Shared HMAC secret for provider webhooks; never commit its deployed value.
+  WebhookToleranceSeconds:
+    Type: Number
+    Default: 300
+    MinValue: 30
+    MaxValue: 900
+    Description: Maximum accepted difference between webhook and server timestamps.
+  LogRetentionDays:
+    Type: Number
+    AllowedValues:
+      - 1
+      - 3
+      - 5
+      - 7
+      - 14
+      - 30
+    Description: Cost-reviewed CloudWatch Logs retention selected before deployment.
+  ApiThrottleBurstLimit:
+    Type: Number
+    MinValue: 1
+    Description: Cost-reviewed maximum HTTP API burst selected before deployment.
+  ApiThrottleRateLimit:
+    Type: Number
+    MinValue: 1
+    Description: Cost-reviewed steady HTTP API request rate selected before deployment.
+  DynamoMaxReadRequestUnits:
+    Type: Number
+    MinValue: 1
+    Description: Cost-reviewed maximum on-demand reads per second for the table and indexes.
+  DynamoMaxWriteRequestUnits:
+    Type: Number
+    MinValue: 1
+    Description: Cost-reviewed maximum on-demand writes per second for the table and indexes.
+
+Globals:
+  Function:
+    Runtime: nodejs24.x
+    Architectures:
+      - x86_64
+    MemorySize: 128
+    Timeout: 10
+    PropagateTags: true
+    Tags:
+      Project: serverless-order-integration
+      Environment: !Ref EnvironmentName
+
+Resources:
+  OrdersTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      TableClass: STANDARD
+      DeletionProtectionEnabled: false
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: false
+      OnDemandThroughput:
+        MaxReadRequestUnits: !Ref DynamoMaxReadRequestUnits
+        MaxWriteRequestUnits: !Ref DynamoMaxWriteRequestUnits
+      AttributeDefinitions:
+        - AttributeName: pk
+          AttributeType: S
+        - AttributeName: sk
+          AttributeType: S
+        - AttributeName: gsi1pk
+          AttributeType: S
+        - AttributeName: gsi1sk
+          AttributeType: S
+        - AttributeName: gsi2pk
+          AttributeType: S
+        - AttributeName: gsi2sk
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pk
+          KeyType: HASH
+        - AttributeName: sk
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: byMerchantCreatedAt
+          KeySchema:
+            - AttributeName: gsi1pk
+              KeyType: HASH
+            - AttributeName: gsi1sk
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          OnDemandThroughput:
+            MaxReadRequestUnits: !Ref DynamoMaxReadRequestUnits
+            MaxWriteRequestUnits: !Ref DynamoMaxWriteRequestUnits
+        - IndexName: byMerchantStatusCreatedAt
+          KeySchema:
+            - AttributeName: gsi2pk
+              KeyType: HASH
+            - AttributeName: gsi2sk
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+          OnDemandThroughput:
+            MaxReadRequestUnits: !Ref DynamoMaxReadRequestUnits
+            MaxWriteRequestUnits: !Ref DynamoMaxWriteRequestUnits
+      Tags:
+        - Key: Project
+          Value: serverless-order-integration
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      UserPoolTier: LITE
+      DeletionProtection: INACTIVE
+      MfaConfiguration: OFF
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: admin_only
+            Priority: 1
+      UsernameConfiguration:
+        CaseSensitive: false
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+          TemporaryPasswordValidityDays: 1
+      UserPoolTags:
+        Project: serverless-order-integration
+        Environment: !Ref EnvironmentName
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 1
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+
+  OperatorsGroup:
+    Type: AWS::Cognito::UserPoolGroup
+    Properties:
+      UserPoolId: !Ref UserPool
+      GroupName: operators
+      Description: Synthetic operators allowed to invoke controlled status changes.
+
+  ApiAccessLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/serverless-order-integration/${AWS::StackName}/api-access
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Project
+          Value: serverless-order-integration
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  OrdersApiLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/serverless-order-integration/${AWS::StackName}/orders-api
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Project
+          Value: serverless-order-integration
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  VendorWebhookLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/serverless-order-integration/${AWS::StackName}/vendor-webhook
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Project
+          Value: serverless-order-integration
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  SynchronousHttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      FailOnWarnings: true
+      DefinitionBody:
+        openapi: 3.0.1
+        info:
+          title: !Sub ${AWS::StackName}-http-api
+          version: '1.0'
+        paths: {}
+      Auth:
+        DefaultAuthorizer: CognitoJwtAuthorizer
+        Authorizers:
+          CognitoJwtAuthorizer:
+            IdentitySource: $request.header.Authorization
+            JwtConfiguration:
+              issuer: !Sub https://cognito-idp.${AWS::Region}.${AWS::URLSuffix}/${UserPool}
+              audience:
+                - !Ref UserPoolClient
+      AccessLogSettings:
+        DestinationArn: !GetAtt ApiAccessLogGroup.Arn
+        Format: >-
+          {"requestId":"$context.requestId","routeKey":"$context.routeKey","status":"$context.status","responseLatency":"$context.responseLatency","responseLength":"$context.responseLength","integrationStatus":"$context.integration.status"}
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: !Ref ApiThrottleBurstLimit
+        ThrottlingRateLimit: !Ref ApiThrottleRateLimit
+      Tags:
+        Project: serverless-order-integration
+        Environment: !Ref EnvironmentName
+
+  OrdersApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: orders-api.handler
+      Description: Authenticated order REST operations for the fixed learning tenant.
+      LoggingConfig:
+        LogFormat: Text
+        LogGroup: !Ref OrdersApiLogGroup
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref OrdersTable
+          MERCHANT_ID: !Ref MerchantId
+          CURSOR_SIGNING_SECRET: !Ref CursorSigningSecret
+          REQUIRE_ACCESS_TOKEN: 'true'
+          REQUIRE_OPERATOR_GROUP: 'true'
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Sid: ReadOrders
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource: !GetAtt OrdersTable.Arn
+            - Sid: QueryOrderIndexes
+              Effect: Allow
+              Action:
+                - dynamodb:Query
+              Resource: !Sub ${OrdersTable.Arn}/index/*
+            - Sid: WriteOrders
+              Effect: Allow
+              Action:
+                - dynamodb:TransactWriteItems
+              Resource: !GetAtt OrdersTable.Arn
+      Events:
+        CreateOrder:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SynchronousHttpApi
+            Method: POST
+            Path: /orders
+            PayloadFormatVersion: '2.0'
+        ListOrders:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SynchronousHttpApi
+            Method: GET
+            Path: /orders
+            PayloadFormatVersion: '2.0'
+        GetOrder:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SynchronousHttpApi
+            Method: GET
+            Path: /orders/{orderId}
+            PayloadFormatVersion: '2.0'
+        ChangeOrderStatus:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SynchronousHttpApi
+            Method: PATCH
+            Path: /orders/{orderId}/status
+            PayloadFormatVersion: '2.0'
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/lambda/orders-api.ts
+        Format: cjs
+        Minify: true
+        Sourcemap: true
+        Target: es2022
+
+  VendorWebhookFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: vendor-webhook.handler
+      Description: Public provider webhook protected by HMAC and durable event deduplication.
+      LoggingConfig:
+        LogFormat: Text
+        LogGroup: !Ref VendorWebhookLogGroup
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref OrdersTable
+          WEBHOOK_SIGNING_SECRET: !Ref WebhookSigningSecret
+          WEBHOOK_TOLERANCE_SECONDS: !Ref WebhookToleranceSeconds
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Sid: ReadWebhookOrder
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource: !GetAtt OrdersTable.Arn
+            - Sid: RecordWebhook
+              Effect: Allow
+              Action:
+                - dynamodb:TransactWriteItems
+              Resource: !GetAtt OrdersTable.Arn
+      Events:
+        VendorWebhook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SynchronousHttpApi
+            Method: POST
+            Path: /webhooks/vendor
+            PayloadFormatVersion: '2.0'
+            Auth:
+              Authorizer: NONE
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/lambda/vendor-webhook.ts
+        Format: cjs
+        Minify: true
+        Sourcemap: true
+        Target: es2022
+
+Outputs:
+  ApiUrl:
+    Description: Regional API Gateway HTTP API endpoint.
+    Value: !Sub https://${SynchronousHttpApi}.execute-api.${AWS::Region}.${AWS::URLSuffix}
+  OrdersTableName:
+    Description: DynamoDB table used by the synchronous application slice.
+    Value: !Ref OrdersTable
+  UserPoolId:
+    Description: Cognito user pool for synthetic merchant and operator users.
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Description: Public Cognito app client ID used to obtain test access tokens.
+    Value: !Ref UserPoolClient
+  UserPoolIssuer:
+    Description: JWT issuer configured on the HTTP API authorizer.
+    Value: !Sub https://cognito-idp.${AWS::Region}.${AWS::URLSuffix}/${UserPool}

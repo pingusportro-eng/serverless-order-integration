@@ -66,11 +66,13 @@ describe('orders API Lambda adapter', () => {
     repository = new InMemoryOrderRepository();
   });
 
-  function handler() {
+  function handler(requireAccessToken = false, requireOperatorGroup = false) {
     return createOrdersApiHandler({
       repository,
       merchantId,
       cursorCodec: createOrderCursorCodec('lambda-test-cursor-signing-secret-0123456789'),
+      requireAccessToken,
+      requireOperatorGroup,
       now: () => new Date('2026-07-22T12:00:00.000Z'),
       logSink: () => undefined,
     });
@@ -142,5 +144,98 @@ describe('orders API Lambda adapter', () => {
       code: 'MALFORMED_REQUEST',
       requestId: 'lambda-request-123',
     });
+  });
+
+  it('requires a verified operators group claim for the cloud operator route', async () => {
+    const request = eventFixture({
+      routeKey: 'PATCH /orders/{orderId}/status',
+      method: 'PATCH',
+      path: '/orders/ord_12345678/status',
+      pathParameters: { orderId: 'ord_12345678' },
+      headers: { 'if-match': '"1"' },
+      body: JSON.stringify({
+        targetStatus: 'CANCELLED',
+        reason: 'Synthetic operator cancellation.',
+      }),
+    });
+
+    const response = await handler(false, true)(request);
+
+    expect(response.statusCode).toBe(403);
+    expect(responseBody(response)).toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('allows the verified operators group claim to reach the operator route', async () => {
+    const request = eventFixture({
+      routeKey: 'PATCH /orders/{orderId}/status',
+      method: 'PATCH',
+      path: '/orders/ord_12345678/status',
+      pathParameters: { orderId: 'ord_12345678' },
+      headers: { 'if-match': '"1"' },
+      body: JSON.stringify({
+        targetStatus: 'CANCELLED',
+        reason: 'Synthetic operator cancellation.',
+      }),
+    });
+    Object.assign(request.requestContext, {
+      authorizer: {
+        principalId: 'synthetic-operator',
+        integrationLatency: 1,
+        jwt: {
+          claims: { 'cognito:groups': ['operators'] },
+          scopes: [],
+        },
+      },
+    });
+
+    const response = await handler(false, true)(request);
+
+    expect(response.statusCode).toBe(404);
+    expect(responseBody(response)).toMatchObject({ code: 'ORDER_NOT_FOUND' });
+  });
+
+  it('rejects an ID token when cloud routes require an access token', async () => {
+    const request = eventFixture({
+      routeKey: 'GET /orders',
+      method: 'GET',
+      path: '/orders',
+    });
+    Object.assign(request.requestContext, {
+      authorizer: {
+        principalId: 'synthetic-user',
+        integrationLatency: 1,
+        jwt: {
+          claims: { token_use: 'id' },
+          scopes: [],
+        },
+      },
+    });
+
+    const response = await handler(true)(request);
+
+    expect(response.statusCode).toBe(401);
+    expect(responseBody(response)).toMatchObject({ code: 'UNAUTHORIZED' });
+  });
+
+  it('accepts a verified access token on a merchant route', async () => {
+    const request = eventFixture({
+      routeKey: 'GET /orders',
+      method: 'GET',
+      path: '/orders',
+    });
+    Object.assign(request.requestContext, {
+      authorizer: {
+        principalId: 'synthetic-user',
+        integrationLatency: 1,
+        jwt: {
+          claims: { token_use: 'access' },
+          scopes: [],
+        },
+      },
+    });
+
+    const response = await handler(true)(request);
+
+    expect(response.statusCode).toBe(200);
   });
 });

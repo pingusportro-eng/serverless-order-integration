@@ -319,7 +319,7 @@ For every step, the review should answer:
 
 ## Phase 5: Cloud infrastructure
 
-- [ ] **5.1 — Define the synchronous cloud slice**
+- [x] **5.1 — Define the synchronous cloud slice**
   - Define the API Gateway HTTP API, Lambda functions, DynamoDB table, IAM, and
     log retention using AWS SAM/CloudFormation.
   - Use on-demand DynamoDB and AWS-managed encryption.
@@ -425,6 +425,6 @@ For every step, the review should answer:
 
 ## Next step
 
-Continue with **5.1 — Define the synchronous cloud slice**. Define and validate
-the infrastructure locally without deploying; deployment still requires the
-separate cost review and explicit approval in step 5.3.
+Continue with **5.2 — Define the asynchronous cloud slice**. Add and validate
+the messaging resources locally without deploying; deployment still requires
+the separate cost review and explicit approval in step 5.3.

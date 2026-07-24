@@ -26,6 +26,8 @@ export interface OrdersApiDependencies {
   readonly repository: OrderRepository;
   readonly cursorCodec: OrderCursorCodec;
   readonly merchantId: MerchantId;
+  readonly requireAccessToken: boolean;
+  readonly requireOperatorGroup: boolean;
   readonly now?: () => Date;
   readonly logSink?: LogSink;
 }
@@ -41,6 +43,21 @@ function requireEnvironment(name: string): string {
     throw new Error(`The ${name} environment variable is required.`);
   }
   return value;
+}
+
+function booleanEnvironment(name: string): boolean {
+  const value = requireEnvironment(name);
+  if (value === 'true') {
+    return true;
+  }
+  if (value === 'false') {
+    return false;
+  }
+  throw new Error(`The ${name} environment variable must be true or false.`);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function header(
@@ -75,6 +92,79 @@ function query(event: APIGatewayProxyEventV2): ListOrdersQuery {
     ...(values?.['cursor'] === undefined ? {} : { cursor: values['cursor'] }),
     ...(values?.['status'] === undefined ? {} : { status: values['status'] }),
   };
+}
+
+function stringList(value: unknown): readonly string[] {
+  if (Array.isArray(value)) {
+    return value.filter((entry): entry is string => typeof entry === 'string');
+  }
+  if (typeof value !== 'string') {
+    return [];
+  }
+
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (Array.isArray(parsed)) {
+      return parsed.filter((entry): entry is string => typeof entry === 'string');
+    }
+  } catch {
+    // API Gateway can expose a simple comma-separated claim instead of JSON.
+  }
+  return value.split(',').map((entry) => entry.trim());
+}
+
+function jwtClaims(event: APIGatewayProxyEventV2): Record<string, unknown> | undefined {
+  const requestContext: unknown = event.requestContext;
+  if (!isRecord(requestContext)) {
+    return undefined;
+  }
+  const authorizer = requestContext['authorizer'];
+  if (!isRecord(authorizer) || !isRecord(authorizer['jwt'])) {
+    return undefined;
+  }
+  const claims = authorizer['jwt']['claims'];
+  return isRecord(claims) ? claims : undefined;
+}
+
+function hasOperatorGroup(event: APIGatewayProxyEventV2): boolean {
+  const claims = jwtClaims(event);
+  return claims !== undefined && stringList(claims['cognito:groups']).includes('operators');
+}
+
+function authorizationFailure(
+  dependencies: OrdersApiDependencies,
+  event: APIGatewayProxyEventV2,
+  requestId: string,
+): HttpResponse<unknown> | undefined {
+  if (dependencies.requireAccessToken && jwtClaims(event)?.['token_use'] !== 'access') {
+    return problemResponse(
+      {
+        status: 401,
+        code: 'UNAUTHORIZED',
+        title: 'Unauthorized',
+        detail: 'A verified Cognito access token is required for this operation.',
+      },
+      requestId,
+    );
+  }
+
+  if (
+    !dependencies.requireOperatorGroup ||
+    event.routeKey !== 'PATCH /orders/{orderId}/status' ||
+    hasOperatorGroup(event)
+  ) {
+    return undefined;
+  }
+
+  return problemResponse(
+    {
+      status: 403,
+      code: 'FORBIDDEN',
+      title: 'Forbidden',
+      detail: 'Operator group membership is required for this operation.',
+    },
+    requestId,
+  );
 }
 
 function serialize(response: HttpResponse<unknown>): APIGatewayProxyStructuredResultV2 {
@@ -166,6 +256,17 @@ export function createOrdersApiHandler(dependencies: OrdersApiDependencies): Ord
       merchantId: dependencies.merchantId,
     });
 
+    const authorizationError = authorizationFailure(dependencies, event, requestId);
+    if (authorizationError !== undefined) {
+      const errorCode = authorizationError.statusCode === 401 ? 'UNAUTHORIZED' : 'FORBIDDEN';
+      logger.write('warn', 'http.request.completed', {
+        route: event.routeKey,
+        statusCode: authorizationError.statusCode,
+        errorCode,
+      });
+      return serialize(authorizationError);
+    }
+
     let body: unknown;
     try {
       body = parseBody(event);
@@ -229,6 +330,8 @@ function createDefaultHandler(): OrdersApiHandler {
     repository: new DynamoDbOrderRepository(client, requireEnvironment('TABLE_NAME')),
     cursorCodec: createOrderCursorCodec(requireEnvironment('CURSOR_SIGNING_SECRET')),
     merchantId: asMerchantId(requireEnvironment('MERCHANT_ID')),
+    requireAccessToken: booleanEnvironment('REQUIRE_ACCESS_TOKEN'),
+    requireOperatorGroup: booleanEnvironment('REQUIRE_OPERATOR_GROUP'),
   });
 }
 

@@ -12,6 +12,8 @@ npm run sam:build
 temporary_directory="$(mktemp -d)"
 api_log="$project_root/.aws-sam/local-api.log"
 api_pid=''
+api_port="$(node -e "const net=require('node:net');const server=net.createServer();server.listen(0,'127.0.0.1',()=>{const address=server.address();if(address===null||typeof address==='string')process.exit(1);process.stdout.write(String(address.port));server.close();});")"
+api_base_url="http://127.0.0.1:$api_port"
 
 cleanup() {
   if [[ -n "$api_pid" ]]; then
@@ -26,7 +28,7 @@ sam local start-api \
   --docker-network serverless-order-integration_default \
   --env-vars sam-local-fixture.json \
   --host 127.0.0.1 \
-  --port 3000 >"$api_log" 2>&1 &
+  --port "$api_port" >"$api_log" 2>&1 &
 api_pid=$!
 
 for _ in {1..90}; do
@@ -34,13 +36,13 @@ for _ in {1..90}; do
     echo "SAM local API stopped before becoming ready. See $api_log." >&2
     exit 1
   fi
-  if curl --silent --fail --output /dev/null 'http://127.0.0.1:3000/orders?limit=1'; then
+  if curl --silent --fail --output /dev/null "$api_base_url/orders?limit=1"; then
     break
   fi
   sleep 1
 done
 
-if ! curl --silent --fail --output /dev/null 'http://127.0.0.1:3000/orders?limit=1'; then
+if ! curl --silent --fail --output /dev/null "$api_base_url/orders?limit=1"; then
   echo "SAM local API did not become ready. See $api_log." >&2
   exit 1
 fi
@@ -53,18 +55,18 @@ create_status="$(curl --silent --output "$temporary_directory/create.json" --wri
   --header 'Content-Type: application/json' \
   --header "Idempotency-Key: sam-$suffix" \
   --data "$create_body" \
-  'http://127.0.0.1:3000/orders')"
+  "$api_base_url/orders")"
 [[ "$create_status" == '201' ]]
 
 order_id="$(node -e "const fs=require('node:fs');const value=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));if(typeof value.orderId!=='string')process.exit(1);process.stdout.write(value.orderId);" "$temporary_directory/create.json")"
 
 get_status="$(curl --silent --output "$temporary_directory/get.json" --write-out '%{http_code}' \
-  "http://127.0.0.1:3000/orders/$order_id")"
+  "$api_base_url/orders/$order_id")"
 [[ "$get_status" == '200' ]]
 node -e "const fs=require('node:fs');const value=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));if(value.orderId!==process.argv[2])process.exit(1);" "$temporary_directory/get.json" "$order_id"
 
 list_status="$(curl --silent --output "$temporary_directory/list.json" --write-out '%{http_code}' \
-  'http://127.0.0.1:3000/orders?limit=1')"
+  "$api_base_url/orders?limit=1")"
 [[ "$list_status" == '200' ]]
 node -e "const fs=require('node:fs');const value=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));if(!Array.isArray(value.items))process.exit(1);" "$temporary_directory/list.json"
 
@@ -73,13 +75,13 @@ change_status="$(curl --silent --output "$temporary_directory/change.json" --wri
   --header 'Content-Type: application/json' \
   --header 'If-Match: "1"' \
   --data "{\"targetStatus\":\"SUBMITTED\",\"reason\":\"SAM local reconciliation.\",\"providerOrderId\":\"provider-$suffix\"}" \
-  "http://127.0.0.1:3000/orders/$order_id/status")"
+  "$api_base_url/orders/$order_id/status")"
 [[ "$change_status" == '200' ]]
 
 node -e "const fs=require('node:fs');const value=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));if(value.status!=='SUBMITTED'||value.version!==2)process.exit(1);" "$temporary_directory/change.json"
 
 webhook_timestamp="$(date +%s)"
-webhook_occurred_at="$(date -u +'%Y-%m-%dT%H:%M:%S.000Z')"
+webhook_occurred_at="$(node -e "process.stdout.write(new Date().toISOString());")"
 webhook_body="{\"eventId\":\"provider-event-$suffix\",\"eventType\":\"DELIVERY_DELIVERED\",\"occurredAt\":\"$webhook_occurred_at\",\"providerOrderId\":\"provider-$suffix\"}"
 webhook_signature="$(node -e "const crypto=require('node:crypto');const [secret,timestamp,body]=process.argv.slice(1);process.stdout.write('sha256='+crypto.createHmac('sha256',secret).update(timestamp+'.'+body,'utf8').digest('hex'));" \
   'LOCAL_ONLY_WEBHOOK_SECRET_0123456789' "$webhook_timestamp" "$webhook_body")"
@@ -90,7 +92,7 @@ webhook_status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
   --header "X-Webhook-Timestamp: $webhook_timestamp" \
   --header "X-Webhook-Signature: $webhook_signature" \
   --data "$webhook_body" \
-  'http://127.0.0.1:3000/webhooks/vendor')"
+  "$api_base_url/webhooks/vendor")"
 [[ "$webhook_status" == '204' ]]
 
 duplicate_webhook_status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
@@ -99,11 +101,11 @@ duplicate_webhook_status="$(curl --silent --output /dev/null --write-out '%{http
   --header "X-Webhook-Timestamp: $webhook_timestamp" \
   --header "X-Webhook-Signature: $webhook_signature" \
   --data "$webhook_body" \
-  'http://127.0.0.1:3000/webhooks/vendor')"
+  "$api_base_url/webhooks/vendor")"
 [[ "$duplicate_webhook_status" == '204' ]]
 
 delivered_status="$(curl --silent --output "$temporary_directory/delivered.json" --write-out '%{http_code}' \
-  "http://127.0.0.1:3000/orders/$order_id")"
+  "$api_base_url/orders/$order_id")"
 [[ "$delivered_status" == '200' ]]
 node -e "const fs=require('node:fs');const value=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));if(value.status!=='DELIVERED'||value.version!==3)process.exit(1);" "$temporary_directory/delivered.json"
 

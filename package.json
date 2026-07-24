@@ -23,6 +23,8 @@
     "lint:fix": "eslint . --fix",
     "mock-vendor:start": "npm run build && node scripts/mock-vendor/start-local.mjs",
     "sam:build": "SAM_CLI_TELEMETRY=0 sam build",
+    "sam:cloud:build": "SAM_CLI_TELEMETRY=0 sam build --template-file template.cloud.yaml --build-dir .aws-sam/cloud-build",
+    "sam:cloud:validate": "SAM_CLI_TELEMETRY=0 sam validate --lint --template-file template.cloud.yaml",
     "sam:local": "npm run dynamodb:bootstrap && npm run sam:build && SAM_CLI_TELEMETRY=0 sam local start-api --docker-network serverless-order-integration_default --env-vars sam-local-fixture.json",
     "sam:validate": "SAM_CLI_TELEMETRY=0 sam validate --lint",
     "test": "vitest run",

@@ -42,6 +42,8 @@ Resources:
           MERCHANT_ID: !Ref MerchantId
           DYNAMODB_ENDPOINT: !Ref DynamoDbEndpoint
           CURSOR_SIGNING_SECRET: !Ref CursorSigningSecret
+          REQUIRE_ACCESS_TOKEN: 'false'
+          REQUIRE_OPERATOR_GROUP: 'false'
       Events:
         CreateOrder:
           Type: HttpApi

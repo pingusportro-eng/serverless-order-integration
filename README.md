@@ -84,6 +84,8 @@ The individual commands are:
 - `npm run test:webhook` — verify webhook signatures, replay protection, and status changes
 - `npm run sam:validate` — lint and validate the local SAM template
 - `npm run sam:build` — bundle the Lambda handler for the Node.js 24 runtime
+- `npm run sam:cloud:validate` — lint the deployable cloud template without deploying
+- `npm run sam:cloud:build` — bundle the deployable synchronous Lambda functions locally
 - `npm run test:sam` — exercise every current API route through local SAM HTTP
 - `npm run test:stream-publisher` — map saved DynamoDB Stream records and test partial failures
 - `npm run build` — compile TypeScript into `dist/`
@@ -189,6 +191,20 @@ fixed `mrc_demo` learning tenant and permits the operator route locally. Cognito
 JWT validation, operator claims, IAM, and the deployable DynamoDB resource are
 part of the reviewed cloud-infrastructure phase; this local template must not
 be deployed as the cloud stack.
+
+## Deployable cloud template
+
+[template.cloud.yaml](template.cloud.yaml) defines the synchronous AWS slice:
+HTTP API, Cognito JWT authorization, order and webhook Lambdas, DynamoDB,
+least-privilege IAM policies, throttling inputs, and short-retention log groups.
+It is separate from the local SAM template.
+
+Several cost-control values deliberately have no defaults and must be agreed
+during the pre-deployment review. Building or validating this template does not
+contact AWS or create resources. See the
+[synchronous cloud slice](docs/infrastructure/synchronous-cloud-slice.md) for
+the resource inventory, security boundaries, deferred decisions, and local
+verification commands.
 
 ## Local mock delivery vendor
 
