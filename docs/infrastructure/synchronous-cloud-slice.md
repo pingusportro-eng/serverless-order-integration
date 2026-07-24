@@ -5,10 +5,15 @@ Last reviewed: 2026-07-24
 
 ## Purpose
 
-`template.cloud.yaml` defines the first deployable AWS slice without creating
-anything by itself. The existing `template.yaml` remains the local SAM template.
-Only the explicit deployment step after the cost review may create AWS
-resources.
+Step 5.1 introduced the first deployable AWS slice in `template.cloud.yaml`
+without creating anything by itself. Step 5.2 extends the same template with
+the separately documented asynchronous resources. The existing `template.yaml`
+remains the local SAM template. Only the explicit deployment step after the
+cost review may create AWS resources.
+
+The editable
+[full AWS cloud stack Draw.io diagram](../architecture/full-cloud-stack.drawio)
+shows this synchronous path together with the asynchronous and failure paths.
 
 The cloud template defines:
 
@@ -19,9 +24,11 @@ The cloud template defines:
 - Three CloudWatch log groups with explicitly selected retention
 - SAM-generated Lambda execution roles and invocation permissions
 
-It intentionally defines no VPC, NAT Gateway, load balancer, custom domain,
-WAF, cache, provisioned concurrency, backup, stream, SNS topic, SQS queue,
-customer-managed KMS key, or test user.
+The complete template intentionally defines no VPC, NAT Gateway, load balancer,
+custom domain, WAF, cache, provisioned concurrency, backup, customer-managed
+KMS key, or test user. See
+[asynchronous-cloud-slice.md](asynchronous-cloud-slice.md) for the stream and
+messaging additions.
 
 ## Security boundaries
 

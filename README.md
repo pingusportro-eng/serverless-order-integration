@@ -194,17 +194,22 @@ be deployed as the cloud stack.
 
 ## Deployable cloud template
 
-[template.cloud.yaml](template.cloud.yaml) defines the synchronous AWS slice:
-HTTP API, Cognito JWT authorization, order and webhook Lambdas, DynamoDB,
-least-privilege IAM policies, throttling inputs, and short-retention log groups.
-It is separate from the local SAM template.
+[template.cloud.yaml](template.cloud.yaml) defines the deployable AWS stack:
+HTTP API, Cognito JWT authorization, application Lambdas, DynamoDB and its
+Stream, SNS, SQS failure paths, least-privilege IAM policies, bounded event
+sources, throttling inputs, and short-retention log groups. It is separate from
+the local SAM template.
 
 Several cost-control values deliberately have no defaults and must be agreed
 during the pre-deployment review. Building or validating this template does not
 contact AWS or create resources. See the
 [synchronous cloud slice](docs/infrastructure/synchronous-cloud-slice.md) for
-the resource inventory, security boundaries, deferred decisions, and local
-verification commands.
+the HTTP/data resource inventory and the
+[asynchronous cloud slice](docs/infrastructure/asynchronous-cloud-slice.md) for
+streaming, messaging, retry, and DLQ details.
+
+The editable [full AWS cloud stack diagram](docs/architecture/full-cloud-stack.drawio)
+shows both paths and their security, observability, and failure boundaries.
 
 ## Local mock delivery vendor
 

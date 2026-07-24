@@ -326,7 +326,7 @@ For every step, the review should answer:
   - Verification: build and validate the template locally.
   - AWS cost before deployment: $0.
 
-- [ ] **5.2 — Define the asynchronous cloud slice**
+- [x] **5.2 — Define the asynchronous cloud slice**
   - Define the DynamoDB Stream mapping, SNS topic, SQS queue, DLQ, subscriptions,
     and worker Lambda mapping.
   - Configure visibility timeout, redrive, batch size, and least-privilege IAM.
@@ -425,6 +425,6 @@ For every step, the review should answer:
 
 ## Next step
 
-Continue with **5.2 — Define the asynchronous cloud slice**. Add and validate
-the messaging resources locally without deploying; deployment still requires
-the separate cost review and explicit approval in step 5.3.
+Continue with **5.3 — Perform the pre-deployment cost review**. Choose every
+required cost-control parameter, resolve the public mock-vendor endpoint, and
+obtain explicit approval before deploying anything.

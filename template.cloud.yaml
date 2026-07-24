@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Deployable synchronous slice for the serverless order integration project
+Description: Deployable serverless order integration stack
 
 Parameters:
   EnvironmentName:
@@ -55,6 +55,70 @@ Parameters:
     Type: Number
     MinValue: 1
     Description: Cost-reviewed maximum on-demand writes per second for the table and indexes.
+  StreamPublisherBatchSize:
+    Type: Number
+    MinValue: 1
+    MaxValue: 1000
+    Description: Cost-reviewed maximum DynamoDB Stream records per publisher invocation.
+  StreamPublisherMaximumRetryAttempts:
+    Type: Number
+    MinValue: 0
+    MaxValue: 10000
+    Description: Cost-reviewed retries before a failed stream record is discarded to SQS.
+  StreamPublisherMaximumRecordAgeSeconds:
+    Type: Number
+    MinValue: 60
+    MaxValue: 86400
+    Description: Cost-reviewed stream record age before it is discarded to SQS.
+  DeliveryWorkerBatchSize:
+    Type: Number
+    MinValue: 1
+    MaxValue: 10
+    Description: Cost-reviewed maximum SQS messages processed sequentially per worker invocation.
+  DeliveryWorkerMaximumConcurrency:
+    Type: Number
+    MinValue: 2
+    MaxValue: 10
+    Description: Cost-reviewed upper bound on concurrent delivery worker invocations.
+  DeliveryWorkerTimeoutSeconds:
+    Type: Number
+    MinValue: 1
+    MaxValue: 60
+    Description: Cost-reviewed Lambda timeout for one delivery batch.
+  DeliveryQueueVisibilityTimeoutSeconds:
+    Type: Number
+    MinValue: 6
+    MaxValue: 43200
+    Description: Cost-reviewed time failed or in-flight delivery messages remain hidden.
+  DeliveryQueueMaxReceiveCount:
+    Type: Number
+    MinValue: 2
+    MaxValue: 10
+    Description: Cost-reviewed delivery attempts before a message moves to the worker DLQ.
+  DeliveryMessageRetentionSeconds:
+    Type: Number
+    MinValue: 60
+    MaxValue: 1209600
+    Description: Cost-reviewed retention for pending delivery messages.
+  FailureMessageRetentionSeconds:
+    Type: Number
+    MinValue: 60
+    MaxValue: 1209600
+    Description: Cost-reviewed retention shared by the stream failure queue and worker DLQ.
+  VendorBaseUrl:
+    Type: String
+    AllowedPattern: '^https://.+'
+    Description: Public HTTPS base URL of the reviewed delivery vendor used by the cloud worker.
+  VendorAuthToken:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: Bearer token for the learning delivery vendor; never commit its deployed value.
+  VendorTimeoutMs:
+    Type: Number
+    MinValue: 100
+    MaxValue: 55000
+    Description: Cost-reviewed HTTP timeout for one vendor submission attempt.
 
 Globals:
   Function:
@@ -79,6 +143,8 @@ Resources:
       DeletionProtectionEnabled: false
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: false
+      StreamSpecification:
+        StreamViewType: NEW_IMAGE
       OnDemandThroughput:
         MaxReadRequestUnits: !Ref DynamoMaxReadRequestUnits
         MaxWriteRequestUnits: !Ref DynamoMaxWriteRequestUnits
@@ -220,6 +286,127 @@ Resources:
           Value: serverless-order-integration
         - Key: Environment
           Value: !Ref EnvironmentName
+
+  StreamPublisherLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/serverless-order-integration/${AWS::StackName}/stream-publisher
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Project
+          Value: serverless-order-integration
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  DeliveryWorkerLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/serverless-order-integration/${AWS::StackName}/delivery-worker
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Project
+          Value: serverless-order-integration
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  DomainEventsTopic:
+    Type: AWS::SNS::Topic
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      DisplayName: Serverless order domain events
+      Tags:
+        - Key: Project
+          Value: serverless-order-integration
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  StreamPublisherFailureQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      MessageRetentionPeriod: !Ref FailureMessageRetentionSeconds
+      SqsManagedSseEnabled: true
+      Tags:
+        - Key: Project
+          Value: serverless-order-integration
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: FailurePath
+          Value: stream-publisher
+
+  DeliveryDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      MessageRetentionPeriod: !Ref FailureMessageRetentionSeconds
+      RedriveAllowPolicy:
+        redrivePermission: allowAll
+      SqsManagedSseEnabled: true
+      Tags:
+        - Key: Project
+          Value: serverless-order-integration
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: FailurePath
+          Value: delivery-worker
+
+  DeliveryQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      MessageRetentionPeriod: !Ref DeliveryMessageRetentionSeconds
+      VisibilityTimeout: !Ref DeliveryQueueVisibilityTimeoutSeconds
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeliveryDeadLetterQueue.Arn
+        maxReceiveCount: !Ref DeliveryQueueMaxReceiveCount
+      SqsManagedSseEnabled: true
+      Tags:
+        - Key: Project
+          Value: serverless-order-integration
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  DeliveryQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref DeliveryQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowDomainEventsTopic
+            Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt DeliveryQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref DomainEventsTopic
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+
+  DeliverySubscription:
+    Type: AWS::SNS::Subscription
+    DependsOn: DeliveryQueuePolicy
+    Properties:
+      TopicArn: !Ref DomainEventsTopic
+      Protocol: sqs
+      Endpoint: !GetAtt DeliveryQueue.Arn
+      RawMessageDelivery: true
+      FilterPolicyScope: MessageAttributes
+      FilterPolicy:
+        eventType:
+          - order.created
+          - order.submission_retry_requested
 
   SynchronousHttpApi:
     Type: AWS::Serverless::HttpApi
@@ -372,6 +559,131 @@ Resources:
         Sourcemap: true
         Target: es2022
 
+  StreamPublisherFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: stream-publisher.handler
+      Description: Converts committed order changes into versioned SNS domain events.
+      LoggingConfig:
+        LogFormat: Text
+        LogGroup: !Ref StreamPublisherLogGroup
+      Environment:
+        Variables:
+          DOMAIN_EVENTS_TOPIC_ARN: !Ref DomainEventsTopic
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Sid: ReadOrdersStream
+              Effect: Allow
+              Action:
+                - dynamodb:DescribeStream
+                - dynamodb:GetRecords
+                - dynamodb:GetShardIterator
+              Resource: !GetAtt OrdersTable.StreamArn
+            - Sid: ListOrdersStreams
+              Effect: Allow
+              Action:
+                - dynamodb:ListStreams
+              Resource: '*'
+            - Sid: PublishDomainEvents
+              Effect: Allow
+              Action:
+                - sns:Publish
+              Resource: !Ref DomainEventsTopic
+            - Sid: RetainDiscardedStreamRecords
+              Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt StreamPublisherFailureQueue.Arn
+      Events:
+        OrdersStream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt OrdersTable.StreamArn
+            StartingPosition: TRIM_HORIZON
+            BatchSize: !Ref StreamPublisherBatchSize
+            BisectBatchOnFunctionError: true
+            Enabled: true
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+            MaximumRecordAgeInSeconds: !Ref StreamPublisherMaximumRecordAgeSeconds
+            MaximumRetryAttempts: !Ref StreamPublisherMaximumRetryAttempts
+            DestinationConfig:
+              OnFailure:
+                Type: SQS
+                Destination: !GetAtt StreamPublisherFailureQueue.Arn
+            FilterCriteria:
+              Filters:
+                - Pattern: >-
+                    {"eventName":["INSERT","MODIFY"],"dynamodb":{"NewImage":{"entityType":{"S":["ORDER"]}}}}
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/lambda/stream-publisher.ts
+        Format: cjs
+        Minify: true
+        Sourcemap: true
+        Target: es2022
+
+  DeliveryWorkerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: delivery-worker.handler
+      Description: Processes actionable order events and submits deliveries to the vendor.
+      Timeout: !Ref DeliveryWorkerTimeoutSeconds
+      LoggingConfig:
+        LogFormat: Text
+        LogGroup: !Ref DeliveryWorkerLogGroup
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref OrdersTable
+          VENDOR_BASE_URL: !Ref VendorBaseUrl
+          VENDOR_AUTH_TOKEN: !Ref VendorAuthToken
+          VENDOR_TIMEOUT_MS: !Ref VendorTimeoutMs
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Sid: ConsumeDeliveryMessages
+              Effect: Allow
+              Action:
+                - sqs:DeleteMessage
+                - sqs:GetQueueAttributes
+                - sqs:ReceiveMessage
+              Resource: !GetAtt DeliveryQueue.Arn
+            - Sid: ReadDeliveryOrders
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource: !GetAtt OrdersTable.Arn
+            - Sid: RecordDeliveryOutcomes
+              Effect: Allow
+              Action:
+                - dynamodb:TransactWriteItems
+              Resource: !GetAtt OrdersTable.Arn
+      Events:
+        DeliveryMessages:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt DeliveryQueue.Arn
+            BatchSize: !Ref DeliveryWorkerBatchSize
+            Enabled: true
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+            ScalingConfig:
+              MaximumConcurrency: !Ref DeliveryWorkerMaximumConcurrency
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/lambda/delivery-worker.ts
+        Format: cjs
+        Minify: true
+        Sourcemap: true
+        Target: es2022
+
 Outputs:
   ApiUrl:
     Description: Regional API Gateway HTTP API endpoint.
@@ -388,3 +700,18 @@ Outputs:
   UserPoolIssuer:
     Description: JWT issuer configured on the HTTP API authorizer.
     Value: !Sub https://cognito-idp.${AWS::Region}.${AWS::URLSuffix}/${UserPool}
+  OrdersTableStreamArn:
+    Description: DynamoDB Stream consumed by the domain-event publisher.
+    Value: !GetAtt OrdersTable.StreamArn
+  DomainEventsTopicArn:
+    Description: SNS topic carrying every published order domain event.
+    Value: !Ref DomainEventsTopic
+  DeliveryQueueUrl:
+    Description: SQS queue containing actionable delivery events.
+    Value: !Ref DeliveryQueue
+  DeliveryDeadLetterQueueUrl:
+    Description: SQS queue retaining delivery messages that exhausted their attempts.
+    Value: !Ref DeliveryDeadLetterQueue
+  StreamPublisherFailureQueueUrl:
+    Description: SQS queue retaining discarded DynamoDB Stream records.
+    Value: !Ref StreamPublisherFailureQueue
