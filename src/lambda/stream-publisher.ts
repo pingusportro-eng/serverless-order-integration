@@ -3,6 +3,7 @@ import type { DynamoDBBatchResponse, DynamoDBRecord, DynamoDBStreamEvent } from 
 
 import type { DomainEvent } from '../events/domain-event.js';
 import { domainEventFromOrderStreamRecord } from '../events/order-stream-event.js';
+import { createLogger, type LogSink } from '../observability/logger.js';
 
 export interface DomainEventPublisher {
   publish(event: DomainEvent): Promise<void>;
@@ -10,9 +11,14 @@ export interface DomainEventPublisher {
 
 export interface StreamPublisherDependencies {
   readonly publisher: DomainEventPublisher;
+  readonly logSink?: LogSink;
 }
 
 export type StreamPublisherHandler = (event: DynamoDBStreamEvent) => Promise<DynamoDBBatchResponse>;
+
+function exceptionName(error: unknown): string {
+  return error instanceof Error && error.name ? error.name : 'UnknownError';
+}
 
 function sequenceNumber(record: DynamoDBRecord): string {
   const value = record.dynamodb?.SequenceNumber;
@@ -28,12 +34,27 @@ export function createStreamPublisherHandler(
   return async (event) => {
     for (const record of event.Records) {
       const itemIdentifier = sequenceNumber(record);
+      let domainEvent: DomainEvent | undefined;
       try {
-        const domainEvent = domainEventFromOrderStreamRecord(record);
+        domainEvent = domainEventFromOrderStreamRecord(record);
         if (domainEvent !== undefined) {
           await dependencies.publisher.publish(domainEvent);
         }
-      } catch {
+      } catch (error) {
+        const logger = createLogger(
+          { requestId: itemIdentifier },
+          dependencies.logSink === undefined ? {} : { sink: dependencies.logSink },
+        );
+        logger.write('error', 'stream.record.failed', {
+          operation: domainEvent === undefined ? 'parseOrderStreamRecord' : 'publishDomainEvent',
+          ...(domainEvent === undefined
+            ? {}
+            : {
+                eventId: domainEvent.eventId,
+                orderId: domainEvent.aggregateId,
+              }),
+          exceptionName: exceptionName(error),
+        });
         return { batchItemFailures: [{ itemIdentifier }] };
       }
     }

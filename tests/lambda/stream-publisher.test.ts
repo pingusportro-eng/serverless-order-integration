@@ -100,12 +100,26 @@ describe('DynamoDB stream publisher', () => {
       new URL('malformed-order.json', fixturesUrl),
     );
     const publish = vi.fn<DomainEventPublisher['publish']>();
-    const handler = createStreamPublisherHandler({ publisher: { publish } });
+    const logLines: string[] = [];
+    const handler = createStreamPublisherHandler({
+      publisher: { publish },
+      logSink: (line) => {
+        logLines.push(line);
+      },
+    });
 
     await expect(handler(streamEvent)).resolves.toEqual({
       batchItemFailures: [{ itemIdentifier: '100000000000000000004' }],
     });
     expect(publish).not.toHaveBeenCalled();
+    expect(logLines.map((line): unknown => JSON.parse(line) as unknown)).toEqual([
+      expect.objectContaining({
+        event: 'stream.record.failed',
+        requestId: '100000000000000000004',
+        operation: 'parseOrderStreamRecord',
+        exceptionName: 'Error',
+      }),
+    ]);
   });
 
   it('reports an SNS publication failure and stops at the failed record', async () => {
@@ -115,12 +129,31 @@ describe('DynamoDB stream publisher', () => {
     const publish = vi
       .fn<DomainEventPublisher['publish']>()
       .mockRejectedValue(new Error('SNS down'));
-    const handler = createStreamPublisherHandler({ publisher: { publish } });
+    const logLines: string[] = [];
+    const handler = createStreamPublisherHandler({
+      publisher: { publish },
+      logSink: (line) => {
+        logLines.push(line);
+      },
+    });
 
     await expect(handler(streamEvent)).resolves.toEqual({
       batchItemFailures: [{ itemIdentifier: '100000000000000000001' }],
     });
     expect(publish).toHaveBeenCalledTimes(1);
+    const publishedEvent = publish.mock.calls[0]?.[0];
+    expect(publishedEvent).toBeDefined();
+    expect(logLines.map((line): unknown => JSON.parse(line) as unknown)).toEqual([
+      expect.objectContaining({
+        event: 'stream.record.failed',
+        requestId: '100000000000000000001',
+        operation: 'publishDomainEvent',
+        eventId: publishedEvent?.eventId,
+        orderId: 'ord_01JABCDEF0123456789',
+        exceptionName: 'Error',
+      }),
+    ]);
+    expect(logLines.join('\n')).not.toContain('SNS down');
   });
 
   it('fails the whole invocation when a malformed record has no retry identifier', async () => {
