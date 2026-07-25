@@ -202,7 +202,7 @@ Resources:
     Properties:
       UserPoolTier: LITE
       DeletionProtection: INACTIVE
-      MfaConfiguration: OFF
+      MfaConfiguration: 'OFF'
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: true
       AccountRecoverySetting:
@@ -429,7 +429,7 @@ Resources:
               audience:
                 - !Ref UserPoolClient
       AccessLogSettings:
-        DestinationArn: !GetAtt ApiAccessLogGroup.Arn
+        DestinationArn: !Sub arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:${ApiAccessLogGroup}
         Format: >-
           {"requestId":"$context.requestId","routeKey":"$context.routeKey","status":"$context.status","responseLatency":"$context.responseLatency","responseLength":"$context.responseLength","integrationStatus":"$context.integration.status"}
       DefaultRouteSettings:

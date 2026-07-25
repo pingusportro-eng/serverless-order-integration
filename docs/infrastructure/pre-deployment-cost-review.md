@@ -1,6 +1,6 @@
 # Pre-deployment cost review
 
-Status: approved for one short development deployment  
+Status: approved and deployed; smoke tests not yet started
 Last reviewed: 2026-07-25  
 Deployment region: `eu-central-1` (Europe, Frankfurt)  
 Required AWS CLI profile: `pingusportro-admin`
@@ -247,7 +247,9 @@ Before deployment:
 - [x] Owner explicitly approved the reviewed deployment on 2026-07-25.
 - [x] A dry local SAM validation and build passed.
 - [x] The AWS identity and region were checked again with the explicit profile.
-- [ ] A CloudFormation change set is reviewed before execution.
+- [x] The 32-addition CloudFormation change set was reviewed before execution;
+      it contained only the approved resources and no deletion, replacement, or
+      excluded fixed-cost resource.
 
 After smoke testing:
 

@@ -341,7 +341,7 @@ For every step, the review should answer:
   - Obtain explicit approval to deploy.
   - AWS cost: $0.
 
-- [ ] **5.4 — Deploy the development stack**
+- [x] **5.4 — Deploy the development stack**
   - Deploy only the reviewed stack to the confirmed region.
   - Record stack outputs without committing secrets.
   - Verification: inspect CloudFormation and the AWS billing dashboard.
@@ -425,7 +425,6 @@ For every step, the review should answer:
 
 ## Next step
 
-Continue with **5.4 — Deploy the development stack** using only the approved
-cost-control parameters, temporary public mock-vendor tunnel, explicit
-`pingusportro-admin` profile, and `eu-central-1` region. Inspect the
-CloudFormation change set before executing it.
+Continue with **5.5 — Run cloud smoke tests**. Stay within the approved workload,
+create only one synthetic Cognito operator, verify each real service boundary,
+and preserve evidence needed for the immediate teardown in step 5.6.
