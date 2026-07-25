@@ -206,7 +206,10 @@ contact AWS or create resources. See the
 [synchronous cloud slice](docs/infrastructure/synchronous-cloud-slice.md) for
 the HTTP/data resource inventory and the
 [asynchronous cloud slice](docs/infrastructure/asynchronous-cloud-slice.md) for
-streaming, messaging, retry, and DLQ details.
+streaming, messaging, retry, and DLQ details. The
+[pre-deployment cost review](docs/infrastructure/pre-deployment-cost-review.md)
+records the complete resource inventory, recommended deployment parameters,
+bounded smoke-test estimate, and approval gates.
 
 The editable [full AWS cloud stack diagram](docs/architecture/full-cloud-stack.drawio)
 shows both paths and their security, observability, and failure boundaries.

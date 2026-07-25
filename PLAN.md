@@ -333,7 +333,7 @@ For every step, the review should answer:
   - Verification: build and validate the template locally.
   - AWS cost before deployment: $0.
 
-- [ ] **5.3 — Perform the pre-deployment cost review**
+- [x] **5.3 — Perform the pre-deployment cost review**
   - List every resource that will be created.
   - Confirm there is no NAT Gateway, paid cache, custom KMS key, or other
     fixed-cost resource.
@@ -425,6 +425,7 @@ For every step, the review should answer:
 
 ## Next step
 
-Continue with **5.3 — Perform the pre-deployment cost review**. Choose every
-required cost-control parameter, resolve the public mock-vendor endpoint, and
-obtain explicit approval before deploying anything.
+Continue with **5.4 — Deploy the development stack** using only the approved
+cost-control parameters, temporary public mock-vendor tunnel, explicit
+`pingusportro-admin` profile, and `eu-central-1` region. Inspect the
+CloudFormation change set before executing it.
