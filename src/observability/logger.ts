@@ -16,6 +16,7 @@ export interface SafeLogFields {
   readonly providerCode?: string;
   readonly eventId?: string;
   readonly errorCode?: string;
+  readonly exceptionName?: string;
   readonly durationMs?: number;
   readonly attempt?: number;
 }
@@ -48,6 +49,7 @@ const SAFE_FIELD_NAMES: ReadonlySet<keyof SafeLogFields> = new Set([
   'providerCode',
   'eventId',
   'errorCode',
+  'exceptionName',
   'durationMs',
   'attempt',
 ]);

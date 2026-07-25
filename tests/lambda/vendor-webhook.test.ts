@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { applyOrderStatusChange } from '../../src/domain/order-status-transition.js';
 import type { Order } from '../../src/domain/order.js';
 import { signWebhook } from '../../src/http/webhook-signature.js';
+import type { ProviderWebhookRepository } from '../../src/application/provider-webhook-repository.js';
 import { InMemoryOrderRepository } from '../../src/infrastructure/memory/in-memory-order-repository.js';
 import { createVendorWebhookLambdaHandler } from '../../src/lambda/vendor-webhook.js';
 import { createOrderFixture } from '../fixtures/order.js';
@@ -256,6 +257,43 @@ describe('vendor webhook Lambda adapter', () => {
 
     expect(response.statusCode).toBe(404);
     expect(problemBody(response)).toMatchObject({ code: 'ORDER_NOT_FOUND' });
+  });
+
+  it('logs the safe exception class for an unexpected repository failure', async () => {
+    const failure = new Error('This internal detail must not be logged.');
+    failure.name = 'AccessDeniedException';
+    const failingRepository: ProviderWebhookRepository = {
+      getByProviderOrderId: () => Promise.reject(failure),
+      recordProviderWebhook: () => Promise.reject(failure),
+    };
+    const logLines: string[] = [];
+    const failingHandler = createVendorWebhookLambdaHandler({
+      repository: failingRepository,
+      signingSecret: SECRET,
+      signatureToleranceSeconds: 300,
+      now: () => NOW,
+      logSink: (line) => {
+        logLines.push(line);
+      },
+    });
+    const rawBody = JSON.stringify({
+      eventId: 'provider-event-1010',
+      eventType: 'DELIVERY_PICKED_UP',
+      occurredAt: '2026-07-21T12:34:00.000Z',
+      providerOrderId: 'delivery-789',
+    });
+
+    const response = await failingHandler(eventFixture(rawBody));
+    const failedLog = logLines
+      .map((line): Record<string, unknown> => JSON.parse(line) as Record<string, unknown>)
+      .find((entry) => entry['event'] === 'webhook.request.failed');
+
+    expect(response.statusCode).toBe(500);
+    expect(failedLog).toMatchObject({
+      errorCode: 'INTERNAL_ERROR',
+      exceptionName: 'AccessDeniedException',
+    });
+    expect(logLines.join('')).not.toContain('This internal detail');
   });
 
   it('records validated delivery failure details', async () => {

@@ -347,7 +347,7 @@ For every step, the review should answer:
   - Verification: inspect CloudFormation and the AWS billing dashboard.
   - Expected AWS cost: within $0–$1 for learning-scale use.
 
-- [ ] **5.5 — Run cloud smoke tests**
+- [x] **5.5 — Run cloud smoke tests**
   - Verify the REST flow, stream publication, SNS-to-SQS delivery, vendor worker,
     webhook, retry, and DLQ behavior.
   - Keep the request count small and record results.
@@ -425,6 +425,7 @@ For every step, the review should answer:
 
 ## Next step
 
-Continue with **5.5 — Run cloud smoke tests**. Stay within the approved workload,
-create only one synthetic Cognito operator, verify each real service boundary,
-and preserve evidence needed for the immediate teardown in step 5.6.
+Continue with **5.6 — Destroy or retain deliberately**. Review the completed
+smoke-test record and current delayed billing view, then stop the local
+vendor/tunnel, delete the application stack and synthetic identity, remove the
+project SAM artifacts, and verify that no project resource remains.

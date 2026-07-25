@@ -471,8 +471,13 @@ Resources:
             - Sid: WriteOrders
               Effect: Allow
               Action:
-                - dynamodb:TransactWriteItems
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
               Resource: !GetAtt OrdersTable.Arn
+              Condition:
+                ForAnyValue:StringEquals:
+                  dynamodb:EnclosingOperation:
+                    - TransactWriteItems
       Events:
         CreateOrder:
           Type: HttpApi
@@ -537,8 +542,14 @@ Resources:
             - Sid: RecordWebhook
               Effect: Allow
               Action:
-                - dynamodb:TransactWriteItems
+                - dynamodb:ConditionCheckItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
               Resource: !GetAtt OrdersTable.Arn
+              Condition:
+                ForAnyValue:StringEquals:
+                  dynamodb:EnclosingOperation:
+                    - TransactWriteItems
       Events:
         VendorWebhook:
           Type: HttpApi
@@ -661,8 +672,13 @@ Resources:
             - Sid: RecordDeliveryOutcomes
               Effect: Allow
               Action:
-                - dynamodb:TransactWriteItems
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
               Resource: !GetAtt OrdersTable.Arn
+              Condition:
+                ForAnyValue:StringEquals:
+                  dynamodb:EnclosingOperation:
+                    - TransactWriteItems
       Events:
         DeliveryMessages:
           Type: SQS

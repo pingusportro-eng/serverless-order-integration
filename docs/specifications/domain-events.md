@@ -33,7 +33,9 @@ through SNS and SQS.
 For an API-originated flow, use an accepted `X-Correlation-Id` or the platform
 request ID when the caller supplied none. Provider events retain the existing
 correlation ID. `causationId` refers to the immediate HTTP request ID, provider
-event ID, or preceding domain event ID.
+event ID, or preceding domain event ID. Trace references accept up to two
+trailing `=` characters because trusted platform request IDs can use padded
+Base64; `=` is not accepted in the middle of an identifier.
 
 The state mutation must preserve this trace metadata so a later DynamoDB Stream
 publisher can construct the same event again. The publisher derives `eventId`

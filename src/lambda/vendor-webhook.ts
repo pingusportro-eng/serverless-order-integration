@@ -32,6 +32,10 @@ export type VendorWebhookLambdaHandler = (
   context?: Context,
 ) => Promise<APIGatewayProxyStructuredResultV2>;
 
+function exceptionName(error: unknown): string {
+  return error instanceof Error && error.name ? error.name : 'UnknownError';
+}
+
 function requireEnvironment(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) {
@@ -88,11 +92,12 @@ export function createVendorWebhookLambdaHandler(
         statusCode: response.statusCode,
       });
       return serialize(response);
-    } catch {
+    } catch (error) {
       logger.write('error', 'webhook.request.failed', {
         route: event.routeKey,
         statusCode: 500,
         errorCode: 'INTERNAL_ERROR',
+        exceptionName: exceptionName(error),
       });
       return serialize(
         problemResponse(

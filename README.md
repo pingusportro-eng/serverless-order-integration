@@ -5,9 +5,9 @@ and asynchronous third-party integration with Node.js, TypeScript, and AWS.
 
 ## Status
 
-The project is in **Phase 4: asynchronous vendor integration**. The REST API,
-DynamoDB foundation, event contract, and local mock delivery provider are
-configured; no AWS infrastructure has been deployed.
+The project is in **Phase 5: controlled AWS verification**. The complete stack
+is deployed, its bounded cloud smoke tests passed, and deliberate teardown is
+the next step.
 
 Work is divided into small reviewable steps. See [PLAN.md](PLAN.md) for the
 current checklist, architecture, verification criteria, and definition of done.
@@ -211,7 +211,10 @@ streaming, messaging, retry, and DLQ details. The
 records the complete resource inventory, recommended deployment parameters,
 bounded smoke-test estimate, and approval gates. The
 [development deployment record](docs/infrastructure/development-deployment.md)
-captures the non-secret stack outputs and cloud verification.
+captures the non-secret stack outputs and deployment verification. The
+[cloud smoke-test record](docs/infrastructure/cloud-smoke-tests.md) captures the
+real service-boundary results, defects found, retry/DLQ recovery, and final
+cost evidence.
 
 The editable [full AWS cloud stack diagram](docs/architecture/full-cloud-stack.drawio)
 shows both paths and their security, observability, and failure boundaries.

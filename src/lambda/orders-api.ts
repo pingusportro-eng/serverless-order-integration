@@ -189,6 +189,10 @@ function malformedJsonResponse(requestId: string): APIGatewayProxyStructuredResu
   );
 }
 
+function exceptionName(error: unknown): string {
+  return error instanceof Error && error.name ? error.name : 'UnknownError';
+}
+
 async function route(
   dependencies: OrdersApiDependencies,
   event: APIGatewayProxyEventV2,
@@ -287,11 +291,12 @@ export function createOrdersApiHandler(dependencies: OrdersApiDependencies): Ord
         statusCode: response.statusCode,
       });
       return serialize(response);
-    } catch {
+    } catch (error) {
       logger.write('error', 'http.request.failed', {
         route: event.routeKey,
         statusCode: 500,
         errorCode: 'INTERNAL_ERROR',
+        exceptionName: exceptionName(error),
       });
       return serialize(
         problemResponse(

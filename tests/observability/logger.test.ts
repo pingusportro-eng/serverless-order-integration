@@ -9,6 +9,7 @@ describe('structured logger', () => {
       operation: 'createOrder',
       orderId: 'ord_123',
       statusCode: 201,
+      exceptionName: 'ValidationException',
       authorization: 'Bearer secret-token',
       requestBody: { customer: 'must-not-be-logged' },
     } as SafeLogFields & Record<string, unknown>;
@@ -34,6 +35,7 @@ describe('structured logger', () => {
       operation: 'createOrder',
       orderId: 'ord_123',
       statusCode: 201,
+      exceptionName: 'ValidationException',
     });
     expect(lines[0]).not.toContain('secret-token');
     expect(lines[0]).not.toContain('must-not-be-logged');

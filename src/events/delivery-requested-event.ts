@@ -23,7 +23,7 @@ const RETRY_PAYLOAD_FIELDS = new Set([
   'submissionKey',
   'reason',
 ]);
-const SAFE_ID_PATTERN = /^[A-Za-z0-9._:-]+$/;
+const SAFE_ID_PATTERN = /^[A-Za-z0-9._:-]+={0,2}$/;
 const EVENT_ID_PATTERN = /^evt_[A-Za-z0-9_-]{16,128}$/;
 const ORDER_ID_PATTERN = /^ord_[A-Za-z0-9]+$/;
 const MERCHANT_ID_PATTERN = /^mrc_[A-Za-z0-9]+$/;

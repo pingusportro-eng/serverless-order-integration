@@ -7,6 +7,7 @@ import type { DeliveryRequestedEvent } from '../events/delivery-requested-event.
 import { parseDeliveryRequestedEvent } from '../events/delivery-requested-event.js';
 import { DynamoDbOrderRepository } from '../infrastructure/dynamodb/dynamodb-order-repository.js';
 import { createDeliveryVendorClient } from '../integrations/delivery-vendor-client.js';
+import { createLogger, type LogSink } from '../observability/logger.js';
 
 const LOCAL_ACCESS_KEY_ID = 'DUMMYIDEXAMPLE';
 const LOCAL_SECRET_ACCESS_KEY = 'DUMMYEXAMPLEKEY';
@@ -17,9 +18,14 @@ export interface DeliveryMessageProcessor {
 
 export interface DeliveryWorkerDependencies {
   readonly processor: DeliveryMessageProcessor;
+  readonly logSink?: LogSink;
 }
 
 export type DeliveryWorkerHandler = (event: SQSEvent) => Promise<SQSBatchResponse>;
+
+function exceptionName(error: unknown): string {
+  return error instanceof Error && error.name ? error.name : 'UnknownError';
+}
 
 function messageId(value: string): string {
   if (value.length === 0) {
@@ -36,10 +42,25 @@ export function createDeliveryWorkerHandler(
 
     for (const record of event.Records) {
       const itemIdentifier = messageId(record.messageId);
+      let deliveryEvent: DeliveryRequestedEvent | undefined;
       try {
-        const deliveryEvent = parseDeliveryRequestedEvent(record.body);
+        deliveryEvent = parseDeliveryRequestedEvent(record.body);
         await dependencies.processor.process(deliveryEvent);
-      } catch {
+      } catch (error) {
+        const logger = createLogger(
+          { requestId: itemIdentifier },
+          dependencies.logSink === undefined ? {} : { sink: dependencies.logSink },
+        );
+        logger.write('error', 'delivery.message.failed', {
+          operation: 'processDeliveryEvent',
+          ...(deliveryEvent === undefined
+            ? {}
+            : {
+                eventId: deliveryEvent.eventId,
+                orderId: deliveryEvent.aggregateId,
+              }),
+          exceptionName: exceptionName(error),
+        });
         batchItemFailures.push({ itemIdentifier });
       }
     }

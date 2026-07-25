@@ -98,11 +98,15 @@ replay it.
 | Function | Allowed actions |
 | --- | --- |
 | Stream publisher | Read the orders stream, list DynamoDB streams, publish only to the domain-events topic, and send discarded records only to its failure queue |
-| Delivery worker | Receive/delete messages only from the delivery queue, get orders from the table, and transact delivery outcomes to the table |
+| Delivery worker | Receive/delete messages only from the delivery queue, get orders from the table, and use transactional `PutItem`/`UpdateItem` for delivery outcomes |
 
 The delivery queue policy permits `sqs:SendMessage` only from the stack's SNS
 topic and account. Lambda functions are not placed in a VPC, so the worker can
 reach a reviewed public HTTPS vendor without a NAT Gateway.
+
+The worker's DynamoDB write actions are constrained by
+`dynamodb:EnclosingOperation` to `TransactWriteItems`; they cannot be used as
+standalone writes.
 
 All three SQS queues use SQS-managed server-side encryption. The SNS topic does
 not use KMS encryption in this disposable synthetic-data environment; adding

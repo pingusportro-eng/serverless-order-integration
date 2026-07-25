@@ -1,6 +1,6 @@
 # Development deployment record
 
-Status: deployed; cloud smoke tests not yet started  
+Status: deployed; cloud smoke tests passed; teardown pending
 Deployed: 2026-07-25  
 Stack: `serverless-order-integration-dev`  
 Region: `eu-central-1`  
@@ -109,7 +109,7 @@ shared.
 
 ## Next boundary
 
-Step 5.5 may create one synthetic Cognito operator and run only the approved
-bounded smoke tests. Step 5.6 must then stop the local tunnel/vendor, destroy
-the application stack, remove the packaging resources, and verify that no
-project resource remains.
+The bounded [cloud smoke tests](cloud-smoke-tests.md) passed after correcting
+the IAM and event-contract defects they exposed. Step 5.6 must now stop the
+local tunnel/vendor, destroy the application stack, remove the packaging
+resources, and verify that no project resource remains.

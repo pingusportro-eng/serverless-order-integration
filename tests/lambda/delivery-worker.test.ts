@@ -74,6 +74,7 @@ describe('SQS delivery worker', () => {
         acceptedAt: '2026-07-23T10:00:05.000Z',
       });
     });
+    const logLines: string[] = [];
     const handler = createDeliveryWorkerHandler({
       processor: {
         async process(event): Promise<void> {
@@ -87,6 +88,9 @@ describe('SQS delivery worker', () => {
           );
         },
       },
+      logSink: (line) => {
+        logLines.push(line);
+      },
     });
 
     await expect(handler(batch)).resolves.toEqual({
@@ -96,6 +100,20 @@ describe('SQS delivery worker', () => {
       ],
     });
     expect(submitDelivery).toHaveBeenCalledTimes(2);
+    expect(logLines.map((line): unknown => JSON.parse(line) as unknown)).toEqual([
+      expect.objectContaining({
+        event: 'delivery.message.failed',
+        requestId: 'message-poison-002',
+        exceptionName: 'Error',
+      }),
+      expect.objectContaining({
+        event: 'delivery.message.failed',
+        requestId: 'message-transient-004',
+        eventId: 'evt_01JABCDEF0123456789B',
+        orderId: 'ord_01JABCDEF0123456790',
+        exceptionName: 'VendorSubmissionError',
+      }),
+    ]);
     await expect(repository.get(merchantId, successfulOrder.orderId)).resolves.toMatchObject({
       status: 'SUBMITTED',
       version: 2,

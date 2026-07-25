@@ -103,13 +103,13 @@
           "type": "string",
           "minLength": 8,
           "maxLength": 128,
-          "pattern": "^[A-Za-z0-9._:-]+$"
+          "pattern": "^[A-Za-z0-9._:-]+={0,2}$"
         },
         "causationId": {
           "type": "string",
           "minLength": 8,
           "maxLength": 128,
-          "pattern": "^[A-Za-z0-9._:-]+$"
+          "pattern": "^[A-Za-z0-9._:-]+={0,2}$"
         },
         "payload": { "type": "object" }
       }

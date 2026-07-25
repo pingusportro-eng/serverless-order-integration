@@ -48,11 +48,13 @@ adapters:
 
 | Function | Allowed DynamoDB actions |
 | --- | --- |
-| Orders API | `GetItem` on the table, `Query` on its indexes, and `TransactWriteItems` on the table |
-| Vendor webhook | `GetItem` and `TransactWriteItems` on the table |
+| Orders API | `GetItem` on the table, `Query` on its indexes, and transactional `PutItem`/`UpdateItem` on the table |
+| Vendor webhook | `GetItem` plus transactional `ConditionCheckItem`/`PutItem`/`UpdateItem` on the table |
 
-Lambda's standard generated logging permission is also present. Neither
-function receives permissions for account administration or unrelated tables.
+The write actions are constrained by `dynamodb:EnclosingOperation` to
+`TransactWriteItems`; they cannot be used as standalone writes. Lambda's
+standard generated logging permission is also present. Neither function
+receives permissions for account administration or unrelated tables.
 
 ## Data protection and lifecycle
 

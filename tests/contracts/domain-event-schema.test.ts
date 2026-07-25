@@ -40,6 +40,17 @@ describe('domain event JSON Schema', () => {
     expect(validate(event)).toBe(false);
   });
 
+  it('accepts trailing platform-ID padding but rejects padding in the middle', () => {
+    const padded = structuredClone(validFixtures[0]) as Record<string, unknown>;
+    padded['correlationId'] = 'BC8AYho8FiAEPYQ==';
+    padded['causationId'] = 'BC8AYho8FiAEPYQ=';
+    const misplaced = structuredClone(padded);
+    misplaced['causationId'] = 'BC8=AYho8FiAEPYQ';
+
+    expect(validate(padded), JSON.stringify(validate.errors)).toBe(true);
+    expect(validate(misplaced)).toBe(false);
+  });
+
   it('rejects an event type paired with the wrong payload', () => {
     const event = structuredClone(validFixtures[0]) as Record<string, unknown>;
     event['eventType'] = 'order.submitted';

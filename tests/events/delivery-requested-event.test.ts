@@ -20,6 +20,17 @@ describe('delivery-requested event parser', () => {
     });
   });
 
+  it('accepts padded platform request IDs as trace references', () => {
+    const event = structuredClone(createdEvent);
+    event['correlationId'] = 'BC8AYho8FiAEPYQ==';
+    event['causationId'] = 'BC8AYho8FiAEPYQ=';
+
+    expect(parseDeliveryRequestedEvent(JSON.stringify(event))).toMatchObject({
+      correlationId: 'BC8AYho8FiAEPYQ==',
+      causationId: 'BC8AYho8FiAEPYQ=',
+    });
+  });
+
   it('accepts a submission retry request with its required reason', () => {
     const retryEvent = structuredClone(createdEvent);
     retryEvent['eventType'] = 'order.submission_retry_requested';
@@ -47,10 +58,15 @@ describe('delivery-requested event parser', () => {
   it('rejects invalid envelope identifiers and unknown fields', () => {
     const invalidId = structuredClone(createdEvent);
     invalidId['aggregateId'] = 'customer-123456789';
+    const misplacedPadding = structuredClone(createdEvent);
+    misplacedPadding['causationId'] = 'BC8=AYho8FiAEPYQ';
     const unknownField = structuredClone(createdEvent);
     unknownField['secret'] = 'must not be accepted';
 
     expect(() => parseDeliveryRequestedEvent(JSON.stringify(invalidId))).toThrow(
+      'valid domain-event envelope',
+    );
+    expect(() => parseDeliveryRequestedEvent(JSON.stringify(misplacedPadding))).toThrow(
       'valid domain-event envelope',
     );
     expect(() => parseDeliveryRequestedEvent(JSON.stringify(unknownField))).toThrow(
