@@ -75,6 +75,11 @@ hint, not as permission for unbounded retries.
 Tests select behavior with `X-Mock-Vendor-Scenario`. This header is a local
 testing control and is not part of a real provider integration.
 
+The executable local server accepts `MOCK_VENDOR_SCENARIO` as its default for
+requests that do not carry the test header. This lets an unmodified vendor
+client exercise one deterministic mode. Invalid configured values prevent the
+server from starting instead of silently falling back to success.
+
 | Value | Behavior |
 | --- | --- |
 | `success` or absent | Accept and return valid JSON. |

@@ -54,6 +54,15 @@ const MAX_BODY_BYTES = 64 * 1024;
 const DEFAULT_TIMEOUT_DELAY_MS = 10_000;
 const SCENARIOS = new Set<string>(MOCK_VENDOR_SCENARIOS);
 
+export function parseMockVendorScenario(value: string): MockVendorScenario {
+  if (!SCENARIOS.has(value)) {
+    throw new Error(
+      `Mock vendor scenario must be one of ${MOCK_VENDOR_SCENARIOS.join(', ')}; received ${value}.`,
+    );
+  }
+  return value as MockVendorScenario;
+}
+
 function header(request: IncomingMessage, name: string): string | undefined {
   const value = request.headers[name];
   return Array.isArray(value) ? undefined : value;
@@ -87,10 +96,11 @@ function scenarioFrom(
   defaultScenario: MockVendorScenario,
 ): MockVendorScenario {
   const value = header(request, 'x-mock-vendor-scenario') ?? defaultScenario;
-  if (!SCENARIOS.has(value)) {
+  try {
+    return parseMockVendorScenario(value);
+  } catch {
     throw new RequestError(400, 'INVALID_SCENARIO', 'Unknown mock vendor scenario.');
   }
-  return value as MockVendorScenario;
 }
 
 async function readJsonBody(request: IncomingMessage): Promise<unknown> {

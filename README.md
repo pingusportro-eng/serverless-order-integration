@@ -232,7 +232,10 @@ npm run mock-vendor:start
 
 The default `local-development-token` is deliberately local test data. Override
 it with `MOCK_VENDOR_TOKEN` when practising configuration, and use
-`MOCK_VENDOR_PORT` to select another port. Stop the server with `Ctrl+C`.
+`MOCK_VENDOR_PORT` to select another port. Set `MOCK_VENDOR_SCENARIO` to
+`success`, `timeout`, `rate-limit`, `server-error`, or `malformed-response` to
+choose the default response mode for an unmodified vendor client. Invalid
+scenario values prevent startup. Stop the server with `Ctrl+C`.
 
 The provider contract documents `POST /deliveries`, idempotency, authentication,
 and the deterministic success, timeout, `429`, `500`, and malformed-response

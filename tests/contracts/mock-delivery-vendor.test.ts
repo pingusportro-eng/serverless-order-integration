@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
+  parseMockVendorScenario,
   startMockDeliveryVendor,
   type MockDeliverySubmission,
   type RunningMockDeliveryVendor,
@@ -38,6 +39,13 @@ describe('mock delivery vendor contract', () => {
 
   afterEach(async () => {
     await vendor.close();
+  });
+
+  it('validates the executable server default scenario', () => {
+    expect(parseMockVendorScenario('timeout')).toBe('timeout');
+    expect(() => parseMockVendorScenario('not-a-scenario')).toThrow(
+      'Mock vendor scenario must be one of',
+    );
   });
 
   function submit(
