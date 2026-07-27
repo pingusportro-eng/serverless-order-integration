@@ -1,6 +1,6 @@
 # Development deployment record
 
-Status: deployed; expanded failure-campaign update pending approval
+Status: deployed; corrected no-execute update pending expanded scope approval
 Deployed: 2026-07-25  
 Stack: `serverless-order-integration-dev`  
 Region: `eu-central-1`  

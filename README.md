@@ -7,8 +7,9 @@ and asynchronous third-party integration with Node.js, TypeScript, and AWS.
 
 The project is in **Phase 5: controlled AWS verification**. The stack is
 deployed and its initial bounded smoke tests passed. The preflight for an
-approved SNS subscription DLQ is complete; its stack update still requires
-explicit deployment approval before the expanded failure campaign.
+approved SNS subscription DLQ is complete. A corrected no-execute change set is
+ready, but its four Lambda code updates and dependent HTTP API refresh require
+explicit scope approval before execution.
 
 Work is divided into small reviewable steps. See [PLAN.md](PLAN.md) for the
 current checklist, architecture, verification criteria, and definition of done.

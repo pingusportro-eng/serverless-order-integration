@@ -60,9 +60,11 @@ mappings, the SQS resource policy, and CloudWatch service metrics have no
 separate fixed charge in this design.
 
 The local cloud build is currently about 9.5 MB before deployment packaging.
-The review uses a conservative upper bound of 20 MB for retained S3 artifacts.
-The artifact bucket is deployment infrastructure outside the application stack
-and must be included in the teardown check.
+The original review used a conservative upper bound of 20 MB for retained S3
+artifacts. On 2026-07-27, the owner permanently increased the project cap to 50
+MB after the expanded campaign required another deployment. The artifact bucket
+is deployment infrastructure outside the application stack and must be
+included in the teardown check.
 
 ### Explicitly absent
 
@@ -214,7 +216,7 @@ The first cloud session is limited to:
 - at most 1,000 SQS API requests;
 - at most 1,000 DynamoDB read request units and 1,000 write request units;
 - at most 10 MB of CloudWatch log ingestion;
-- at most 20 MB of S3 deployment artifacts; and
+- at most 50 MB of S3 deployment artifacts; and
 - synthetic order data only, with no personal or production data.
 
 The test must stop if request counts, queue depth, repeated failures, log volume,
@@ -236,7 +238,7 @@ Prices were checked for `eu-central-1` through the AWS Price List API on
 | SQS | 1,000 Standard requests at `$0.40 / million` | `< $0.0005` |
 | Cognito Lite | One direct-sign-in MAU, priced without assuming a free allowance | `< $0.0055` |
 | CloudWatch Logs | 10 MB at `$0.63 / GB`, plus one-day storage | `< $0.0065` |
-| S3 artifacts | At most 20 MB for one month plus a few deployment requests | `< $0.0010` |
+| S3 artifacts | At most 50 MB for one month plus a few deployment requests | `< $0.0030` |
 | Small internet transfer and rounding margin | Synthetic payloads only | `< $0.0020` |
 
 **Conservative planned total: less than `$0.05`.**

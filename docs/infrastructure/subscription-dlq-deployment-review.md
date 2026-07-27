@@ -1,6 +1,6 @@
 # SNS subscription-DLQ deployment review
 
-Status: preflight complete; deployment approval pending
+Status: corrected no-execute change set ready; expanded scope approval pending
 
 Reviewed: 2026-07-27
 
@@ -12,13 +12,14 @@ Required AWS CLI profile: `pingusportro-admin`
 
 ## Approval boundary
 
-This review does not authorize a stack update. It records the live baseline,
-the expected CloudFormation change set, cost exposure, rollback behavior, and
-verification gates for adding the approved SNS subscription DLQ.
+This review records the live baseline, actual no-execute CloudFormation change
+set, cost exposure, rollback behavior, and verification gates for adding the
+approved SNS subscription DLQ.
 
-No stack resource, S3 artifact, change set, application API request, or test
-message was created during this preflight. All AWS calls were read-only
-control-plane checks.
+The initial preflight used only read-only control-plane checks. After approval,
+SAM packaging added five project-prefix objects and created a no-execute change
+set. No stack resource, application API request, or test message was created,
+and the deployed stack remains unchanged.
 
 ## Live baseline
 
@@ -40,16 +41,20 @@ Read-only checks on 2026-07-27 found:
 Budget and queue counters are delayed or approximate observations, not hard
 spending or consistency guarantees.
 
-## Expected stack changes
+## Reviewed stack changes
 
-The next SAM deployment is expected to produce this change set:
+The corrected no-execute change set contains:
 
 | Logical resource | Action | Expected interruption |
 | --- | --- | --- |
 | `DeliverySubscriptionDeadLetterQueue` | Add one standard, SQS-encrypted queue with one-day retention | None to existing resources |
 | `DeliverySubscriptionDeadLetterQueuePolicy` | Add the topic-and-account-scoped `sqs:SendMessage` policy | None to existing resources |
 | `DeliverySubscription` | Add the DLQ `RedrivePolicy` and creation dependency | No interruption |
-| `StreamPublisherFunction` | Update the bundle with the already-reviewed safe failure logging added after the previous deployment | No interruption |
+| `OrdersApiFunction` | Update the rebuilt code artifact | No interruption |
+| `VendorWebhookFunction` | Update the rebuilt code artifact | No interruption |
+| `StreamPublisherFunction` | Update the rebuilt bundle containing its reviewed safe failure logging | No interruption |
+| `DeliveryWorkerFunction` | Update the rebuilt code artifact | No interruption |
+| `SynchronousHttpApi` | Dynamically refresh its body because it references the API and webhook Lambda ARNs | No interruption |
 | `DeliverySubscriptionDeadLetterQueueUrl` | Add a non-secret stack output | Not a resource |
 
 The redrive update does not change the subscription endpoint, protocol, topic,
@@ -57,15 +62,20 @@ raw-message setting, or filter. CloudFormation documents `RedrivePolicy` as a
 no-interruption subscription update:
 <https://docs.aws.amazon.com/AWSCloudFormation/latest/TemplateReference/aws-resource-sns-subscription.html>.
 
-No resource deletion or replacement is expected. No API throttle, Lambda
-memory, timeout, concurrency, DynamoDB throughput control, message retention,
-log retention, vendor endpoint, authentication resource, or secret parameter
-changes.
+The HTTP API change is dependency propagation from the Lambda resources; it
+does not alter routes, authorization, throttling, or logging. All four Lambda
+changes modify only their S3 code keys.
 
-This is an expectation derived from the committed template and code. Before
-execution, SAM must create a no-execute change set. Execution must stop for a
-new review if that change set contains anything beyond the actions above,
-especially a replacement, deletion, IAM broadening, or cost-setting change.
+No resource deletion, replacement, IAM change, stack-tag change, or parameter
+change is present. No Lambda memory, timeout, concurrency, DynamoDB throughput
+control, message retention, log retention, vendor endpoint, authentication
+resource, or secret changes are present.
+
+The first no-execute change set was rejected because the SAM command omitted
+the two existing stack tags and therefore proposed removing them from most
+resources. It was never executed and was deleted. The corrected command
+preserves `Project=serverless-order-integration` and `Environment=dev`; its
+change set contains no tag modifications.
 
 ## Cost review
 
@@ -74,15 +84,13 @@ especially a replacement, deletion, IAM broadening, or cost-setting change.
 - Successful SNS deliveries do not write to the subscription DLQ.
 - The queue reuses the approved one-day failure retention and SQS-owned
   encryption, with no customer-managed KMS key or KMS request cost.
-- The existing SAM prefix currently contains 40 objects totalling 17,753,944
-  bytes.
-- A conservative deployment estimate assumes SAM uploads all four bundles
-  again. Using the previous four-bundle total of 4,436,520 bytes gives a
-  temporary peak of 22,190,464 bytes.
-- That peak exceeds the earlier 20 MB artifact cap. The recommended deployment
-  cap is therefore 25 MB until step 5.6 removes the project artifacts.
-- Even if all 25 MB remained for a full month, its storage and small number of
-  packaging requests would remain below the existing `$0.001` S3 allowance.
+- Before packaging, the existing SAM prefix contained 40 objects totalling
+  17,753,944 bytes.
+- Packaging added four rebuilt bundles and one template. The prefix now
+  contains 45 objects totalling 19,978,053 bytes.
+- This remains well below the permanently approved 50 MB project cap.
+- Even if all 50 MB remained for a full month, its storage and small number of
+  packaging requests are conservatively bounded below `$0.003`.
 - The deployment and bounded failure campaign still fit inside the approved
   incremental `$0.02` ceiling.
 
@@ -91,16 +99,20 @@ AWS pricing remains usage-based:
 
 ## Deployment gate
 
-Deployment is paused until the owner explicitly approves both the stack update
-and the temporary S3 artifact-cap increase from 20 MB to 25 MB. After approval:
+On 2026-07-27, the owner approved the subscription-DLQ update and permanently
+increased the project SAM artifact cap from 20 MB to 50 MB.
 
-1. Re-run the local checks and cloud SAM build.
-2. Package to the existing project SAM prefix without printing secret values.
-3. Create but do not execute the CloudFormation change set.
-4. Verify it contains only the reviewed additions and no-interruption
-   modifications above.
-5. Execute it only if the verification passes.
-6. Wait for `UPDATE_COMPLETE`; stop if CloudFormation begins rollback.
+The local checks, packaging, and corrected no-execute change-set review have
+passed. Execution is paused because the actual set includes rebuilt code for
+all four Lambdas and the resulting dynamic HTTP API body update, while the
+earlier expectation listed only the publisher. Explicit approval of this exact
+expanded scope is required before execution.
+
+After approval:
+
+1. Reconfirm that the saved change set is `AVAILABLE` and unchanged.
+2. Execute it without creating another change set.
+3. Wait for `UPDATE_COMPLETE`; stop if CloudFormation begins rollback.
 
 CloudFormation should return the subscription to its previous configuration
 and remove the new queue and policy if the update fails. After any rollback,
