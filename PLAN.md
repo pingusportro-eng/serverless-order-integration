@@ -429,6 +429,8 @@ For every step, the review should answer:
 
 Before **5.6 — Destroy or retain deliberately**, finish the approved bounded
 failure campaign. The SNS subscription DLQ's isolated client-error drill has
-passed, including cleanup and drift verification. The next small step is to
-select and review the next unverified journey from the failure matrix. After
-the campaign, return to teardown and verify that no project resource remains.
+passed, including cleanup and drift verification. The next proposed journey is
+the documented stream-publisher poison-record and same-shard recovery drill.
+Its guarded harness and interrupted-run recovery are locally verified; review
+and approve the real AWS mutation before execution. After the campaign, return
+to teardown and verify that no project resource remains.

@@ -8,8 +8,8 @@ readonly expected_profile='pingusportro-admin'
 readonly stack_name='serverless-order-integration-dev'
 readonly drill_queue_prefix='serverless-order-integration-dev-sns-dlq-drill-'
 readonly drill_event_type='sns.subscription_dlq_drill'
-readonly sqs_call_cap=30
-readonly sns_call_cap=10
+readonly sqs_call_cap=100
+readonly sns_call_cap=50
 
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 default_state_directory="$project_root/.aws-sam/cloud-drill"

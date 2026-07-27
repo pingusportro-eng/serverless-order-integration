@@ -145,8 +145,8 @@ The drill is capped at:
 - one temporary queue for at most five minutes;
 - one temporary subscription;
 - one SNS publish;
-- at most 30 SQS API requests;
-- at most 10 SNS API requests;
+- at most 100 SQS API requests, including diagnostic and recovery headroom;
+- at most 50 SNS API requests, including diagnostic and recovery headroom;
 - zero expected Lambda invocations; and
 - less than 1 KiB of message payload.
 

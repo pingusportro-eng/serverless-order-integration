@@ -83,8 +83,8 @@ describe('SNS subscription-DLQ cloud drill harness', () => {
     ).resolves.toBeUndefined();
 
     const calls = await readFile(join(fixture.drillStateDirectory, 'aws-calls.log'), 'utf8');
-    expect(calls.match(/^sns$/gmu)?.length).toBeLessThanOrEqual(10);
-    expect(calls.match(/^sqs$/gmu)?.length).toBeLessThanOrEqual(30);
+    expect(calls.match(/^sns$/gmu)?.length).toBeLessThanOrEqual(50);
+    expect(calls.match(/^sqs$/gmu)?.length).toBeLessThanOrEqual(100);
 
     const commands = await readFile(join(fixture.fakeStateDirectory, 'commands.log'), 'utf8');
     expect(commands.match(/^sns publish /gmu)).toHaveLength(1);

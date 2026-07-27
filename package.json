@@ -34,6 +34,7 @@
     "test:delivery-worker": "vitest run tests/events/delivery-requested-event.test.ts tests/application/process-delivery-event.test.ts tests/lambda/delivery-worker.test.ts",
     "test:integration": "npm run dynamodb:bootstrap && vitest run --config vitest.integration.config.ts",
     "test:mock-vendor": "vitest run tests/contracts/mock-delivery-vendor.test.ts",
+    "test:publisher-failure-drill": "vitest run tests/scripts/stream-publisher-failure-drill.test.ts",
     "test:sam": "bash scripts/sam/smoke-local.sh",
     "test:stream-publisher": "vitest run tests/events/order-stream-event.test.ts tests/lambda/stream-publisher.test.ts",
     "test:vendor-client": "vitest run tests/integrations/delivery-vendor-client.test.ts",
