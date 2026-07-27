@@ -65,10 +65,12 @@ Cloud tests then exercise one transient and one terminal orchestration class.
 | `IDEMPOTENCY_CONFLICT` | No | Covered with `409` | None | Local evidence is sufficient |
 | `REQUEST_REJECTED` | No | Covered through deterministic mock-vendor `422` | None | Same terminal path |
 
-The delivery application currently demonstrates one retryable code and one
-non-retryable code. It should be table-driven across all eight client codes to
-prove that every retryable failure remains on the SQS failure path and every
-terminal failure is durably recorded before acknowledgement.
+The delivery application has a table-driven classification test covering all
+eight client codes. It proves that every retryable failure remains on the SQS
+failure path without a status write and every terminal failure is durably
+recorded as `SUBMISSION_FAILED` before acknowledgement. A completeness
+assertion fails if the vendor client later declares a code without adding it to
+this classification.
 
 ## Mock-vendor response contract
 

@@ -11,9 +11,31 @@ import {
 } from '../../src/application/order-repository.js';
 import { asMerchantId, asOrderId, type Order } from '../../src/domain/order.js';
 import type { OrderCreatedEvent } from '../../src/events/domain-event.js';
-import type { DeliveryVendorClient } from '../../src/integrations/delivery-vendor-client.js';
+import {
+  VENDOR_SUBMISSION_FAILURE_CODES,
+  VendorSubmissionError,
+  type DeliveryVendorClient,
+  type VendorSubmissionFailureCode,
+} from '../../src/integrations/delivery-vendor-client.js';
 import { InMemoryOrderRepository } from '../../src/infrastructure/memory/in-memory-order-repository.js';
 import { createOrderFixture } from '../fixtures/order.js';
+
+const VENDOR_FAILURE_CASES = [
+  { code: 'TIMEOUT', retryable: true },
+  { code: 'NETWORK_ERROR', retryable: true },
+  { code: 'RATE_LIMITED', retryable: true },
+  { code: 'PROVIDER_UNAVAILABLE', retryable: true },
+  { code: 'INVALID_RESPONSE', retryable: true },
+  { code: 'AUTHENTICATION_FAILED', retryable: false },
+  { code: 'IDEMPOTENCY_CONFLICT', retryable: false },
+  { code: 'REQUEST_REJECTED', retryable: false },
+] as const satisfies readonly {
+  readonly code: VendorSubmissionFailureCode;
+  readonly retryable: boolean;
+}[];
+
+const RETRYABLE_VENDOR_FAILURES = VENDOR_FAILURE_CASES.filter((failure) => failure.retryable);
+const TERMINAL_VENDOR_FAILURES = VENDOR_FAILURE_CASES.filter((failure) => !failure.retryable);
 
 function eventFor(order: Order): OrderCreatedEvent {
   return {
@@ -56,6 +78,106 @@ function repositoryWithGet(order: Order | undefined): OrderRepository {
 }
 
 describe('processDeliveryEvent', () => {
+  it('classifies every declared vendor failure code', () => {
+    expect(VENDOR_FAILURE_CASES.map(({ code }) => code).toSorted()).toEqual(
+      [...VENDOR_SUBMISSION_FAILURE_CODES].toSorted(),
+    );
+  });
+
+  it.each(RETRYABLE_VENDOR_FAILURES)(
+    'leaves $code on the retry path without changing the order',
+    async ({ code }) => {
+      const order = createOrderFixture();
+      const saveStatusChange = vi.fn<OrderRepository['saveStatusChange']>(() => Promise.resolve());
+      const repository: OrderRepository = {
+        create: () => Promise.reject(new Error('not used')),
+        get: () => Promise.resolve(order),
+        list: () => Promise.reject(new Error('not used')),
+        saveStatusChange,
+      };
+      const vendorClient: DeliveryVendorClient = {
+        submitDelivery: () =>
+          Promise.reject(
+            new VendorSubmissionError({
+              code,
+              retryable: true,
+              message: `Retryable provider failure: ${code}.`,
+            }),
+          ),
+      };
+
+      await expect(
+        processDeliveryEvent({ repository, vendorClient }, eventFor(order)),
+      ).rejects.toMatchObject({
+        code,
+        retryable: true,
+      });
+      expect(saveStatusChange).not.toHaveBeenCalled();
+      expect(order).toMatchObject({ status: 'PENDING_SUBMISSION', version: 1 });
+    },
+  );
+
+  it.each(TERMINAL_VENDOR_FAILURES)(
+    'persists $code before acknowledging the delivery event',
+    async ({ code }) => {
+      const repository = new InMemoryOrderRepository();
+      const order = createOrderFixture();
+      await repository.create({
+        order,
+        idempotencyKey: `idempotency-${code.toLowerCase()}`,
+        requestFingerprint: `fingerprint-${code.toLowerCase()}`,
+        mutation: {
+          kind: 'ORDER_CREATED',
+          correlationId: 'corr_terminal_failure',
+          causationId: 'request_terminal_failure',
+        },
+      });
+      const summary = `Terminal provider failure: ${code}.`;
+      const vendorClient: DeliveryVendorClient = {
+        submitDelivery: () =>
+          Promise.reject(
+            new VendorSubmissionError({
+              code,
+              retryable: false,
+              message: summary,
+            }),
+          ),
+      };
+
+      await expect(
+        processDeliveryEvent(
+          {
+            repository,
+            vendorClient,
+            now: () => new Date('2026-07-23T11:00:01.000Z'),
+          },
+          eventFor(order),
+        ),
+      ).resolves.toMatchObject({
+        outcome: 'submission_failed',
+        order: {
+          status: 'SUBMISSION_FAILED',
+          version: 2,
+          failure: {
+            stage: 'SUBMISSION',
+            reasonCode: code,
+            summary,
+            occurredAt: '2026-07-23T11:00:01.000Z',
+          },
+        },
+      });
+      await expect(repository.get(order.merchantId, order.orderId)).resolves.toMatchObject({
+        status: 'SUBMISSION_FAILED',
+        version: 2,
+        failure: {
+          stage: 'SUBMISSION',
+          reasonCode: code,
+          summary,
+        },
+      });
+    },
+  );
+
   it('rejects a missing order', async () => {
     const order = createOrderFixture();
 
