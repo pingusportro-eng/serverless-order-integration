@@ -430,19 +430,19 @@ For every step, the review should answer:
 Continue **6.2 — Configure GitHub-to-AWS OIDC**. The public repository identity
 is verified as `pingusportro-eng/serverless-order-integration`, with immutable
 owner ID `309778154`, repository ID `1313908687`, and default branch `master`.
-The read-only AWS review found no existing IAM OIDC provider, matching IAM role,
-or active application stack.
+The approved `serverless-order-integration-github-oidc-bootstrap` stack is
+`CREATE_COMPLETE` with exactly one OIDC provider and two IAM roles.
 
-The local bootstrap trust binds the AWS account, exact immutable GitHub subject,
+The deployed trust binds the AWS account, exact immutable GitHub subject,
 and repository IDs, `development` environment, and `master` ref. The GitHub role
-will operate only the application stack through one fixed CloudFormation
-service role; it will not be able to modify its own identity bootstrap.
+operates only the application stack through one fixed CloudFormation service
+role; permission simulation confirmed it cannot modify its identity bootstrap.
 
 The full design, permission split, cost boundary, verification, and teardown
 plan are in the
 [GitHub OIDC review](docs/infrastructure/github-oidc-review.md), and the locally
 validated resources are in
 [the bootstrap template](infrastructure/github-oidc-bootstrap.yaml). The next
-safe external action is to create, but not execute, its CloudFormation change
-set and inspect the exact three-resource plan. Any GitHub or AWS mutation still
-requires separate explicit approval.
+safe action is to create the protected GitHub `development` environment and run
+a claim-only OIDC authentication test. This will not deploy the application.
+Any GitHub or AWS mutation still requires separate explicit approval.
