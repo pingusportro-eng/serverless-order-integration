@@ -1,6 +1,6 @@
 # Development deployment record
 
-Status: deployed; cloud smoke tests passed; teardown pending
+Status: deployed; expanded failure-campaign update pending approval
 Deployed: 2026-07-25  
 Stack: `serverless-order-integration-dev`  
 Region: `eu-central-1`  
@@ -110,6 +110,9 @@ shared.
 ## Next boundary
 
 The bounded [cloud smoke tests](cloud-smoke-tests.md) passed after correcting
-the IAM and event-contract defects they exposed. Step 5.6 must now stop the
-local tunnel/vendor, destroy the application stack, remove the packaging
-resources, and verify that no project resource remains.
+the IAM and event-contract defects they exposed. A later review approved a
+subscription DLQ before the expanded failure campaign. Its
+[deployment preflight](subscription-dlq-deployment-review.md) is complete, but
+the stack update still requires explicit approval. After that campaign, step
+5.6 must destroy the application stack, remove the packaging resources, and
+verify that no project resource remains.

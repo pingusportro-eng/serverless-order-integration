@@ -98,6 +98,10 @@ delivery subscription's dead-letter queue.
 - This approval covers the template change, not deployment; deployment remains
   a separate deliberate action.
 
+The live baseline, exact expected update, rollback behavior, and deployment
+gates are recorded in the
+[SNS subscription-DLQ deployment review](subscription-dlq-deployment-review.md).
+
 ## Recommended deployment parameters
 
 These values are **recommendations awaiting owner approval**:

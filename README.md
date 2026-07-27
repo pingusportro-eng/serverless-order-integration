@@ -5,9 +5,10 @@ and asynchronous third-party integration with Node.js, TypeScript, and AWS.
 
 ## Status
 
-The project is in **Phase 5: controlled AWS verification**. The complete stack
-is deployed, its bounded cloud smoke tests passed, and deliberate teardown is
-the next step.
+The project is in **Phase 5: controlled AWS verification**. The stack is
+deployed and its initial bounded smoke tests passed. The preflight for an
+approved SNS subscription DLQ is complete; its stack update still requires
+explicit deployment approval before the expanded failure campaign.
 
 Work is divided into small reviewable steps. See [PLAN.md](PLAN.md) for the
 current checklist, architecture, verification criteria, and definition of done.

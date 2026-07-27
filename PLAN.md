@@ -427,6 +427,7 @@ For every step, the review should answer:
 ## Next step
 
 Before **5.6 — Destroy or retain deliberately**, finish the approved bounded
-failure campaign. The next small step is to review the pending stack update and
-obtain explicit approval before deploying the SNS subscription DLQ. After the
+failure campaign. The SNS subscription-DLQ deployment preflight is complete;
+the next small step is to obtain explicit approval, create and verify a
+no-execute change set, and deploy only if it matches the review. After the
 campaign, return to teardown and verify that no project resource remains.
