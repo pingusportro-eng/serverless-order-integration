@@ -5,10 +5,10 @@ and asynchronous third-party integration with Node.js, TypeScript, and AWS.
 
 ## Status
 
-The project is in **Phase 5: controlled AWS verification**. The stack is
-deployed and the bounded smoke, retry, DLQ, poison-record, webhook, public-error,
-and throttling campaigns passed. The next separate step is the deliberate
-retain-or-destroy review.
+The project is entering **Phase 6: GitHub Actions CI/CD**. The bounded AWS
+campaigns passed, and the application and SAM packaging stacks were
+deliberately destroyed and independently verified absent. The next step is a
+pull-request workflow containing local checks only.
 
 Work is divided into small reviewable steps. See [PLAN.md](PLAN.md) for the
 current checklist, architecture, verification criteria, and definition of done.

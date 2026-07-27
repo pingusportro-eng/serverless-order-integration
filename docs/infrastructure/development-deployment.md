@@ -1,6 +1,6 @@
 # Development deployment record
 
-Status: expanded cloud campaign passed; deliberate retain-or-destroy review pending
+Status: tests passed; development and SAM packaging stacks destroyed
 Deployed: 2026-07-25  
 Stack: `serverless-order-integration-dev`  
 Region: `eu-central-1`  
@@ -111,12 +111,10 @@ SAM created these approved packaging resources:
 | Managed S3 bucket | `aws-sam-cli-managed-default-samclisourcebucket-j2b4pugchzol` |
 | Project object prefix | `serverless-order-integration-dev/` |
 
-They are not deleted with the application stack. Step 5.6 must remove the
-project artifacts and, because this managed stack and bucket were created
-specifically for this project, remove them after confirming they are not
-shared.
+They were not deleted with the application stack. Step 5.6 confirmed they were
+not shared, deleted all 49 object versions, and then deleted the managed stack.
 
-## Next boundary
+## Teardown result
 
 The bounded [cloud smoke tests](cloud-smoke-tests.md) passed after correcting
 the IAM and event-contract defects they exposed. The later subscription-DLQ
@@ -124,7 +122,11 @@ update and all expanded failure drills are deployed and verified. The final
 [terminal failure and operator-retry campaign](../testing/terminal-retry-campaign.md)
 also passed and removed its temporary data and resources.
 
-Step 5.6 must now make a deliberate retain-or-destroy decision. Destruction
-must remove the application stack, project packaging objects, and
-project-specific managed SAM resources, then verify that no project resource
-remains.
+Step 5.6 permanently deleted the application stack, its 34 resources, all 49
+versions in the project artifact bucket, and the SAM-managed stack. The final
+authoritative-service audit found no operational project resource. The exact
+evidence is in the
+[development AWS teardown review](teardown-review.md).
+
+The next boundary is Phase 6.1: add GitHub Actions pull-request checks that run
+locally and create no AWS resources.

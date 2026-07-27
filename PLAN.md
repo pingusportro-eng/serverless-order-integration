@@ -356,7 +356,7 @@ For every step, the review should answer:
   - Verification: all smoke-test assertions pass or produce a documented defect.
   - Expected AWS cost: negligible at the planned volume.
 
-- [ ] **5.6 — Destroy or retain deliberately**
+- [x] **5.6 — Destroy or retain deliberately**
   - Review resources and current spend after the test session.
   - Destroy the stack unless there is a reviewed reason to retain it.
   - Verify that no unexpected resource remains.
@@ -427,19 +427,20 @@ For every step, the review should answer:
 
 ## Next step
 
-Complete **5.6 — Destroy or retain deliberately** by reviewing and explicitly
-approving the destructive execution in the
+Proceed to **6.1 — Add pull-request checks**. The development application stack,
+its 34 resources, all 49 versions in the project-only SAM artifact bucket, and
+the SAM-managed packaging stack were permanently deleted in the approved
+order.
+
+The final authoritative-service audit found zero active stacks, project
+buckets, APIs, Lambda functions, DynamoDB tables, Cognito pools, SNS topics,
+SQS queues, log groups, and IAM roles. No local vendor/tunnel process,
+container, or recovery state remains. The account-level Budget and
+administrator, Git repository, and local DynamoDB volume were preserved. The
+Budget view remains `$0.00` actual/forecast.
+
+The exact scope, safeguards, deletion evidence, and one stale
+resource-tagging-index observation are recorded in the
 [development AWS teardown review](docs/infrastructure/teardown-review.md).
-
-The read-only inventory found 34 application-stack resources containing five
-synthetic DynamoDB items and one synthetic Cognito user. All four queues are
-empty and the five log groups report zero stored bytes. The separate,
-versioned SAM bucket contains exactly 49 object versions totalling 22,174,164
-bytes, all under this project's only prefix. No other active application stack
-or regional SAM bucket exists, so the managed packaging stack is not currently
-shared.
-
-No deletion has been executed. The next step requires explicit approval to
-delete the application stack, all versions in its exact SAM artifact bucket,
-and the SAM-managed stack. The account-level Budget, administrator, Git
-repository, and local DynamoDB volume are outside the deletion scope.
+Step 6.1 should add a GitHub Actions pull-request workflow that runs only local
+checks and creates no AWS resources.

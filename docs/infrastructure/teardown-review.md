@@ -1,8 +1,10 @@
 # Development AWS teardown review
 
-Status: reviewed; deletion not yet approved or executed
+Status: executed and verified
 
 Reviewed: 2026-07-27
+
+Executed: 2026-07-27
 
 AWS account: `454921778743`
 
@@ -12,13 +14,15 @@ AWS CLI profile: `pingusportro-admin`
 
 ## Decision
 
-Destroying the development resources is recommended. All approved cloud tests
-have passed, the repository and Infrastructure as Code remain available for a
-future deployment, and retaining the live stack adds no current learning value.
+Destroying the development resources was recommended and explicitly approved.
+All approved cloud tests had passed, the repository and Infrastructure as Code
+remain available for a future deployment, and retaining the live stack added no
+current learning value.
 
-This review was read-only. It did not delete or modify any AWS resource.
+The original review was read-only. The separately approved execution followed
+the exact scope and ordering below.
 
-## Current billing and lifecycle state
+## Pre-deletion billing and lifecycle state
 
 - The application stack is `UPDATE_COMPLETE`, drift `IN_SYNC`, and termination
   protection is disabled.
@@ -33,8 +37,8 @@ billing view, not a guarantee that every usage record has arrived.
 
 ## Application stack deletion scope
 
-Deleting `serverless-order-integration-dev` will ask CloudFormation to delete
-these 34 resources:
+The approved deletion of `serverless-order-integration-dev` asked
+CloudFormation to delete these 34 resources:
 
 | Resource type | Count |
 | --- | ---: |
@@ -56,9 +60,9 @@ The table, user pool, five log groups, SNS topic, and four queues have explicit
 resources use CloudFormation's default delete behavior. The table and user
 pool both report deletion protection disabled.
 
-### Data that will be permanently lost
+### Data permanently deleted
 
-The remaining cloud data is synthetic test data:
+The remaining cloud data was synthetic test data:
 
 - five DynamoDB items: one order, one idempotency item, one merchant-reference
   item, one provider-order mapping, and one processed-event marker;
@@ -70,9 +74,9 @@ All four SQS queues contain zero visible, in-flight, and delayed messages. The
 five one-day log groups currently report zero stored bytes. The SNS topic has
 only its one stack-owned SQS subscription.
 
-CloudFormation deletion is permanent. The synthetic records and user cannot be
-recovered from AWS afterward. The source code, templates, tests, diagrams, and
-test evidence remain in Git and can recreate a new empty stack.
+CloudFormation deletion was permanent. The synthetic records and user cannot
+be recovered from AWS. The source code, templates, tests, diagrams, and test
+evidence remain in Git and can recreate a new empty stack.
 
 ## SAM packaging resources outside the application stack
 
@@ -101,8 +105,8 @@ the bucket.
 
 ## Approved-target teardown sequence
 
-The execution step must use only the identifiers recorded in this document and
-must stop on any identity, state, ownership, or content mismatch.
+The execution used only the identifiers recorded in this document and was
+configured to stop on any identity, state, ownership, or content mismatch.
 
 1. Reconfirm account `454921778743`, region `eu-central-1`, profile
    `pingusportro-admin`, budget, empty queues, and both expected stack statuses.
@@ -139,13 +143,38 @@ history for a period after the resources are gone.
   and investigate the CloudFormation event instead of deleting unrelated
   infrastructure.
 
-## Execution approval required
+## Execution result
 
-The next step is destructive and requires explicit approval. Approval should
-cover permanent deletion of:
+Explicit approval covered permanent deletion of:
 
 1. `serverless-order-integration-dev` and its 34 resources;
 2. the five synthetic DynamoDB records and one synthetic Cognito user contained
    in that stack;
 3. all 49 versions in the exact SAM artifact bucket; and
 4. `aws-sam-cli-managed-default`, its bucket, and its bucket policy.
+
+The guarded preflight matched the review exactly: account `454921778743`, 34
+application resources, four empty queues, 49 project-only artifact versions,
+zero other active application stacks, and zero local processes or containers.
+
+Execution then completed in the approved order:
+
+1. `serverless-order-integration-dev` reached `DELETE_COMPLETE`.
+2. Independent service checks found zero matching APIs, Lambda functions,
+   DynamoDB tables, Cognito pools, SNS topics, SQS queues, log groups, IAM
+   roles, and event-source mappings.
+3. All 49 exact S3 object versions were deleted with zero errors.
+4. The bucket was verified to contain zero versions, delete markers, and
+   visible objects.
+5. `aws-sam-cli-managed-default` reached `DELETE_COMPLETE`, removing the empty
+   bucket and its policy.
+
+The final authoritative-service audit found zero active stacks, project
+buckets, functions, tables, pools, topics, queues, log groups, roles, or HTTP
+APIs. No local vendor/tunnel process, running Compose container, or recovery
+state remains. The Budget remains in place and reports `$0.00` actual and
+`$0.00` forecast.
+
+The Resource Groups Tagging API temporarily continued to return the deleted
+Cognito pool ARN. Cognito's authoritative API returned zero matching pools, so
+this is a stale secondary-index entry rather than an operational resource.
