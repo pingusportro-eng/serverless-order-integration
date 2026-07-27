@@ -430,7 +430,9 @@ For every step, the review should answer:
 Before **5.6 — Destroy or retain deliberately**, finish the approved bounded
 failure campaign. The SNS subscription-DLQ and stream-publisher poison-record
 drills have passed, including recovery, cleanup, and drift verification. The
-next proposed journey is one transient vendor failure (`429` or timeout)
-through SQS retry and the delivery-worker DLQ. Design its isolation, workload,
-cleanup, and cost boundary for review before any AWS mutation. After the
-campaign, return to teardown and verify that no project resource remains.
+next proposed journey is the documented deterministic vendor `429` through SQS
+retry, the delivery-worker DLQ, and managed redrive. Review its choice of
+failure, temporary vendor-parameter update, one-item injection, cleanup, and
+`< $0.001` estimate before implementing its guarded harness. No AWS mutation is
+authorized yet. After the campaign, return to teardown and verify that no
+project resource remains.
