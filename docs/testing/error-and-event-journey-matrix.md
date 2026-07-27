@@ -131,6 +131,9 @@ those two actionable values.
 | Worker DLQ -> managed redrive -> delivery queue -> worker | AWS-managed move task completes and the recovered message is consumed | Previous recovery used manual send-then-delete because of the old CLI | Repeat once with `start-message-move-task` |
 | Webhook -> DynamoDB -> Stream -> SNS filter | Applied, duplicate, stale, and conflicting provider events produce correct order state and no delivery resubmission | Applied and duplicate paths passed; stale/conflict mostly local | Add stale and event-ID conflict HTTP cases; one non-actionable routing assertion is enough |
 
+The controlled SNS client-error procedure is specified separately in the
+[SNS subscription-DLQ failure drill](sns-subscription-dlq-drill.md).
+
 ## SNS subscription failure safeguard
 
 The publisher failure queue handles DynamoDB Stream records that the publisher

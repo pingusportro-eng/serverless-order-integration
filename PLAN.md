@@ -429,6 +429,6 @@ For every step, the review should answer:
 
 Before **5.6 — Destroy or retain deliberately**, finish the approved bounded
 failure campaign. The SNS subscription DLQ is deployed and verified. The next
-small step is to prepare and run its controlled delivery-failure drill within
-the approved request and cost caps. After the campaign, return to teardown and
-verify that no project resource remains.
+small step is to review and approve its isolated temporary-subscription failure
+drill before implementing or running the harness. After the campaign, return to
+teardown and verify that no project resource remains.
