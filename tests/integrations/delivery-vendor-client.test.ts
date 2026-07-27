@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { asOrderId } from '../../src/domain/order.js';
 import {
@@ -19,6 +19,8 @@ describe('delivery vendor client', () => {
 
   afterEach(async () => {
     await vendor?.close();
+    vendor = undefined;
+    vi.unstubAllGlobals();
   });
 
   async function startClient(
@@ -36,6 +38,28 @@ describe('delivery vendor client', () => {
       authToken: options.authToken ?? AUTH_TOKEN,
       timeoutMs: options.timeoutMs ?? 500,
     });
+  }
+
+  function clientForStubbedFetch() {
+    return createDeliveryVendorClient({
+      baseUrl: 'https://vendor.example.test',
+      authToken: AUTH_TOKEN,
+      timeoutMs: 500,
+    });
+  }
+
+  function stubFetchResponse(response: Response): void {
+    vi.stubGlobal('fetch', (): Promise<Response> => Promise.resolve(response));
+  }
+
+  async function captureVendorError(promise: Promise<unknown>): Promise<VendorSubmissionError> {
+    try {
+      await promise;
+      throw new Error('Expected the vendor call to fail.');
+    } catch (error: unknown) {
+      expect(error).toBeInstanceOf(VendorSubmissionError);
+      return error as VendorSubmissionError;
+    }
   }
 
   it('submits an order through the provider HTTP contract', async () => {
@@ -92,6 +116,31 @@ describe('delivery vendor client', () => {
     });
   });
 
+  it.each([
+    { retryAfter: 'invalid', expectedRetryAfterMs: undefined },
+    { retryAfter: '120', expectedRetryAfterMs: 60_000 },
+  ])(
+    'validates and caps Retry-After value $retryAfter',
+    async ({ retryAfter, expectedRetryAfterMs }) => {
+      stubFetchResponse(
+        new Response('rate limited', {
+          status: 429,
+          headers: { 'Retry-After': retryAfter },
+        }),
+      );
+      const error = await captureVendorError(
+        clientForStubbedFetch().submitDelivery(createOrderFixture(), 'correlation-rate-limit-edge'),
+      );
+
+      expect(error).toMatchObject({
+        code: 'RATE_LIMITED',
+        retryable: true,
+        statusCode: 429,
+      });
+      expect(error.retryAfterMs).toBe(expectedRetryAfterMs);
+    },
+  );
+
   it('maps a provider server error without exposing its response', async () => {
     const client = await startClient('server-error');
 
@@ -118,6 +167,41 @@ describe('delivery vendor client', () => {
     });
   });
 
+  it('rejects a valid JSON success body with an invalid contract shape', async () => {
+    stubFetchResponse(
+      Response.json(
+        {
+          providerOrderId: '',
+          status: 'ACCEPTED',
+          acceptedAt: 'not-a-date',
+        },
+        { status: 201 },
+      ),
+    );
+
+    await expect(
+      clientForStubbedFetch().submitDelivery(createOrderFixture(), 'correlation-invalid-shape'),
+    ).rejects.toMatchObject({
+      code: 'INVALID_RESPONSE',
+      retryable: true,
+      statusCode: 201,
+      message: 'Delivery provider returned an unusable response.',
+    });
+  });
+
+  it('rejects an unexpected provider success status', async () => {
+    stubFetchResponse(new Response(null, { status: 204 }));
+
+    await expect(
+      clientForStubbedFetch().submitDelivery(createOrderFixture(), 'correlation-unexpected-status'),
+    ).rejects.toMatchObject({
+      code: 'INVALID_RESPONSE',
+      retryable: true,
+      statusCode: 204,
+      message: 'Delivery provider returned an unexpected response.',
+    });
+  });
+
   it('treats authentication failure as non-retryable configuration work', async () => {
     const client = await startClient('success', { authToken: 'incorrect-token' });
 
@@ -127,6 +211,19 @@ describe('delivery vendor client', () => {
       code: 'AUTHENTICATION_FAILED',
       retryable: false,
       statusCode: 401,
+      message: 'Delivery provider authentication failed.',
+    });
+  });
+
+  it('maps a provider 403 to the same terminal authentication failure', async () => {
+    stubFetchResponse(new Response('forbidden', { status: 403 }));
+
+    await expect(
+      clientForStubbedFetch().submitDelivery(createOrderFixture(), 'correlation-forbidden'),
+    ).rejects.toMatchObject({
+      code: 'AUTHENTICATION_FAILED',
+      retryable: false,
+      statusCode: 403,
       message: 'Delivery provider authentication failed.',
     });
   });

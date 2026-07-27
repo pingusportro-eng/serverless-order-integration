@@ -58,10 +58,10 @@ Cloud tests then exercise one transient and one terminal orchestration class.
 | --- | --- | --- | --- | --- |
 | `TIMEOUT` | Yes | Covered through a real local timeout | None | Candidate transient failure |
 | `NETWORK_ERROR` | Yes | Covered through a stopped local endpoint | None | Same retry path as other transient failures |
-| `RATE_LIMITED` | Yes | Covered with `429` and `Retry-After: 1` | Add invalid and over-limit `Retry-After` cases | Candidate transient failure |
-| `PROVIDER_UNAVAILABLE` | Yes | Covered with `500` | Add another representative `5xx` boundary if useful | Same retry path |
-| `INVALID_RESPONSE` | Yes | Covered for truncated `201` JSON | Add valid JSON with an invalid shape and an unexpected success status | Candidate uncertain-outcome failure |
-| `AUTHENTICATION_FAILED` | No | Covered with `401` | Add the shared `403` mapping | Candidate terminal failure |
+| `RATE_LIMITED` | Yes | Covered with valid, invalid, and capped `Retry-After` values | None | Candidate transient failure |
+| `PROVIDER_UNAVAILABLE` | Yes | Covered with `500` | None | Same retry path |
+| `INVALID_RESPONSE` | Yes | Covered for truncated JSON, invalid success shape, and unexpected status | None | Candidate uncertain-outcome failure |
+| `AUTHENTICATION_FAILED` | No | Covered with `401` and `403` | None | Candidate terminal failure |
 | `IDEMPOTENCY_CONFLICT` | No | Covered with `409` | None | Local evidence is sufficient |
 | `REQUEST_REJECTED` | No | Covered through deterministic mock-vendor `422` | None | Same terminal path |
 
