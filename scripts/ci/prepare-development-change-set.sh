@@ -180,11 +180,20 @@ change_set_id="$(
     --no-cli-pager
 )"
 
-aws cloudformation wait change-set-create-complete \
+if ! aws cloudformation wait change-set-create-complete \
   --stack-name "$stack_name" \
   --change-set-name "$change_set_name" \
   --region "$region" \
-  --no-cli-pager
+  --no-cli-pager; then
+  aws cloudformation describe-change-set \
+    --stack-name "$stack_name" \
+    --change-set-name "$change_set_name" \
+    --query '{Name:ChangeSetName,Status:Status,StatusReason:StatusReason,ExecutionStatus:ExecutionStatus}' \
+    --output json \
+    --region "$region" \
+    --no-cli-pager >&2 || true
+  fail 'change-set creation did not complete; no application change was executed.'
+fi
 
 aws cloudformation describe-change-set \
   --stack-name "$stack_name" \

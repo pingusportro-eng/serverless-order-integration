@@ -274,6 +274,15 @@ Resources:
                   - s3:GetObjectVersion
                 Resource:
                   Fn::Sub: ${DeploymentArtifactBucket.Arn}/serverless-order-integration-dev/*
+        - PolicyName: ExpandServerlessTransform
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: UseOnlyAwsServerlessTransform
+                Effect: Allow
+                Action: cloudformation:CreateChangeSet
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:cloudformation:eu-central-1:aws:transform/Serverless-2016-10-31
       Tags:
         - Key: Project
           Value: serverless-order-integration

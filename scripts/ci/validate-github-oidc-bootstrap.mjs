@@ -178,6 +178,20 @@ assert.deepEqual(executionArtifactPolicy.PolicyDocument.Statement, [
     },
   },
 ]);
+const executionTransformPolicy = executionRole.Policies.find(
+  (policy) => policy.PolicyName === 'ExpandServerlessTransform',
+);
+assert.deepEqual(executionTransformPolicy.PolicyDocument.Statement, [
+  {
+    Sid: 'UseOnlyAwsServerlessTransform',
+    Effect: 'Allow',
+    Action: 'cloudformation:CreateChangeSet',
+    Resource: {
+      'Fn::Sub':
+        'arn:${AWS::Partition}:cloudformation:eu-central-1:aws:transform/Serverless-2016-10-31',
+    },
+  },
+]);
 
 const roleStatements = Object.values(resources)
   .filter((resource) => resource.Type === 'AWS::IAM::Role')
@@ -301,6 +315,7 @@ for (const expectedControl of [
   'sam package',
   'create-change-set',
   'wait change-set-create-complete',
+  'StatusReason:StatusReason',
   'execute-change-set',
   'wait stack-delete-complete',
   'CONFIRM_DESTROY:-}" == "$stack_name',
