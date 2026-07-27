@@ -8,8 +8,9 @@ and asynchronous third-party integration with Node.js, TypeScript, and AWS.
 The project is in **Phase 6: GitHub Actions CI/CD**. Pull requests targeting
 `master` now run local quality, test, DynamoDB Local integration, and SAM
 validation/build checks. The workflow uses no AWS credentials and creates no
-AWS resources. The next OIDC boundary has been reviewed but remains
-unconfigured until the exact GitHub repository identity is available.
+AWS resources. The exact GitHub OIDC identity boundary and its bootstrap
+template are locally validated, but no IAM or GitHub environment resource has
+been created.
 
 Work is divided into small reviewable steps. See [PLAN.md](PLAN.md) for the
 current checklist, architecture, verification criteria, and definition of done.
@@ -75,8 +76,8 @@ The same checks, plus DynamoDB Local integration and deployable SAM validation,
 run in the
 [pull-request workflow](docs/infrastructure/pull-request-checks.md).
 
-The proposed short-lived GitHub-to-AWS identity boundary and its explicit
-approval gate are recorded in the
+The exact short-lived GitHub-to-AWS identity boundary, local bootstrap template,
+and explicit approval gate are recorded in the
 [GitHub OIDC review](docs/infrastructure/github-oidc-review.md).
 
 The individual commands are:
@@ -96,6 +97,7 @@ The individual commands are:
 - `npm run sam:build` — bundle the Lambda handler for the Node.js 24 runtime
 - `npm run sam:cloud:validate` — lint the deployable cloud template without deploying
 - `npm run sam:cloud:build` — bundle the deployable synchronous Lambda functions locally
+- `npm run oidc:validate` — verify and lint the local GitHub OIDC bootstrap
 - `npm run test:sam` — exercise every current API route through local SAM HTTP
 - `npm run test:stream-publisher` — map saved DynamoDB Stream records and test partial failures
 - `npm run test:terminal-retry-campaign` — verify the guarded terminal/retry AWS harness locally

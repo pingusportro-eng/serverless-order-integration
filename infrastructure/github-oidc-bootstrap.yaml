@@ -1,0 +1,368 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Account-level GitHub OIDC identity and dedicated CloudFormation execution
+  role for serverless-order-integration. This stack does not deploy the
+  application or create an artifact bucket.
+
+Rules:
+  DeployOnlyToReviewedAccount:
+    Assertions:
+      - Assert:
+          Fn::Equals:
+            - Ref: AWS::AccountId
+            - '454921778743'
+        AssertDescription: This bootstrap was reviewed only for AWS account 454921778743.
+  DeployOnlyToReviewedRegion:
+    Assertions:
+      - Assert:
+          Fn::Equals:
+            - Ref: AWS::Region
+            - eu-central-1
+        AssertDescription: This bootstrap was reviewed only for eu-central-1.
+
+Resources:
+  GitHubActionsOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      Tags:
+        - Key: Project
+          Value: serverless-order-integration
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  CloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: serverless-order-integration-cloudformation-execution
+      Description: Provisions only the reviewed serverless-order-integration application services.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowCloudFormation
+            Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: ManageApplicationIamRoles
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ManageGeneratedLambdaRoles
+                Effect: Allow
+                Action:
+                  - iam:AttachRolePolicy
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:DeleteRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:GetRole
+                  - iam:GetRolePolicy
+                  - iam:ListAttachedRolePolicies
+                  - iam:ListRolePolicies
+                  - iam:PutRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:UpdateAssumeRolePolicy
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-integration-dev-*
+              - Sid: PassGeneratedRolesOnlyToLambda
+                Effect: Allow
+                Action: iam:PassRole
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-integration-dev-*
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: lambda.amazonaws.com
+        - PolicyName: ManageApplicationComputeAndData
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ManageApplicationFunctions
+                Effect: Allow
+                Action:
+                  - lambda:AddPermission
+                  - lambda:CreateFunction
+                  - lambda:DeleteFunction
+                  - lambda:GetFunction
+                  - lambda:GetFunctionConfiguration
+                  - lambda:GetPolicy
+                  - lambda:ListTags
+                  - lambda:RemovePermission
+                  - lambda:TagResource
+                  - lambda:UntagResource
+                  - lambda:UpdateFunctionCode
+                  - lambda:UpdateFunctionConfiguration
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-integration-dev-*
+              - Sid: ManageApplicationEventSourceMappings
+                Effect: Allow
+                Action:
+                  - lambda:CreateEventSourceMapping
+                  - lambda:DeleteEventSourceMapping
+                  - lambda:GetEventSourceMapping
+                  - lambda:UpdateEventSourceMapping
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: eu-central-1
+              - Sid: ListEventSourceMappings
+                Effect: Allow
+                Action: lambda:ListEventSourceMappings
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: eu-central-1
+              - Sid: ManageApplicationTable
+                Effect: Allow
+                Action:
+                  - dynamodb:CreateTable
+                  - dynamodb:DeleteTable
+                  - dynamodb:DescribeContinuousBackups
+                  - dynamodb:DescribeTable
+                  - dynamodb:DescribeTimeToLive
+                  - dynamodb:ListTagsOfResource
+                  - dynamodb:TagResource
+                  - dynamodb:UntagResource
+                  - dynamodb:UpdateContinuousBackups
+                  - dynamodb:UpdateTable
+                  - dynamodb:UpdateTimeToLive
+                Resource:
+                  - Fn::Sub: arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/serverless-order-integration-dev-*
+                  - Fn::Sub: arn:${AWS::Partition}:dynamodb:${AWS::Region}:${AWS::AccountId}:table/serverless-order-integration-dev-*/index/*
+        - PolicyName: ManageApplicationMessagingAndLogs
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ManageApplicationQueues
+                Effect: Allow
+                Action:
+                  - sqs:AddPermission
+                  - sqs:CreateQueue
+                  - sqs:DeleteQueue
+                  - sqs:GetQueueAttributes
+                  - sqs:GetQueueUrl
+                  - sqs:ListQueueTags
+                  - sqs:RemovePermission
+                  - sqs:SetQueueAttributes
+                  - sqs:TagQueue
+                  - sqs:UntagQueue
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:sqs:${AWS::Region}:${AWS::AccountId}:serverless-order-integration-dev-*
+              - Sid: ManageApplicationTopics
+                Effect: Allow
+                Action:
+                  - sns:CreateTopic
+                  - sns:DeleteTopic
+                  - sns:GetSubscriptionAttributes
+                  - sns:GetTopicAttributes
+                  - sns:ListTagsForResource
+                  - sns:SetSubscriptionAttributes
+                  - sns:SetTopicAttributes
+                  - sns:Subscribe
+                  - sns:TagResource
+                  - sns:Unsubscribe
+                  - sns:UntagResource
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:serverless-order-integration-dev-*
+              - Sid: ManageApplicationLogGroups
+                Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:DeleteLogGroup
+                  - logs:ListTagsForResource
+                  - logs:PutRetentionPolicy
+                  - logs:TagResource
+                  - logs:UntagResource
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/serverless-order-integration/serverless-order-integration-dev/*
+              - Sid: DescribeRegionalLogGroups
+                Effect: Allow
+                Action: logs:DescribeLogGroups
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: eu-central-1
+        - PolicyName: ManageApplicationApiAndIdentity
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ManageRegionalHttpApiResources
+                Effect: Allow
+                Action:
+                  - apigateway:DELETE
+                  - apigateway:GET
+                  - apigateway:PATCH
+                  - apigateway:POST
+                  - apigateway:PUT
+                Resource:
+                  - Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis
+                  - Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/*
+                  - Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}::/tags/*
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: eu-central-1
+              - Sid: ManageApplicationUserPool
+                Effect: Allow
+                Action:
+                  - cognito-idp:CreateGroup
+                  - cognito-idp:CreateUserPool
+                  - cognito-idp:CreateUserPoolClient
+                  - cognito-idp:DeleteGroup
+                  - cognito-idp:DeleteUserPool
+                  - cognito-idp:DeleteUserPoolClient
+                  - cognito-idp:DescribeUserPool
+                  - cognito-idp:DescribeUserPoolClient
+                  - cognito-idp:GetGroup
+                  - cognito-idp:ListTagsForResource
+                  - cognito-idp:TagResource
+                  - cognito-idp:UntagResource
+                  - cognito-idp:UpdateGroup
+                  - cognito-idp:UpdateUserPool
+                  - cognito-idp:UpdateUserPoolClient
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: eu-central-1
+      Tags:
+        - Key: Project
+          Value: serverless-order-integration
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  GitHubDeployerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: serverless-order-integration-github-deployer
+      Description: Short-lived GitHub Actions identity for the development application stack.
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowReviewedGitHubDeploymentJob
+            Effect: Allow
+            Principal:
+              Federated:
+                Ref: GitHubActionsOidcProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: repo:pingusportro-eng@309778154/serverless-order-integration@1313908687:environment:development
+                token.actions.githubusercontent.com:repository: pingusportro-eng/serverless-order-integration
+                token.actions.githubusercontent.com:repository_owner_id: '309778154'
+                token.actions.githubusercontent.com:repository_id: '1313908687'
+                token.actions.githubusercontent.com:environment: development
+                token.actions.githubusercontent.com:ref: refs/heads/master
+                token.actions.githubusercontent.com:workflow: Deploy development
+      Policies:
+        - PolicyName: OperateDevelopmentApplicationStack
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: PrepareApplicationChangeSetWithFixedServiceRole
+                Effect: Allow
+                Action:
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:cloudformation:eu-central-1:${AWS::AccountId}:stack/serverless-order-integration-dev/*
+                Condition:
+                  ArnEquals:
+                    cloudformation:RoleArn:
+                      Fn::GetAtt:
+                        - CloudFormationExecutionRole
+                        - Arn
+                  StringEquals:
+                    aws:RequestedRegion: eu-central-1
+              - Sid: ExecuteAndInspectApplicationChangeSets
+                Effect: Allow
+                Action:
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:ListChangeSets
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:cloudformation:eu-central-1:${AWS::AccountId}:stack/serverless-order-integration-dev/*
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: eu-central-1
+              - Sid: InspectApplicationStack
+                Effect: Allow
+                Action:
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:DescribeStacks
+                  - cloudformation:GetTemplate
+                  - cloudformation:ListStackResources
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:cloudformation:eu-central-1:${AWS::AccountId}:stack/serverless-order-integration-dev/*
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: eu-central-1
+              - Sid: ReadTemplateSummary
+                Effect: Allow
+                Action: cloudformation:GetTemplateSummary
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: eu-central-1
+              - Sid: DeleteApplicationStackWithFixedServiceRole
+                Effect: Allow
+                Action: cloudformation:DeleteStack
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:cloudformation:eu-central-1:${AWS::AccountId}:stack/serverless-order-integration-dev/*
+                Condition:
+                  ArnEquals:
+                    cloudformation:RoleArn:
+                      Fn::GetAtt:
+                        - CloudFormationExecutionRole
+                        - Arn
+                  StringEquals:
+                    aws:RequestedRegion: eu-central-1
+              - Sid: UseServerlessTransform
+                Effect: Allow
+                Action: cloudformation:CreateChangeSet
+                Resource:
+                  Fn::Sub: arn:${AWS::Partition}:cloudformation:eu-central-1:aws:transform/Serverless-2016-10-31
+              - Sid: PassOnlyCloudFormationExecutionRole
+                Effect: Allow
+                Action: iam:PassRole
+                Resource:
+                  Fn::GetAtt:
+                    - CloudFormationExecutionRole
+                    - Arn
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: cloudformation.amazonaws.com
+      Tags:
+        - Key: Project
+          Value: serverless-order-integration
+        - Key: ManagedBy
+          Value: CloudFormation
+
+Outputs:
+  GitHubActionsOidcProviderArn:
+    Description: OIDC provider trusted by the reviewed GitHub deployment role.
+    Value:
+      Ref: GitHubActionsOidcProvider
+  GitHubDeployerRoleArn:
+    Description: Role assumed by the approved GitHub deployment workflow.
+    Value:
+      Fn::GetAtt:
+        - GitHubDeployerRole
+        - Arn
+  CloudFormationExecutionRoleArn:
+    Description: Role passed by GitHub to CloudFormation for application provisioning.
+    Value:
+      Fn::GetAtt:
+        - CloudFormationExecutionRole
+        - Arn
+  ExpectedGitHubSubject:
+    Description: Exact immutable GitHub environment subject accepted by the trust policy.
+    Value: repo:pingusportro-eng@309778154/serverless-order-integration@1313908687:environment:development

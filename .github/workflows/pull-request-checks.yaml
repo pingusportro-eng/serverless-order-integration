@@ -73,5 +73,8 @@ jobs:
       - name: Validate the deployable SAM template
         run: npm run sam:cloud:validate
 
+      - name: Validate the GitHub OIDC bootstrap
+        run: npm run oidc:validate
+
       - name: Build the deployable SAM application
         run: npm run sam:cloud:build

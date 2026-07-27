@@ -129,5 +129,7 @@ evidence is in the
 [development AWS teardown review](teardown-review.md).
 
 Phase 6.1 added GitHub Actions pull-request checks that run locally and create
-no AWS resources. The next boundary is the separately approval-gated
-[GitHub-to-AWS OIDC design](github-oidc-review.md).
+no AWS resources. The exact repository identity and locally validated bootstrap
+are documented in the separately approval-gated
+[GitHub-to-AWS OIDC review](github-oidc-review.md). No OIDC, IAM role, GitHub
+environment, artifact bucket, or application resource has been created.
