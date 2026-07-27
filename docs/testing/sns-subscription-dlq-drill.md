@@ -1,6 +1,6 @@
 # SNS subscription-DLQ failure drill
 
-Status: design complete; temporary-resource approval pending
+Status: guarded harness implemented and locally verified; real execution pending approval
 
 Reviewed: 2026-07-27
 
@@ -155,5 +155,19 @@ and remains inside the campaign's `$0.02` ceiling. Standard SQS queues have no
 per-queue hourly charge:
 <https://aws.amazon.com/sqs/pricing/>.
 
-This design requires explicit approval before the harness is implemented or
-any temporary AWS resource is created.
+## Harness
+
+The guarded implementation is
+[`scripts/cloud/sns-subscription-dlq-drill.sh`](../../scripts/cloud/sns-subscription-dlq-drill.sh).
+It has no default execution mode:
+
+```bash
+npm run test:cloud-drill
+scripts/cloud/sns-subscription-dlq-drill.sh run
+scripts/cloud/sns-subscription-dlq-drill.sh cleanup
+```
+
+The test command uses a fake AWS CLI and creates no AWS resources. `run` is the
+real drill and must not be used until its temporary-resource execution receives
+separate explicit approval. `cleanup` is reserved for recovering an interrupted
+approved run from its validated state file.
