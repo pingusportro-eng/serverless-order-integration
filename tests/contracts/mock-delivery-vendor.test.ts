@@ -52,21 +52,29 @@ describe('mock delivery vendor contract', () => {
     scenario = 'success',
     options: {
       readonly body?: MockDeliverySubmission;
+      readonly contentType?: string;
       readonly idempotencyKey?: string;
+      readonly omitIdempotencyKey?: boolean;
+      readonly path?: string;
+      readonly rawBody?: string;
       readonly signal?: AbortSignal;
       readonly token?: string;
     } = {},
   ): Promise<Response> {
-    return fetch(`${vendor.baseUrl}/deliveries`, {
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${options.token ?? AUTH_TOKEN}`,
+      'Content-Type': options.contentType ?? 'application/json',
+      'X-Correlation-Id': 'correlation-contract-123',
+      'X-Mock-Vendor-Scenario': scenario,
+    };
+    if (!options.omitIdempotencyKey) {
+      headers['Idempotency-Key'] = options.idempotencyKey ?? 'submission-contract-123';
+    }
+
+    return fetch(`${vendor.baseUrl}${options.path ?? '/deliveries'}`, {
       method: 'POST',
-      headers: {
-        Authorization: `Bearer ${options.token ?? AUTH_TOKEN}`,
-        'Content-Type': 'application/json',
-        'Idempotency-Key': options.idempotencyKey ?? 'submission-contract-123',
-        'X-Correlation-Id': 'correlation-contract-123',
-        'X-Mock-Vendor-Scenario': scenario,
-      },
-      body: JSON.stringify(options.body ?? SUBMISSION),
+      headers,
+      body: options.rawBody ?? JSON.stringify(options.body ?? SUBMISSION),
       ...(options.signal === undefined ? {} : { signal: options.signal }),
     });
   }
@@ -156,5 +164,49 @@ describe('mock delivery vendor contract', () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({ code: 'INVALID_SCENARIO' });
+  });
+
+  it('rejects a request sent to the wrong route', async () => {
+    const response = await submit('success', { path: '/unknown' });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('rejects an unsupported content type', async () => {
+    const response = await submit('success', { contentType: 'text/plain' });
+
+    expect(response.status).toBe(415);
+    await expect(response.json()).resolves.toMatchObject({ code: 'UNSUPPORTED_MEDIA_TYPE' });
+  });
+
+  it('rejects a body larger than 64 KiB', async () => {
+    const response = await submit('success', {
+      rawBody: JSON.stringify({ padding: 'x'.repeat(64 * 1024) }),
+    });
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toMatchObject({ code: 'REQUEST_TOO_LARGE' });
+  });
+
+  it('requires an idempotency key', async () => {
+    const response = await submit('success', { omitIdempotencyKey: true });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ code: 'IDEMPOTENCY_KEY_REQUIRED' });
+  });
+
+  it('rejects malformed JSON', async () => {
+    const response = await submit('success', { rawBody: '{"platformOrderId":' });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ code: 'MALFORMED_REQUEST' });
+  });
+
+  it('rejects a structurally invalid delivery', async () => {
+    const response = await submit('success', { rawBody: '{}' });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ code: 'INVALID_DELIVERY' });
   });
 });

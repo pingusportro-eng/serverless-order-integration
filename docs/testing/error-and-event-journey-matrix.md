@@ -72,12 +72,9 @@ terminal failure is durably recorded before acknowledgement.
 
 ## Mock-vendor response contract
 
-The mock vendor already covers success, idempotent success,
-`IDEMPOTENCY_CONFLICT`, `UNAUTHORIZED`, `RATE_LIMITED`, `PROVIDER_ERROR`,
-invalid scenario selection, timeout, and malformed success JSON.
-
-Additional local contract tests are required for implementation responses that
-are not yet exercised:
+The mock vendor covers success, idempotent success, timeout, malformed success
+JSON, scenario selection, and every stable error response implemented by its
+HTTP boundary:
 
 | HTTP status | Mock code | Trigger |
 | --- | --- | --- |
@@ -88,9 +85,9 @@ are not yet exercised:
 | `400` | `MALFORMED_REQUEST` | Invalid JSON |
 | `400` | `INVALID_DELIVERY` | Structurally invalid delivery |
 
-The executable server also needs a validated scenario-selection input so cloud
-failure drills can choose a deterministic default without adding test-only
-headers to production vendor requests.
+The executable server's validated `MOCK_VENDOR_SCENARIO` input lets cloud
+failure drills choose a deterministic default without adding test-only headers
+to production vendor requests.
 
 ## Domain-event coverage
 
