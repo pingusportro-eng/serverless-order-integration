@@ -104,9 +104,11 @@ queue_attributes() {
           ApproximateNumberOfMessagesNotVisible: "0",
           ApproximateNumberOfMessagesDelayed: "0",
           MessageRetentionPeriod: "300",
-          SqsManagedSseEnabled: "true"
-        } + (if $policy == "" then {} else {Policy: $policy} end)
+          SqsManagedSseEnabled: "true",
+          Policy: $policy
+        }
       }
+      | if $policy == "" then del(.Attributes.Policy) else . end
     '
 }
 
