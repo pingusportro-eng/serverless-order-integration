@@ -1,6 +1,6 @@
 # Development deployment record
 
-Status: subscription-DLQ update deployed and verified; expanded campaign pending
+Status: expanded cloud campaign passed; deliberate retain-or-destroy review pending
 Deployed: 2026-07-25  
 Stack: `serverless-order-integration-dev`  
 Region: `eu-central-1`  
@@ -95,7 +95,7 @@ vendor token remain unrecorded.
 | HTTP API | HTTP protocol, auto-deploy, rate 1 request/second, burst 2, access logging enabled |
 | Cognito | Empty Lite pool; MFA `OFF`; no test user created yet |
 | Logs | Five log groups, each with one-day retention and zero stored bytes before testing |
-| SAM artifacts | 45 objects totalling 19,978,053 bytes; below the permanent 50 MB cap |
+| SAM artifacts | 49 objects totalling 22,174,164 bytes; below the permanent 50 MiB cap |
 | Budget | Existing `$1` Zero-Spend Budget still reported `$0.00`; AWS billing can be delayed |
 
 The installed tunnel client is `cloudflared 2026.7.3`; its published SHA-256
@@ -120,7 +120,11 @@ shared.
 
 The bounded [cloud smoke tests](cloud-smoke-tests.md) passed after correcting
 the IAM and event-contract defects they exposed. The later subscription-DLQ
-update is deployed and verified. The next separate step is the bounded expanded
-failure campaign. After that campaign, step 5.6 must destroy the application
-stack, remove the packaging resources, and verify that no project resource
+update and all expanded failure drills are deployed and verified. The final
+[terminal failure and operator-retry campaign](../testing/terminal-retry-campaign.md)
+also passed and removed its temporary data and resources.
+
+Step 5.6 must now make a deliberate retain-or-destroy decision. Destruction
+must remove the application stack, project packaging objects, and
+project-specific managed SAM resources, then verify that no project resource
 remains.

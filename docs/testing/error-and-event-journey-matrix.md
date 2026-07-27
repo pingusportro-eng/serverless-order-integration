@@ -1,6 +1,6 @@
 # Error and event-journey test matrix
 
-Status: inventory complete; transient-vendor AWS journey passed; additional tests pending
+Status: complete; local error inventory and approved AWS journeys passed
 
 Last reviewed: 2026-07-27
 
@@ -28,19 +28,19 @@ application's Problem Details shape.
 
 | Problem code | Emitting path | Current automated evidence | Additional local work | Cloud evidence |
 | --- | --- | --- | --- | --- |
-| `MALFORMED_REQUEST` | Invalid JSON, idempotency key, `If-Match`, or route input | Covered in API, create-order, status, and webhook tests | Add a table-driven route-level set so every emitting route is explicit | Reproduce malformed JSON and malformed `If-Match` |
+| `MALFORMED_REQUEST` | Invalid JSON, idempotency key, `If-Match`, or route input | Covered in API, create-order, status, and webhook tests | Completed with a table-driven route-level set | Invalid JSON and malformed `If-Match` reproduced |
 | `UNAUTHORIZED` | Missing or wrong token; mock-vendor authentication is a separate contract | Covered in Lambda authorization and mock-vendor tests | None | Already reproduced without a Cognito token |
-| `FORBIDDEN` | Authenticated caller missing the `operators` group on the operator route | Covered in the Orders Lambda test | None | Reproduce with a confirmed non-operator user |
-| `INVALID_WEBHOOK_SIGNATURE` | Missing, malformed, wrong, or expired webhook signature | Covered for wrong and expired signatures | Add explicit missing/malformed header cases | Wrong and expired signatures already reproduced |
+| `FORBIDDEN` | Authenticated caller missing the `operators` group on the operator route | Covered in the Orders Lambda test, including API Gateway's `[operators]` representation | None | Confirmed non-operator received `403`; confirmed operator exposed and verified the bracketed-claim fix |
+| `INVALID_WEBHOOK_SIGNATURE` | Missing, malformed, wrong, or expired webhook signature | Covered for missing, malformed, wrong, and expired signatures | Completed | Wrong and expired signatures already reproduced |
 | `ORDER_NOT_FOUND` | Hidden/missing order or unknown provider order reference | Covered in get-order, status, and webhook tests | None | Reproduce on API and webhook routes |
 | `IDEMPOTENCY_CONFLICT` | Same idempotency key with different order input | Covered at HTTP, repository, DynamoDB, vendor-client, and mock-vendor boundaries | None | Reproduce through `POST /orders` |
 | `MERCHANT_REFERENCE_CONFLICT` | Same merchant reference with a different idempotency key | Covered at HTTP and DynamoDB integration boundaries | None | Reproduce through `POST /orders` |
 | `INVALID_STATUS_TRANSITION` | Disallowed order status transition | Covered at domain, HTTP, and DynamoDB integration boundaries | None | Reproduce through the operator route |
 | `EVENT_ID_CONFLICT` | Same provider event ID with different validated values | Covered in the webhook Lambda test | None | Reproduce through the public webhook |
-| `VERSION_MISMATCH` | Stale operator ETag or repeated concurrent webhook conflict | Operator path is covered; webhook exhaustion path is not | Add a repository double that conflicts on all three webhook attempts | Reproduce the deterministic stale-ETag path; keep webhook contention local |
+| `VERSION_MISMATCH` | Stale operator ETag or repeated concurrent webhook conflict | Operator and three-attempt webhook-exhaustion paths covered | Completed | Deterministic stale ETag reproduced; unsafe live contention remains local |
 | `PRECONDITION_REQUIRED` | Operator mutation without `If-Match` | Covered in the status-handler test | None | Reproduce through the operator route |
-| `VALIDATION_ERROR` | Invalid create, list, status, or webhook values | Covered at each application handler | Add a compact route-level matrix for representative invalid bodies and queries | Reproduce one case per public route |
-| `INTERNAL_ERROR` | Safe ID-collision response or unexpected Lambda boundary failure | Covered for create collision and unexpected webhook repository failure | Add an Orders Lambda unexpected-failure/log-safety test | Do not deliberately break live IAM merely to manufacture a `500` |
+| `VALIDATION_ERROR` | Invalid create, list, status, or webhook values | Covered at each handler and through a route-level matrix | Completed | Invalid create, list, status, and webhook values reproduced |
+| `INTERNAL_ERROR` | Safe ID-collision response or unexpected Lambda boundary failure | Covered for create collision and unexpected Orders/webhook failures with safe logging | Completed | Live IAM was not deliberately broken merely to manufacture a `500` |
 `RATE_LIMITED` and `SERVICE_UNAVAILABLE` were removed from the application
 Problem Details contract because no handler can emit them. API Gateway `429`
 remains documented as a platform-native response and must be captured in the
@@ -118,18 +118,18 @@ those two actionable values.
 | Journey | Expected evidence | Current state | Planned action |
 | --- | --- | --- | --- |
 | API -> Lambda -> DynamoDB -> Stream -> publisher -> SNS -> delivery queue -> worker -> vendor -> DynamoDB | One accepted delivery, stable correlation/idempotency references, final `SUBMITTED` order | Passed in the first smoke test | Keep as the baseline |
-| Non-order transaction items -> Stream filter | Publisher is not invoked for idempotency and reference items | Inferred from logs and local mapping tests | Add an infrastructure filter assertion |
+| Non-order transaction items -> Stream filter | Publisher is not invoked for idempotency and reference items | Exact deployed filter shape locked by an infrastructure test | Completed |
 | Non-actionable domain event -> SNS filter | Event is published but does not enter the delivery queue | Representative `order.submitted` path passed | Assert the exact allow-list locally; one cloud representative is sufficient |
 | Malformed order record -> publisher retries -> publisher failure queue | Structured failure logs, configured attempts exhausted, retained stream invocation record | Passed with one marked malformed item; exact stream record and three attempts verified, then same-shard recovery proved and all artifacts removed | Keep as the controlled publisher poison-record proof |
 | Publisher -> SNS failure | Publisher returns the sequence number and logs safely | Covered locally | Do not break live IAM; local handler evidence is sufficient |
 | SNS -> SQS delivery exhaustion | Failed subscription delivery is retained for investigation | Passed with one isolated client-error marker; exact body recovered from the deployed subscription DLQ and deleted | Keep as the controlled failure-path proof |
 | Delivery queue mixed batch -> worker partial response | Successful record is removed while only the failed record retries | Covered locally | Use a small two-message AWS batch only if timing can be deterministic |
 | Transient vendor failure -> queue retries -> worker DLQ | Same submission key on every attempt, bounded receive count, retained message | Passed with three real `429` attempts using one correlation ID and idempotency-key digest; exact message and worker logs verified in the DLQ | Keep as the representative transient-vendor proof |
-| Terminal vendor failure -> DynamoDB `SUBMISSION_FAILED` -> acknowledgement | Failure details persisted, `order.submission_failed` published, no worker DLQ entry | Covered locally only | Run one authentication or request-rejection scenario |
-| Operator retry -> `order.submission_retry_requested` -> delivery queue -> success | Failed order returns to `PENDING_SUBMISSION`, actionable retry event reaches worker, final `SUBMITTED` | Not tested in AWS | Run after the terminal-failure journey |
-| Duplicate delivery event | No second external effect and message is acknowledged | Covered locally; provider idempotency observed during recovery | Add a deterministic AWS duplicate only if the harness can count vendor submissions |
+| Terminal vendor failure -> DynamoDB `SUBMISSION_FAILED` -> acknowledgement | Failure details persisted, `order.submission_failed` published, no worker DLQ entry | Passed with deterministic vendor `422`, version 2, captured event, empty queues, and no worker failure marker | Keep as the representative terminal path |
+| Operator retry -> `order.submission_retry_requested` -> delivery queue -> success | Failed order returns to `PENDING_SUBMISSION`, actionable retry event reaches worker, final `SUBMITTED` | Passed from version 2 through retry version 3 to submitted version 4, with stable vendor idempotency digest | Keep as the operator-recovery proof |
+| Duplicate delivery event | No second external effect and message is acknowledged | Passed with a directly injected retry event after version 6 and no third vendor journal entry | Keep as the deterministic duplicate proof |
 | Worker DLQ -> managed redrive -> delivery queue -> worker | AWS-managed move task completes and the recovered message is consumed | Passed: one managed move completed, one `201` recovery used the same idempotency key, and the order reached `SUBMITTED` version 2 | Keep as the managed-redrive recovery proof |
-| Webhook -> DynamoDB -> Stream -> SNS filter | Applied, duplicate, stale, and conflicting provider events produce correct order state and no delivery resubmission | Applied and duplicate paths passed; stale/conflict mostly local | Add stale and event-ID conflict HTTP cases; one non-actionable routing assertion is enough |
+| Webhook -> DynamoDB -> Stream -> SNS filter | Applied, duplicate, stale, and conflicting provider events produce correct order state and no delivery resubmission | Passed pickup, delivered, stale, unknown-order, validation, malformed, and event-ID-conflict cases; events 5–6 captured and delivery queue stayed empty | Keep as the public webhook and non-actionable-filter proof |
 
 The controlled SNS client-error procedure is specified separately in the
 [SNS subscription-DLQ failure drill](sns-subscription-dlq-drill.md).
@@ -137,6 +137,9 @@ The completed poison-record and same-shard recovery procedure is recorded in
 the [stream-publisher failure drill](stream-publisher-failure-drill.md).
 The completed transient-vendor and managed-redrive procedure is recorded in the
 [vendor rate-limit and worker-DLQ drill](vendor-rate-limit-dlq-drill.md).
+The terminal failure, operator retry, webhook, duplicate, public-error, and
+native-throttling evidence is recorded in the
+[terminal failure and operator-retry campaign](terminal-retry-campaign.md).
 
 ## SNS subscription failure safeguard
 

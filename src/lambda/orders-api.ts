@@ -110,7 +110,8 @@ function stringList(value: unknown): readonly string[] {
   } catch {
     // API Gateway can expose a simple comma-separated claim instead of JSON.
   }
-  return value.split(',').map((entry) => entry.trim());
+  const commaSeparated = value.startsWith('[') && value.endsWith(']') ? value.slice(1, -1) : value;
+  return commaSeparated.split(',').map((entry) => entry.trim());
 }
 
 function jwtClaims(event: APIGatewayProxyEventV2): Record<string, unknown> | undefined {

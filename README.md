@@ -6,9 +6,9 @@ and asynchronous third-party integration with Node.js, TypeScript, and AWS.
 ## Status
 
 The project is in **Phase 5: controlled AWS verification**. The stack is
-deployed and its initial bounded smoke tests passed. The approved SNS
-subscription DLQ is also deployed and verified. The next separate step is the
-bounded expanded failure campaign, followed by deliberate teardown.
+deployed and the bounded smoke, retry, DLQ, poison-record, webhook, public-error,
+and throttling campaigns passed. The next separate step is the deliberate
+retain-or-destroy review.
 
 Work is divided into small reviewable steps. See [PLAN.md](PLAN.md) for the
 current checklist, architecture, verification criteria, and definition of done.
@@ -89,6 +89,7 @@ The individual commands are:
 - `npm run sam:cloud:build` — bundle the deployable synchronous Lambda functions locally
 - `npm run test:sam` — exercise every current API route through local SAM HTTP
 - `npm run test:stream-publisher` — map saved DynamoDB Stream records and test partial failures
+- `npm run test:terminal-retry-campaign` — verify the guarded terminal/retry AWS harness locally
 - `npm run build` — compile TypeScript into `dist/`
 - `npm run format` — apply Prettier formatting
 
@@ -217,8 +218,10 @@ captures the non-secret stack outputs and deployment verification. The
 real service-boundary results, defects found, retry/DLQ recovery, and final
 cost evidence. The
 [error and event-journey test matrix](docs/testing/error-and-event-journey-matrix.md)
-tracks every stable error contract, the local coverage gaps, and the bounded
-AWS failure scenarios still to run.
+tracks every stable error contract and its completed evidence. The
+[terminal failure and operator-retry campaign](docs/testing/terminal-retry-campaign.md)
+records the final public-error, event-journey, duplicate, webhook, and native
+throttling results.
 
 The editable [full AWS cloud stack diagram](docs/architecture/full-cloud-stack.drawio)
 shows both paths and their security, observability, and failure boundaries.

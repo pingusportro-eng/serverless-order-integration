@@ -427,17 +427,21 @@ For every step, the review should answer:
 
 ## Next step
 
-Before **5.6 — Destroy or retain deliberately**, finish the approved bounded
-failure campaign. The SNS subscription-DLQ and stream-publisher poison-record
-drills have passed, including recovery, cleanup, and drift verification. The
-deterministic vendor `429` journey through SQS retries, the delivery-worker DLQ,
-and managed redrive has also passed in AWS: three failures were retained, one
-managed move recovered the order, cleanup removed its two marked DynamoDB
-items, all four queues finished empty, the stack was `IN_SYNC`, and budget
-actual/forecast remained `$0.00`.
+Proceed to **5.6 — Destroy or retain deliberately** after reviewing the completed
+cloud evidence. The SNS subscription-DLQ, stream-publisher poison record,
+transient vendor/DLQ/redrive, terminal vendor, operator retry, webhook,
+duplicate delivery, public error, and native API throttling journeys have all
+passed.
 
-The next smallest journey is one terminal vendor failure followed by the
-operator retry path. First review a bounded design that proves
-`SUBMISSION_FAILED`, `order.submission_failed`, no worker-DLQ message, then
-`order.submission_retry_requested` routing and final `SUBMITTED`. After the
-campaign, return to teardown and verify that no project resource remains.
+The final terminal/retry campaign captured the complete version 1–6 event
+journey, found and corrected the real API Gateway `[operators]` claim
+representation defect, and finished with 51 native `429` responses inside 125
+total HTTP calls. Cleanup removed its synthetic DynamoDB data, two Cognito
+users, audit queue, and audit subscription. All four deployed queues are empty,
+the stack is `UPDATE_COMPLETE` and `IN_SYNC`, packaging is 22,174,164 bytes
+under the 50 MiB cap, and the budget view remains `$0.00` actual/forecast.
+
+The result and recovery notes are recorded in the
+[terminal failure and operator-retry campaign](docs/testing/terminal-retry-campaign.md).
+Do not destroy or retain the application stack by default; make that deliberate
+cost/lifecycle decision as the next reviewable step.

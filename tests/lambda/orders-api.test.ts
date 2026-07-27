@@ -1,6 +1,7 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import type { OrderRepository } from '../../src/application/order-repository.js';
 import { asMerchantId } from '../../src/domain/order.js';
 import { createOrderCursorCodec } from '../../src/http/order-cursor.js';
 import { InMemoryOrderRepository } from '../../src/infrastructure/memory/in-memory-order-repository.js';
@@ -146,6 +147,109 @@ describe('orders API Lambda adapter', () => {
     });
   });
 
+  it.each([
+    {
+      name: 'create malformed JSON',
+      event: {
+        routeKey: 'POST /orders',
+        method: 'POST',
+        path: '/orders',
+        headers: { 'idempotency-key': 'lambda-matrix-key-1' },
+        body: '{invalid',
+      },
+      statusCode: 400,
+      code: 'MALFORMED_REQUEST',
+    },
+    {
+      name: 'status malformed JSON',
+      event: {
+        routeKey: 'PATCH /orders/{orderId}/status',
+        method: 'PATCH',
+        path: '/orders/ord_12345678/status',
+        pathParameters: { orderId: 'ord_12345678' },
+        headers: { 'if-match': '"1"' },
+        body: '{invalid',
+      },
+      statusCode: 400,
+      code: 'MALFORMED_REQUEST',
+    },
+    {
+      name: 'status malformed If-Match',
+      event: {
+        routeKey: 'PATCH /orders/{orderId}/status',
+        method: 'PATCH',
+        path: '/orders/ord_12345678/status',
+        pathParameters: { orderId: 'ord_12345678' },
+        headers: { 'if-match': '1' },
+        body: JSON.stringify({
+          targetStatus: 'CANCELLED',
+          reason: 'Route matrix cancellation.',
+        }),
+      },
+      statusCode: 400,
+      code: 'MALFORMED_REQUEST',
+    },
+    {
+      name: 'unknown route',
+      event: {
+        routeKey: '$default',
+        method: 'GET',
+        path: '/unknown',
+      },
+      statusCode: 404,
+      code: 'MALFORMED_REQUEST',
+    },
+    {
+      name: 'create validation',
+      event: {
+        routeKey: 'POST /orders',
+        method: 'POST',
+        path: '/orders',
+        headers: { 'idempotency-key': 'lambda-matrix-key-2' },
+        body: JSON.stringify({}),
+      },
+      statusCode: 422,
+      code: 'VALIDATION_ERROR',
+    },
+    {
+      name: 'list validation',
+      event: {
+        routeKey: 'GET /orders',
+        method: 'GET',
+        path: '/orders',
+        queryStringParameters: { limit: '0' },
+      },
+      statusCode: 422,
+      code: 'VALIDATION_ERROR',
+    },
+    {
+      name: 'status validation',
+      event: {
+        routeKey: 'PATCH /orders/{orderId}/status',
+        method: 'PATCH',
+        path: '/orders/ord_12345678/status',
+        pathParameters: { orderId: 'ord_12345678' },
+        headers: { 'if-match': '"1"' },
+        body: JSON.stringify({ targetStatus: 'CANCELLED', reason: 'x' }),
+      },
+      statusCode: 422,
+      code: 'VALIDATION_ERROR',
+    },
+  ] satisfies readonly {
+    name: string;
+    event: EventOptions;
+    statusCode: number;
+    code: string;
+  }[])('maps $name through the Lambda route boundary', async ({ event, statusCode, code }) => {
+    const response = await handler()(eventFixture(event));
+
+    expect(response.statusCode).toBe(statusCode);
+    expect(responseBody(response)).toMatchObject({
+      code,
+      requestId: 'lambda-request-123',
+    });
+  });
+
   it('requires a verified operators group claim for the cloud operator route', async () => {
     const request = eventFixture({
       routeKey: 'PATCH /orders/{orderId}/status',
@@ -182,7 +286,7 @@ describe('orders API Lambda adapter', () => {
         principalId: 'synthetic-operator',
         integrationLatency: 1,
         jwt: {
-          claims: { 'cognito:groups': ['operators'] },
+          claims: { 'cognito:groups': '[operators]' },
           scopes: [],
         },
       },
@@ -237,5 +341,47 @@ describe('orders API Lambda adapter', () => {
     const response = await handler(true)(request);
 
     expect(response.statusCode).toBe(200);
+  });
+
+  it('returns a safe internal error and logs only the unexpected exception class', async () => {
+    const failure = new Error('Repository connection details must stay private.');
+    failure.name = 'ProvisionedThroughputExceededException';
+    const failingRepository: OrderRepository = {
+      create: () => Promise.reject(failure),
+      get: () => Promise.reject(failure),
+      list: () => Promise.reject(failure),
+      saveStatusChange: () => Promise.reject(failure),
+    };
+    const logLines: string[] = [];
+    const failingHandler = createOrdersApiHandler({
+      repository: failingRepository,
+      merchantId,
+      cursorCodec: createOrderCursorCodec('lambda-test-cursor-signing-secret-0123456789'),
+      requireAccessToken: false,
+      requireOperatorGroup: false,
+      now: () => new Date('2026-07-22T12:00:00.000Z'),
+      logSink: (line) => {
+        logLines.push(line);
+      },
+    });
+
+    const response = await failingHandler(
+      eventFixture({
+        routeKey: 'GET /orders',
+        method: 'GET',
+        path: '/orders',
+      }),
+    );
+    const failedLog = logLines
+      .map((line): Record<string, unknown> => JSON.parse(line) as Record<string, unknown>)
+      .find((entry) => entry['event'] === 'http.request.failed');
+
+    expect(response.statusCode).toBe(500);
+    expect(responseBody(response)).toMatchObject({ code: 'INTERNAL_ERROR' });
+    expect(failedLog).toMatchObject({
+      errorCode: 'INTERNAL_ERROR',
+      exceptionName: 'ProvisionedThroughputExceededException',
+    });
+    expect(logLines.join('')).not.toContain('Repository connection details');
   });
 });

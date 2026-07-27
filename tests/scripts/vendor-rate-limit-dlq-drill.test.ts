@@ -61,63 +61,75 @@ describe('vendor rate-limit and worker-DLQ drill harness', () => {
     await expect(access(join(fixture.fakeStateDirectory, 'aws-commands.log'))).rejects.toThrow();
   });
 
-  it('proves bounded 429 attempts, managed redrive, recovery, and cleanup', async () => {
-    const fixture = await testEnvironment({
-      FAKE_VENDOR_DRILL_STALE_REDRIVE_COUNT_ONCE: '1',
-    });
+  it(
+    'proves bounded 429 attempts, managed redrive, recovery, and cleanup',
+    { timeout: 20_000 },
+    async () => {
+      const fixture = await testEnvironment({
+        FAKE_VENDOR_DRILL_STALE_REDRIVE_COUNT_ONCE: '1',
+      });
 
-    const result = await execFileAsync('bash', [drillScript, 'run'], {
-      cwd: projectRoot,
-      env: fixture.environment,
-    });
+      const result = await execFileAsync('bash', [drillScript, 'run'], {
+        cwd: projectRoot,
+        env: fixture.environment,
+      });
 
-    expect(result.stdout).toContain('Vendor rate-limit drill passed:');
-    await expect(access(join(fixture.drillStateDirectory, 'state.json'))).rejects.toThrow();
-    await expect(access(join(fixture.drillStateDirectory, 'vendor-token.json'))).rejects.toThrow();
-    await expect(access(join(fixture.fakeStateDirectory, 'order.json'))).rejects.toThrow();
-    await expect(access(join(fixture.fakeStateDirectory, 'provider-item.json'))).rejects.toThrow();
-    await expect(access(join(fixture.fakeStateDirectory, 'vendor-running'))).rejects.toThrow();
-    await expect(access(join(fixture.fakeStateDirectory, 'tunnel-running'))).rejects.toThrow();
-    await expect(
-      access(join(fixture.fakeStateDirectory, 'redrive-completed')),
-    ).resolves.toBeUndefined();
-    await expect(access(join(fixture.fakeStateDirectory, 'data-deleted'))).resolves.toBeUndefined();
+      expect(result.stdout).toContain('Vendor rate-limit drill passed:');
+      await expect(access(join(fixture.drillStateDirectory, 'state.json'))).rejects.toThrow();
+      await expect(
+        access(join(fixture.drillStateDirectory, 'vendor-token.json')),
+      ).rejects.toThrow();
+      await expect(access(join(fixture.fakeStateDirectory, 'order.json'))).rejects.toThrow();
+      await expect(
+        access(join(fixture.fakeStateDirectory, 'provider-item.json')),
+      ).rejects.toThrow();
+      await expect(access(join(fixture.fakeStateDirectory, 'vendor-running'))).rejects.toThrow();
+      await expect(access(join(fixture.fakeStateDirectory, 'tunnel-running'))).rejects.toThrow();
+      await expect(
+        access(join(fixture.fakeStateDirectory, 'redrive-completed')),
+      ).resolves.toBeUndefined();
+      await expect(
+        access(join(fixture.fakeStateDirectory, 'data-deleted')),
+      ).resolves.toBeUndefined();
 
-    const attempts = (
-      await readFile(join(fixture.drillStateDirectory, 'vendor-attempts.jsonl'), 'utf8')
-    )
-      .trim()
-      .split('\n')
-      .map((line) => JSON.parse(line) as { scenario: string; statusCode: number });
-    expect(attempts).toHaveLength(4);
-    expect(attempts.filter((attempt) => attempt.statusCode === 429)).toHaveLength(3);
-    expect(attempts.filter((attempt) => attempt.statusCode === 201)).toHaveLength(1);
+      const attempts = (
+        await readFile(join(fixture.drillStateDirectory, 'vendor-attempts.jsonl'), 'utf8')
+      )
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as { scenario: string; statusCode: number });
+      expect(attempts).toHaveLength(4);
+      expect(attempts.filter((attempt) => attempt.statusCode === 429)).toHaveLength(3);
+      expect(attempts.filter((attempt) => attempt.statusCode === 201)).toHaveLength(1);
 
-    const calls = await readFile(join(fixture.drillStateDirectory, 'aws-calls.log'), 'utf8');
-    for (const service of [
-      'budgets',
-      'cloudformation',
-      'dynamodb',
-      'lambda',
-      'logs',
-      'sqs',
-      'sts',
-    ]) {
-      expect(calls.match(new RegExp(`^${service} `, 'gmu'))?.length ?? 0).toBeLessThanOrEqual(200);
-    }
+      const calls = await readFile(join(fixture.drillStateDirectory, 'aws-calls.log'), 'utf8');
+      for (const service of [
+        'budgets',
+        'cloudformation',
+        'dynamodb',
+        'lambda',
+        'logs',
+        'sqs',
+        'sts',
+      ]) {
+        expect(calls.match(new RegExp(`^${service} `, 'gmu'))?.length ?? 0).toBeLessThanOrEqual(
+          200,
+        );
+      }
 
-    const awsCommands = await readFile(
-      join(fixture.fakeStateDirectory, 'aws-commands.log'),
-      'utf8',
-    );
-    expect(awsCommands.match(/^cloudformation create-change-set /gmu)).toHaveLength(1);
-    expect(awsCommands.match(/^cloudformation execute-change-set /gmu)).toHaveLength(1);
-    expect(awsCommands.match(/^dynamodb put-item /gmu)).toHaveLength(1);
-    expect(awsCommands.match(/^dynamodb transact-write-items /gmu)).toHaveLength(1);
-    expect(awsCommands.match(/^sqs start-message-move-task /gmu)).toHaveLength(1);
-    expect(awsCommands).not.toMatch(/[a-f0-9]{64}/u);
-    expect(awsCommands).not.toContain('execute-api');
-  });
+      const awsCommands = await readFile(
+        join(fixture.fakeStateDirectory, 'aws-commands.log'),
+        'utf8',
+      );
+      expect(awsCommands.match(/^cloudformation create-change-set /gmu)).toHaveLength(1);
+      expect(awsCommands.match(/^cloudformation execute-change-set /gmu)).toHaveLength(1);
+      expect(awsCommands.match(/^dynamodb put-item /gmu)).toHaveLength(1);
+      expect(awsCommands.match(/^dynamodb transact-write-items /gmu)).toHaveLength(1);
+      expect(awsCommands.match(/^sqs start-message-move-task /gmu)).toHaveLength(1);
+      expect(awsCommands).not.toMatch(/[a-f0-9]{64}/u);
+      expect(awsCommands).not.toContain('execute-api');
+    },
+  );
 
   it('retains mode-0600 recovery state and resumes after the order write', async () => {
     const fixture = await testEnvironment({

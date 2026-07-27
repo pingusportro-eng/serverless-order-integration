@@ -37,6 +37,7 @@
     "test:publisher-failure-drill": "vitest run tests/scripts/stream-publisher-failure-drill.test.ts",
     "test:sam": "bash scripts/sam/smoke-local.sh",
     "test:stream-publisher": "vitest run tests/events/order-stream-event.test.ts tests/lambda/stream-publisher.test.ts",
+    "test:terminal-retry-campaign": "vitest run tests/scripts/sign-webhook.test.ts tests/scripts/terminal-retry-campaign.test.ts",
     "test:vendor-client": "vitest run tests/integrations/delivery-vendor-client.test.ts",
     "test:vendor-rate-limit-drill": "vitest run tests/scripts/vendor-rate-limit-dlq-drill.test.ts",
     "test:webhook": "vitest run tests/application/provider-webhook-validation.test.ts tests/lambda/vendor-webhook.test.ts",

@@ -114,4 +114,19 @@ describe('cloud messaging infrastructure', () => {
       },
     });
   });
+
+  it('invokes the stream publisher only for inserted or modified order items', () => {
+    const publisher = template.Resources['StreamPublisherFunction'];
+    const events = publisher?.Properties?.['Events'] as
+      Record<string, { Properties?: Record<string, unknown> }> | undefined;
+
+    expect(events?.['OrdersStream']?.Properties?.['FilterCriteria']).toEqual({
+      Filters: [
+        {
+          Pattern:
+            '{"eventName":["INSERT","MODIFY"],"dynamodb":{"NewImage":{"entityType":{"S":["ORDER"]}}}}',
+        },
+      ],
+    });
+  });
 });

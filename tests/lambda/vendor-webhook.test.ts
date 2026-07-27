@@ -1,6 +1,7 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { OrderVersionConflictError } from '../../src/application/order-repository.js';
 import { applyOrderStatusChange } from '../../src/domain/order-status-transition.js';
 import type { Order } from '../../src/domain/order.js';
 import { signWebhook } from '../../src/http/webhook-signature.js';
@@ -142,6 +143,41 @@ describe('vendor webhook Lambda adapter', () => {
     });
   });
 
+  it.each([
+    {
+      name: 'missing timestamp',
+      mutate: (event: APIGatewayProxyEventV2) => {
+        delete event.headers['x-webhook-timestamp'];
+      },
+    },
+    {
+      name: 'missing signature',
+      mutate: (event: APIGatewayProxyEventV2) => {
+        delete event.headers['x-webhook-signature'];
+      },
+    },
+    {
+      name: 'malformed signature',
+      mutate: (event: APIGatewayProxyEventV2) => {
+        event.headers['x-webhook-signature'] = 'not-a-sha256-signature';
+      },
+    },
+  ])('rejects a $name header', async ({ mutate }) => {
+    const rawBody = JSON.stringify({
+      eventId: 'provider-event-auth-matrix',
+      eventType: 'DELIVERY_DELIVERED',
+      occurredAt: '2026-07-21T12:34:00.000Z',
+      providerOrderId: 'delivery-789',
+    });
+    const event = eventFixture(rawBody);
+    mutate(event);
+
+    const response = await handler()(event);
+
+    expect(response.statusCode).toBe(401);
+    expect(problemBody(response)).toMatchObject({ code: 'INVALID_WEBHOOK_SIGNATURE' });
+  });
+
   it('rejects an otherwise valid signature outside the replay window', async () => {
     const rawBody = JSON.stringify({
       eventId: 'provider-event-1003',
@@ -202,6 +238,36 @@ describe('vendor webhook Lambda adapter', () => {
       status: 'PICKED_UP',
       version: 3,
     });
+  });
+
+  it('returns a version mismatch after all three concurrent-write attempts conflict', async () => {
+    let attempts = 0;
+    const conflictingRepository: ProviderWebhookRepository = {
+      getByProviderOrderId: () => Promise.resolve(order),
+      recordProviderWebhook: () => {
+        attempts += 1;
+        return Promise.reject(new OrderVersionConflictError(order.version + attempts));
+      },
+    };
+    const conflictingHandler = createVendorWebhookLambdaHandler({
+      repository: conflictingRepository,
+      signingSecret: SECRET,
+      signatureToleranceSeconds: 300,
+      now: () => NOW,
+      logSink: () => undefined,
+    });
+    const rawBody = JSON.stringify({
+      eventId: 'provider-event-contention',
+      eventType: 'DELIVERY_PICKED_UP',
+      occurredAt: '2026-07-21T12:34:00.000Z',
+      providerOrderId: 'delivery-789',
+    });
+
+    const response = await conflictingHandler(eventFixture(rawBody));
+
+    expect(attempts).toBe(3);
+    expect(response.statusCode).toBe(409);
+    expect(problemBody(response)).toMatchObject({ code: 'VERSION_MISMATCH' });
   });
 
   it('validates the authenticated body before resolving an order', async () => {
