@@ -157,7 +157,8 @@ role, not permissions granted directly to GitHub.
 
 ## GitHub environment controls
 
-The public repository's `development` environment is configured with:
+Before step 6.3, the public repository's `development` environment was
+configured with:
 
 - a required reviewer: `pingusportro-eng`;
 - administrator bypass disabled;
@@ -171,7 +172,10 @@ not separation of duties. A team repository should use a different reviewer and
 enable prevent self-review.
 
 OIDC replaces AWS credentials, not the application's cursor, webhook, or vendor
-secrets. Their storage and redaction remain part of step 6.3.
+secrets. Step 6.3 now defines the approved secret boundary in the
+[controlled deployment workflow](deployment-workflows.md): the three values
+will be GitHub environment secrets and are exposed only to non-executing
+change-set preparation. They have not yet been added.
 
 ## Local validation
 

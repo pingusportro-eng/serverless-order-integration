@@ -379,6 +379,8 @@ For every step, the review should answer:
 - [ ] **6.3 — Add controlled deployment and destruction workflows**
   - Require manual invocation or environment approval for AWS changes.
   - Deploy, smoke-test, and expose a separate deliberate destroy action.
+  - Approved local design and controls:
+    [controlled development deployment workflows](docs/infrastructure/deployment-workflows.md).
   - Verification: run one reviewed end-to-end pipeline.
   - AWS cost: reviewed before running the workflow.
 
@@ -427,22 +429,18 @@ For every step, the review should answer:
 
 ## Next step
 
-Continue **6.3 — Add controlled deployment and destruction workflows** with a
-local design and cost review before making any external change.
+Continue **6.3 — Add controlled deployment and destruction workflows** by
+reviewing the local implementation before any external change.
 
-Step 6.2 is complete. The deployed trust binds the AWS account, exact immutable
-GitHub subject and repository IDs, `development` environment, `master` ref, and
-manual workflow. The protected environment required approval, and
-[`Deploy development #1`](https://github.com/pingusportro-eng/serverless-order-integration/actions/runs/30277647600)
-verified the claims and short-lived AWS identity without deploying anything.
+The approved design is implemented in the
+[controlled deployment workflow](docs/infrastructure/deployment-workflows.md).
+It uses a dedicated non-versioned one-day S3 bucket, a permanent 50 MB cap,
+GitHub environment secrets, non-executing change-set preparation, commit-bound
+execution with two smoke requests, and exact stack-and-prefix teardown.
 
-The full design, permission split, cost boundary, verification, and teardown
-plan are in the
-[GitHub OIDC review](docs/infrastructure/github-oidc-review.md), and the locally
-validated identity resources are in
-[the bootstrap template](infrastructure/github-oidc-bootstrap.yaml).
-
-Before step 6.3 changes code or cloud state, review the artifact bucket,
-lifecycle, exact S3 permissions, secret handling, workflow controls, traffic
-caps, log retention, expected cost, and teardown. Any GitHub or AWS mutation
-still requires separate explicit approval.
+The next external step is a separately reviewed update to the existing identity
+bootstrap stack. That update adds exactly one artifact bucket and scoped S3
+permissions. It does not deploy the application. After the effective AWS
+configuration is verified, configure the three GitHub environment secrets.
+Application preparation, execution, and destruction each remain separate
+manual approvals.

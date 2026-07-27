@@ -1,8 +1,8 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Description: >-
   Account-level GitHub OIDC identity and dedicated CloudFormation execution
-  role for serverless-order-integration. This stack does not deploy the
-  application or create an artifact bucket.
+  role and bounded artifact storage for serverless-order-integration. This
+  stack does not deploy the application.
 
 Rules:
   DeployOnlyToReviewedAccount:
@@ -30,6 +30,41 @@ Resources:
       Tags:
         - Key: Project
           Value: serverless-order-integration
+        - Key: ManagedBy
+          Value: CloudFormation
+
+  DeploymentArtifactBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketName:
+        Fn::Sub: serverless-order-integration-artifacts-${AWS::AccountId}-${AWS::Region}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: ExpireDevelopmentArtifacts
+            Status: Enabled
+            Prefix: serverless-order-integration-dev/
+            ExpirationInDays: 1
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      Tags:
+        - Key: Project
+          Value: serverless-order-integration
+        - Key: Environment
+          Value: development
         - Key: ManagedBy
           Value: CloudFormation
 
@@ -228,6 +263,17 @@ Resources:
                 Condition:
                   StringEquals:
                     aws:RequestedRegion: eu-central-1
+        - PolicyName: ReadPackagedApplicationCode
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadOnlyDevelopmentArtifacts
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:GetObjectVersion
+                Resource:
+                  Fn::Sub: ${DeploymentArtifactBucket.Arn}/serverless-order-integration-dev/*
       Tags:
         - Key: Project
           Value: serverless-order-integration
@@ -340,6 +386,37 @@ Resources:
                 Condition:
                   StringEquals:
                     iam:PassedToService: cloudformation.amazonaws.com
+        - PolicyName: ManageBoundedDeploymentArtifacts
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: InspectArtifactBucket
+                Effect: Allow
+                Action: s3:GetBucketLocation
+                Resource:
+                  Fn::GetAtt:
+                    - DeploymentArtifactBucket
+                    - Arn
+              - Sid: ListOnlyDevelopmentArtifactPrefix
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource:
+                  Fn::GetAtt:
+                    - DeploymentArtifactBucket
+                    - Arn
+                Condition:
+                  StringLike:
+                    s3:prefix:
+                      - serverless-order-integration-dev
+                      - serverless-order-integration-dev/*
+              - Sid: ManageOnlyDevelopmentArtifactObjects
+                Effect: Allow
+                Action:
+                  - s3:DeleteObject
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource:
+                  Fn::Sub: ${DeploymentArtifactBucket.Arn}/serverless-order-integration-dev/*
       Tags:
         - Key: Project
           Value: serverless-order-integration
@@ -363,6 +440,10 @@ Outputs:
       Fn::GetAtt:
         - CloudFormationExecutionRole
         - Arn
+  DeploymentArtifactBucketName:
+    Description: Non-versioned bucket containing short-lived packaged application code.
+    Value:
+      Ref: DeploymentArtifactBucket
   ExpectedGitHubSubject:
     Description: Exact immutable GitHub environment subject accepted by the trust policy.
     Value: repo:pingusportro-eng@309778154/serverless-order-integration@1313908687:environment:development

@@ -2,6 +2,27 @@ name: Deploy development
 
 on:
   workflow_dispatch:
+    inputs:
+      operation:
+        description: Prepare, execute, or deliberately destroy the development stack
+        required: true
+        type: choice
+        options:
+          - prepare
+          - execute
+          - destroy
+      vendor_base_url:
+        description: HTTPS Quick Tunnel root URL; required only for prepare
+        required: false
+        type: string
+      change_set_name:
+        description: Exact reviewed change-set name; required only for execute
+        required: false
+        type: string
+      confirm_destroy:
+        description: Type serverless-order-integration-dev only for destroy
+        required: false
+        type: string
 
 permissions: {}
 
@@ -10,11 +31,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  oidc-diagnostic:
-    name: Verify GitHub OIDC identity
+  controlled-operation:
+    name: ${{ inputs.operation }} development
     environment: development
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 45
     permissions:
       contents: read
       id-token: write
@@ -34,7 +55,7 @@ jobs:
           aws-region: eu-central-1
           role-to-assume: arn:aws:iam::454921778743:role/serverless-order-integration-github-deployer
           role-session-name: github-${{ github.run_id }}
-          role-duration-seconds: 900
+          role-duration-seconds: 2700
           allowed-account-ids: '454921778743'
           retry-max-attempts: 3
 
@@ -52,3 +73,57 @@ jobs:
             --arg accountId "$actual_account_id" \
             --arg roleArn "$actual_role_arn" \
             '{accountId: $accountId, roleArn: $roleArn}'
+
+      - name: Set up Node.js 24
+        if: inputs.operation == 'prepare'
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install locked dependencies
+        if: inputs.operation == 'prepare'
+        run: npm ci
+
+      - name: Run local quality checks
+        if: inputs.operation == 'prepare'
+        run: npm run check
+
+      - name: Set up AWS SAM CLI
+        if: inputs.operation == 'prepare'
+        uses: aws-actions/setup-sam@89ddb14d60e682855e3fea4be85b3c56485de310 # v3
+        with:
+          version: 1.163.0
+          use-installer: true
+          token: ${{ github.token }}
+
+      - name: Validate deployment controls and cloud template
+        if: inputs.operation == 'prepare'
+        run: |
+          npm run deployment:validate
+          npm run sam:cloud:validate
+
+      - name: Build the deployable application
+        if: inputs.operation == 'prepare'
+        run: npm run sam:cloud:build
+
+      - name: Prepare a non-executing change set
+        if: inputs.operation == 'prepare'
+        env:
+          CURSOR_SIGNING_SECRET: ${{ secrets.CURSOR_SIGNING_SECRET }}
+          VENDOR_AUTH_TOKEN: ${{ secrets.VENDOR_AUTH_TOKEN }}
+          VENDOR_BASE_URL: ${{ inputs.vendor_base_url }}
+          WEBHOOK_SIGNING_SECRET: ${{ secrets.WEBHOOK_SIGNING_SECRET }}
+        run: bash scripts/ci/prepare-development-change-set.sh
+
+      - name: Execute the exact reviewed change set and smoke-test
+        if: inputs.operation == 'execute'
+        env:
+          CHANGE_SET_NAME: ${{ inputs.change_set_name }}
+        run: bash scripts/ci/execute-development-change-set.sh
+
+      - name: Destroy the exact development stack and artifacts
+        if: inputs.operation == 'destroy'
+        env:
+          CONFIRM_DESTROY: ${{ inputs.confirm_destroy }}
+        run: bash scripts/ci/destroy-development-stack.sh
