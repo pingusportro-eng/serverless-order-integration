@@ -122,7 +122,7 @@ those two actionable values.
 | Non-actionable domain event -> SNS filter | Event is published but does not enter the delivery queue | Representative `order.submitted` path passed | Assert the exact allow-list locally; one cloud representative is sufficient |
 | Malformed order record -> publisher retries -> publisher failure queue | Structured failure logs, configured attempts exhausted, retained stream invocation record | Not tested; queue remained empty | Inject one synthetic malformed order item, then repair it and verify the shard continues |
 | Publisher -> SNS failure | Publisher returns the sequence number and logs safely | Covered locally | Do not break live IAM; local handler evidence is sufficient |
-| SNS -> SQS delivery exhaustion | Failed subscription delivery is retained for investigation | Subscription DLQ and least-privilege policy are asserted locally; not deployed yet | Verify the deployed redrive policy and run one controlled client-error drill |
+| SNS -> SQS delivery exhaustion | Failed subscription delivery is retained for investigation | Subscription DLQ, policy, encryption, retention, and redrive target verified in AWS | Run one controlled client-error drill |
 | Delivery queue mixed batch -> worker partial response | Successful record is removed while only the failed record retries | Covered locally | Use a small two-message AWS batch only if timing can be deterministic |
 | Transient vendor failure -> queue retries -> worker DLQ | Same submission key on every attempt, bounded receive count, retained message | Poison-message DLQ path passed, but no real vendor transient did | Run one timeout or `429` scenario |
 | Terminal vendor failure -> DynamoDB `SUBMISSION_FAILED` -> acknowledgement | Failure details persisted, `order.submission_failed` published, no worker DLQ entry | Covered locally only | Run one authentication or request-rejection scenario |
@@ -148,9 +148,9 @@ template tests lock those relationships and the exact two-event subscription
 filter.
 
 The project owner approved this additional SQS queue on 2026-07-27. It has no
-fixed or idle request charge and has not yet been deployed. The cloud campaign
-must still verify the deployed attributes and perform a controlled failure
-drill without exceeding the workload boundary below.
+fixed or idle request charge and is now deployed with its attributes verified.
+The cloud campaign must still perform a controlled failure drill without
+exceeding the workload boundary below.
 
 ## Initial cloud safety boundary
 

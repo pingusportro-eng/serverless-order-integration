@@ -1,6 +1,6 @@
 # Development deployment record
 
-Status: deployed; corrected no-execute update pending expanded scope approval
+Status: subscription-DLQ update deployed and verified; expanded campaign pending
 Deployed: 2026-07-25  
 Stack: `serverless-order-integration-dev`  
 Region: `eu-central-1`  
@@ -54,6 +54,14 @@ It contained no addition, deletion, replacement, permission, concurrency,
 retention, or cost-setting change. The final stack drift status is `IN_SYNC`
 with zero drifted resources.
 
+On 2026-07-27, the approved
+[SNS subscription-DLQ update](subscription-dlq-deployment-review.md) added one
+SQS queue and its topic-scoped policy, then updated the existing subscription
+without replacement. SAM also updated four rebuilt Lambda code artifacts and
+CloudFormation refreshed the dependent HTTP API body without replacement.
+The update completed without rollback, and fresh drift detection returned
+`IN_SYNC` with zero drifted resources.
+
 ## Non-secret stack outputs
 
 | Output | Deployed value |
@@ -65,6 +73,7 @@ with zero drifted resources.
 | `DeliveryQueueUrl` | `https://sqs.eu-central-1.amazonaws.com/454921778743/serverless-order-integration-dev-DeliveryQueue-uHI8DMZh02m5` |
 | `DeliveryDeadLetterQueueUrl` | `https://sqs.eu-central-1.amazonaws.com/454921778743/serverless-order-integration-dev-DeliveryDeadLetterQueue-lbW7gu1aNo9T` |
 | `StreamPublisherFailureQueueUrl` | `https://sqs.eu-central-1.amazonaws.com/454921778743/serverless-order-integration-dev-StreamPublisherFailureQueue-J5wrZfmO0rkb` |
+| `DeliverySubscriptionDeadLetterQueueUrl` | `https://sqs.eu-central-1.amazonaws.com/454921778743/serverless-order-integration-dev-DeliverySubscriptionDeadLetterQueu-F20hAdn3WTtC` |
 | `UserPoolId` | `eu-central-1_DkYQiGwT7` |
 | `UserPoolClientId` | `1d78o6l382tglhs3vjolbh7pqq` |
 | `UserPoolIssuer` | `https://cognito-idp.eu-central-1.amazonaws.com/eu-central-1_DkYQiGwT7` |
@@ -76,17 +85,17 @@ vendor token remain unrecorded.
 
 | Boundary | Result |
 | --- | --- |
-| CloudFormation | Final status `UPDATE_COMPLETE`; 32 resources; drift `IN_SYNC` |
+| CloudFormation | Final status `UPDATE_COMPLETE`; 34 resources; drift `IN_SYNC` |
 | DynamoDB | Table and both GSIs `ACTIVE`; `PAY_PER_REQUEST`; `NEW_IMAGE` Stream enabled; deployed definition in sync |
 | Lambda | Four functions `Active`, last update successful, 128 MB; worker timeout 15 seconds and other timeouts 10 seconds |
 | Stream mapping | `Enabled`; batch 10; two retries; one-hour age; partial failures enabled |
 | SQS mapping | `Enabled`; batch 2; partial failures enabled; deployed maximum concurrency 2 |
 | Delivery queue | 90-second visibility, one-day retention, SQS-managed encryption, redrive count 3 |
-| Failure queues | One-day retention and SQS-managed encryption |
+| Failure queues | All three use one-day retention and SQS-managed encryption |
 | HTTP API | HTTP protocol, auto-deploy, rate 1 request/second, burst 2, access logging enabled |
 | Cognito | Empty Lite pool; MFA `OFF`; no test user created yet |
 | Logs | Five log groups, each with one-day retention and zero stored bytes before testing |
-| SAM artifacts | Ten objects totalling 4,436,520 bytes |
+| SAM artifacts | 45 objects totalling 19,978,053 bytes; below the permanent 50 MB cap |
 | Budget | Existing `$1` Zero-Spend Budget still reported `$0.00`; AWS billing can be delayed |
 
 The installed tunnel client is `cloudflared 2026.7.3`; its published SHA-256
@@ -110,9 +119,8 @@ shared.
 ## Next boundary
 
 The bounded [cloud smoke tests](cloud-smoke-tests.md) passed after correcting
-the IAM and event-contract defects they exposed. A later review approved a
-subscription DLQ before the expanded failure campaign. Its
-[deployment preflight](subscription-dlq-deployment-review.md) is complete, but
-the stack update still requires explicit approval. After that campaign, step
-5.6 must destroy the application stack, remove the packaging resources, and
-verify that no project resource remains.
+the IAM and event-contract defects they exposed. The later subscription-DLQ
+update is deployed and verified. The next separate step is the bounded expanded
+failure campaign. After that campaign, step 5.6 must destroy the application
+stack, remove the packaging resources, and verify that no project resource
+remains.

@@ -1,6 +1,6 @@
 # Asynchronous cloud slice
 
-Status: defined; subscription-DLQ update approved locally but not yet deployed
+Status: defined, deployed, and verified
 
 Last reviewed: 2026-07-27
 

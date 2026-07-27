@@ -1,6 +1,6 @@
 # Pre-deployment cost review
 
-Status: original stack deployed; subscription-DLQ update approved but not deployed
+Status: original stack and approved subscription-DLQ update deployed
 
 Last reviewed: 2026-07-27
 

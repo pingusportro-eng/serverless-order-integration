@@ -1,6 +1,6 @@
 # SNS subscription-DLQ deployment review
 
-Status: corrected no-execute change set ready; expanded scope approval pending
+Status: deployed and verified
 
 Reviewed: 2026-07-27
 
@@ -102,17 +102,10 @@ AWS pricing remains usage-based:
 On 2026-07-27, the owner approved the subscription-DLQ update and permanently
 increased the project SAM artifact cap from 20 MB to 50 MB.
 
-The local checks, packaging, and corrected no-execute change-set review have
-passed. Execution is paused because the actual set includes rebuilt code for
-all four Lambdas and the resulting dynamic HTTP API body update, while the
-earlier expectation listed only the publisher. Explicit approval of this exact
-expanded scope is required before execution.
-
-After approval:
-
-1. Reconfirm that the saved change set is `AVAILABLE` and unchanged.
-2. Execute it without creating another change set.
-3. Wait for `UPDATE_COMPLETE`; stop if CloudFormation begins rollback.
+The local checks, packaging, and corrected no-execute change-set review passed.
+The owner then explicitly approved its four Lambda code updates and resulting
+dynamic HTTP API body update. The saved change set was reconfirmed, executed
+without rebuilding, and reached `UPDATE_COMPLETE` without rollback.
 
 CloudFormation should return the subscription to its previous configuration
 and remove the new queue and policy if the update fails. After any rollback,
@@ -136,3 +129,27 @@ Before sending test traffic:
 
 Starting the vendor and tunnel and deliberately breaking SNS delivery belong to
 the later bounded failure campaign, not to the deployment itself.
+
+## Deployment result
+
+Post-deployment checks on 2026-07-27 confirmed:
+
+- the stack is `UPDATE_COMPLETE` with 34 complete resources;
+- the two stack tags remain present;
+- the new queue has one-day retention, SQS-managed encryption, and no backlog;
+- its policy grants `sqs:SendMessage` only to `sns.amazonaws.com` when the
+  source is this account and the deployed domain-events topic;
+- the confirmed SNS subscription points its `RedrivePolicy` to the new queue;
+- its raw-delivery setting and exact two-event filter are unchanged;
+- all four Lambdas are `Active` with `LastUpdateStatus=Successful`;
+- both event-source mappings remain `Enabled`;
+- all four SQS queues report zero visible, in-flight, and delayed messages;
+- the HTTP API still exposes the same five routes, authorization modes,
+  one-request-per-second rate, and burst limit of two;
+- the SAM prefix contains 45 objects totalling 19,978,053 bytes, below the
+  permanent 50 MB cap;
+- the budget view remains `$0.00` actual and forecast; and
+- fresh drift detection returned `IN_SYNC` with zero drifted resources.
+
+No application API request or test message was sent during deployment
+verification.

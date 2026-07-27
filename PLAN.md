@@ -428,9 +428,7 @@ For every step, the review should answer:
 ## Next step
 
 Before **5.6 — Destroy or retain deliberately**, finish the approved bounded
-failure campaign. The SNS subscription-DLQ deployment preflight is complete;
-the corrected no-execute change set contains two additions plus
-no-interruption subscription, Lambda-code, and dependent HTTP API updates. The
-next small step is explicit approval of that exact scope before execution.
-After the campaign, return to teardown and verify that no project resource
-remains.
+failure campaign. The SNS subscription DLQ is deployed and verified. The next
+small step is to prepare and run its controlled delivery-failure drill within
+the approved request and cost caps. After the campaign, return to teardown and
+verify that no project resource remains.
