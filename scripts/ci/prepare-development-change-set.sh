@@ -5,7 +5,7 @@ set -euo pipefail
 readonly expected_account_id='454921778743'
 readonly region='eu-central-1'
 readonly stack_name='serverless-order-integration-dev'
-readonly artifact_bucket='serverless-order-integration-artifacts-454921778743-eu-central-1'
+readonly artifact_bucket='soi-artifacts-454921778743-eu-central-1'
 readonly artifact_prefix='serverless-order-integration-dev/'
 readonly execution_role_arn='arn:aws:iam::454921778743:role/serverless-order-integration-cloudformation-execution'
 readonly maximum_artifact_bytes=$((50 * 1024 * 1024))

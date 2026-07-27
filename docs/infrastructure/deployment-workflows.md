@@ -1,6 +1,6 @@
 # Controlled development deployment workflows
 
-Status: implemented and locally validated; not yet deployed or executed
+Status: implemented and locally validated; first bootstrap update rolled back safely
 
 Last reviewed: 2026-07-27
 
@@ -36,12 +36,44 @@ The existing conservative limit for one deployment and bounded smoke test
 remains less than `$0.05`. The monthly project ceiling remains `$5`, and the
 existing `$1` Budget is an alert rather than a hard spending cap.
 
+## First bootstrap update result
+
+The reviewed non-executing change set
+`bootstrap-artifacts-review-20260727` exactly matched commit `58f1e27` and
+contained only:
+
+- one `Add` for `DeploymentArtifactBucket`;
+- one non-replacing policy modification for
+  `CloudFormationExecutionRole`; and
+- one non-replacing policy modification for `GitHubDeployerRole`.
+
+Execution failed before the bucket was created because the first deterministic
+bucket name contained 64 characters. S3 bucket names have a maximum length of
+63 characters. CloudFormation reached `UPDATE_ROLLBACK_COMPLETE` and restored
+the original three-resource bootstrap:
+
+- no artifact bucket exists;
+- neither new inline policy remains;
+- the OIDC provider and trust are unchanged; and
+- the application stack remains absent.
+
+The corrected name is:
+
+```text
+soi-artifacts-454921778743-eu-central-1
+```
+
+It contains 39 characters and still includes the account and region for global
+uniqueness. The deployment validator now renders the final name and asserts
+both the S3 syntax and 63-character limit. The corrected update has not been
+retried and requires a new reviewed change set and explicit approval.
+
 ## Persistent deployment infrastructure
 
 The bootstrap template adds exactly one resource:
 
 ```text
-serverless-order-integration-artifacts-454921778743-eu-central-1
+soi-artifacts-454921778743-eu-central-1
 ```
 
 The bucket:
@@ -168,7 +200,7 @@ and waits for only that stack, then constructs and rechecks this exact cleanup
 target:
 
 ```text
-s3://serverless-order-integration-artifacts-454921778743-eu-central-1/serverless-order-integration-dev/
+s3://soi-artifacts-454921778743-eu-central-1/serverless-order-integration-dev/
 ```
 
 It removes only objects below that prefix and verifies both the stack and
@@ -202,17 +234,19 @@ The deployment validator locks:
 
 ## Remaining external steps
 
-No external step is authorized merely by this document. Continue in small,
+No further external step is authorized merely by this document. Continue in small,
 reviewable operations:
 
-1. review and deploy the bootstrap change set that adds the bucket and scoped
-   S3 permissions;
-2. verify the effective AWS bucket and IAM configuration;
-3. add the three GitHub `development` environment secrets;
-4. start the local mock vendor and Quick Tunnel;
-5. manually run `prepare` and inspect its change set;
-6. separately approve and run `execute`;
-7. inspect the live application and billing view;
-8. separately approve and run `destroy`; and
-9. verify the application is absent, the prefix is empty, and no unexpected
+1. commit the corrected bucket name and length assertion;
+2. create and review a new non-executing bootstrap change set;
+3. separately approve and execute the corrected update that adds the bucket
+   and scoped S3 permissions;
+4. verify the effective AWS bucket and IAM configuration;
+5. add the three GitHub `development` environment secrets;
+6. start the local mock vendor and Quick Tunnel;
+7. manually run `prepare` and inspect its change set;
+8. separately approve and run `execute`;
+9. inspect the live application and billing view;
+10. separately approve and run `destroy`; and
+11. verify the application is absent, the prefix is empty, and no unexpected
    billed resource remains.

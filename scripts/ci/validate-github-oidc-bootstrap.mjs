@@ -29,7 +29,15 @@ const artifactBucket = resources.DeploymentArtifactBucket;
 assert.equal(artifactBucket.Type, 'AWS::S3::Bucket');
 assert.equal(
   artifactBucket.Properties.BucketName['Fn::Sub'],
-  'serverless-order-integration-artifacts-${AWS::AccountId}-${AWS::Region}',
+  'soi-artifacts-${AWS::AccountId}-${AWS::Region}',
+);
+const renderedArtifactBucketName = artifactBucket.Properties.BucketName['Fn::Sub']
+  .replace('${AWS::AccountId}', '454921778743')
+  .replace('${AWS::Region}', 'eu-central-1');
+assert.match(renderedArtifactBucketName, /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/);
+assert.ok(
+  renderedArtifactBucketName.length <= 63,
+  'The rendered artifact bucket name exceeds the S3 63-character limit.',
 );
 assert.equal(
   Object.hasOwn(artifactBucket.Properties, 'VersioningConfiguration'),
@@ -285,7 +293,7 @@ for (const expectedControl of [
   "readonly expected_account_id='454921778743'",
   "readonly region='eu-central-1'",
   "readonly stack_name='serverless-order-integration-dev'",
-  "readonly artifact_bucket='serverless-order-integration-artifacts-454921778743-eu-central-1'",
+  "readonly artifact_bucket='soi-artifacts-454921778743-eu-central-1'",
   "readonly artifact_prefix='serverless-order-integration-dev/'",
   'maximum_artifact_bytes=$((50 * 1024 * 1024))',
   'sam package',

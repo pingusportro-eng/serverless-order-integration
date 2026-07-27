@@ -39,7 +39,7 @@ Resources:
     UpdateReplacePolicy: Delete
     Properties:
       BucketName:
-        Fn::Sub: serverless-order-integration-artifacts-${AWS::AccountId}-${AWS::Region}
+        Fn::Sub: soi-artifacts-${AWS::AccountId}-${AWS::Region}
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:

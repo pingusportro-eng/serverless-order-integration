@@ -438,9 +438,14 @@ It uses a dedicated non-versioned one-day S3 bucket, a permanent 50 MB cap,
 GitHub environment secrets, non-executing change-set preparation, commit-bound
 execution with two smoke requests, and exact stack-and-prefix teardown.
 
-The next external step is a separately reviewed update to the existing identity
-bootstrap stack. That update adds exactly one artifact bucket and scoped S3
-permissions. It does not deploy the application. After the effective AWS
-configuration is verified, configure the three GitHub environment secrets.
+The first reviewed bootstrap update rolled back safely because its proposed S3
+bucket name was 64 characters, one above the S3 limit. No bucket or policy
+change remains. The corrected 39-character name and a rendered-length
+regression assertion are now local changes documented in
+[the workflow review](docs/infrastructure/deployment-workflows.md).
+
+Commit that correction, then create and inspect a new non-executing bootstrap
+change set. Execution requires another explicit approval. After the effective
+AWS configuration is verified, configure the three GitHub environment secrets.
 Application preparation, execution, and destruction each remain separate
 manual approvals.
