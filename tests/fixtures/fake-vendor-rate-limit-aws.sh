@@ -158,9 +158,11 @@ queue_attributes() {
           ApproximateNumberOfMessagesDelayed: "0",
           VisibilityTimeout: "90",
           MessageRetentionPeriod: "86400",
-          SqsManagedSseEnabled: "true"
-        } + (if $redrive == "" then {} else {RedrivePolicy: $redrive} end)
+          SqsManagedSseEnabled: "true",
+          RedrivePolicy: $redrive
+        }
       }
+      | if $redrive == "" then del(.Attributes.RedrivePolicy) else . end
     '
 }
 
