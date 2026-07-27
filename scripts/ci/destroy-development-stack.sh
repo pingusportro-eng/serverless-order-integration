@@ -63,7 +63,7 @@ remaining_objects="$(
   aws s3api list-objects-v2 \
     --bucket "$artifact_bucket" \
     --prefix "$artifact_prefix" \
-    --query 'length(Contents)' \
+    --query 'length(Contents || `[]`)' \
     --output text \
     --region "$region" \
     --no-cli-pager

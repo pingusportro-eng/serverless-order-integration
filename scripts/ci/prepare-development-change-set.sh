@@ -62,7 +62,7 @@ existing_artifact_bytes="$(
   aws s3api list-objects-v2 \
     --bucket "$artifact_bucket" \
     --prefix "$artifact_prefix" \
-    --query 'sum(Contents[].Size)' \
+    --query 'sum(Contents[].Size || `[]`)' \
     --output text \
     --region "$region" \
     --no-cli-pager
@@ -84,7 +84,7 @@ artifact_bytes="$(
   aws s3api list-objects-v2 \
     --bucket "$artifact_bucket" \
     --prefix "$artifact_prefix" \
-    --query 'sum(Contents[].Size)' \
+    --query 'sum(Contents[].Size || `[]`)' \
     --output text \
     --region "$region" \
     --no-cli-pager

@@ -296,6 +296,8 @@ for (const expectedControl of [
   "readonly artifact_bucket='soi-artifacts-454921778743-eu-central-1'",
   "readonly artifact_prefix='serverless-order-integration-dev/'",
   'maximum_artifact_bytes=$((50 * 1024 * 1024))',
+  'sum(Contents[].Size || `[]`)',
+  'length(Contents || `[]`)',
   'sam package',
   'create-change-set',
   'wait change-set-create-complete',
