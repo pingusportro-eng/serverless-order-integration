@@ -370,7 +370,7 @@ For every step, the review should answer:
   - Verification: intentionally fail and then pass each important check.
   - AWS cost: $0.
 
-- [ ] **6.2 — Configure GitHub-to-AWS OIDC**
+- [x] **6.2 — Configure GitHub-to-AWS OIDC**
   - Define a narrowly scoped deployment role and trust policy.
   - Do not store long-lived AWS access keys in GitHub.
   - Verification: inspect the effective trust and permission policies.
@@ -427,22 +427,22 @@ For every step, the review should answer:
 
 ## Next step
 
-Continue **6.2 — Configure GitHub-to-AWS OIDC**. The public repository identity
-is verified as `pingusportro-eng/serverless-order-integration`, with immutable
-owner ID `309778154`, repository ID `1313908687`, and default branch `master`.
-The approved `serverless-order-integration-github-oidc-bootstrap` stack is
-`CREATE_COMPLETE` with exactly one OIDC provider and two IAM roles.
+Continue **6.3 — Add controlled deployment and destruction workflows** with a
+local design and cost review before making any external change.
 
-The deployed trust binds the AWS account, exact immutable GitHub subject,
-and repository IDs, `development` environment, and `master` ref. The GitHub role
-operates only the application stack through one fixed CloudFormation service
-role; permission simulation confirmed it cannot modify its identity bootstrap.
+Step 6.2 is complete. The deployed trust binds the AWS account, exact immutable
+GitHub subject and repository IDs, `development` environment, `master` ref, and
+manual workflow. The protected environment required approval, and
+[`Deploy development #1`](https://github.com/pingusportro-eng/serverless-order-integration/actions/runs/30277647600)
+verified the claims and short-lived AWS identity without deploying anything.
 
 The full design, permission split, cost boundary, verification, and teardown
 plan are in the
 [GitHub OIDC review](docs/infrastructure/github-oidc-review.md), and the locally
-validated resources are in
-[the bootstrap template](infrastructure/github-oidc-bootstrap.yaml). The next
-safe action is to create the protected GitHub `development` environment and run
-a claim-only OIDC authentication test. This will not deploy the application.
-Any GitHub or AWS mutation still requires separate explicit approval.
+validated identity resources are in
+[the bootstrap template](infrastructure/github-oidc-bootstrap.yaml).
+
+Before step 6.3 changes code or cloud state, review the artifact bucket,
+lifecycle, exact S3 permissions, secret handling, workflow controls, traffic
+caps, log retention, expected cost, and teardown. Any GitHub or AWS mutation
+still requires separate explicit approval.

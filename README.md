@@ -9,8 +9,9 @@ The project is in **Phase 6: GitHub Actions CI/CD**. Pull requests targeting
 `master` now run local quality, test, DynamoDB Local integration, and SAM
 validation/build checks. The workflow uses no AWS credentials and creates no
 AWS resources. The exact GitHub OIDC provider and two IAM roles are deployed
-and verified at expected AWS cost `$0`; the protected GitHub `development`
-environment and claim-only authentication test are next.
+and verified at expected AWS cost `$0`. The protected GitHub `development`
+environment and claim-only authentication run also passed. Application
+deployment remains separately approval-gated.
 
 Work is divided into small reviewable steps. See [PLAN.md](PLAN.md) for the
 current checklist, architecture, verification criteria, and definition of done.

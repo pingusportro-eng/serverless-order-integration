@@ -132,5 +132,6 @@ Phase 6.1 added GitHub Actions pull-request checks that run locally and create
 no AWS resources. The exact repository identity and locally validated bootstrap
 are documented in the separately approval-gated
 [GitHub-to-AWS OIDC review](github-oidc-review.md). The approved OIDC provider
-and two IAM roles are deployed and verified. No GitHub deployment environment,
-artifact bucket, or application resource has been created.
+and two IAM roles are deployed and verified. The protected GitHub `development`
+environment and claim-only OIDC authentication run also passed. No artifact
+bucket or application resource has been created.

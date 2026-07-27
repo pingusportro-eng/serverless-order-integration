@@ -1,6 +1,6 @@
 # GitHub-to-AWS OIDC review
 
-Status: AWS identity bootstrap deployed and verified; GitHub environment pending
+Status: configured and verified end to end
 
 Reviewed: 2026-07-27  
 AWS account: `454921778743`  
@@ -16,8 +16,8 @@ GitHub Actions should obtain short-lived AWS credentials through OpenID Connect
 The account-level identity resources are defined in the
 [OIDC bootstrap template](../../infrastructure/github-oidc-bootstrap.yaml) and
 deployed through the `serverless-order-integration-github-oidc-bootstrap`
-CloudFormation stack. The GitHub `development` environment and OIDC diagnostic
-workflow have not yet been created.
+CloudFormation stack. The protected GitHub `development` environment and
+manual OIDC diagnostic workflow are also configured and verified.
 
 Step 6.3 will separately review the artifact bucket, application deployment,
 test traffic, and their usage-based costs.
@@ -45,8 +45,8 @@ For a job using the `development` environment, its expected default subject is:
 repo:pingusportro-eng@309778154/serverless-order-integration@1313908687:environment:development
 ```
 
-The first authorized OIDC diagnostic job must print decoded non-secret claims,
-not the token, and confirm this exact value before any application deployment.
+The first authorized OIDC diagnostic job printed decoded non-secret claims, not
+the token, and confirmed this exact value before any application deployment.
 
 The pre-deployment AWS review found no conflicting provider, role, or stack.
 The approved bootstrap was created on 2026-07-27.
@@ -157,12 +157,18 @@ role, not permissions granted directly to GitHub.
 
 ## GitHub environment controls
 
-The public repository's `development` environment should:
+The public repository's `development` environment is configured with:
 
-- permit deployment only from `master`;
-- require a reviewer and prevent self-review;
-- contain no long-lived AWS credentials; and
+- a required reviewer: `pingusportro-eng`;
+- administrator bypass disabled;
+- only the selected `master` branch permitted;
+- no environment secrets; and
 - be referenced only by the deployment job.
+
+Prevent self-review is disabled because this is a personal repository with one
+available reviewer. The approval is therefore a deliberate manual checkpoint,
+not separation of duties. A team repository should use a different reviewer and
+enable prevent self-review.
 
 OIDC replaces AWS credentials, not the application's cursor, webhook, or vendor
 secrets. Their storage and redaction remain part of step 6.3.
@@ -214,6 +220,35 @@ Post-deployment verification confirmed:
   create either bootstrap role or operate the bootstrap stack; and
 - IAM Access Analyzer policy validation returned no errors.
 
+The first GitHub diagnostic run then proved the complete federation path:
+
+| Field | Verified value |
+| --- | --- |
+| Workflow run | [`Deploy development #1`](https://github.com/pingusportro-eng/serverless-order-integration/actions/runs/30277647600) |
+| Trigger | `workflow_dispatch` |
+| Branch | `master` |
+| Commit | `2d1f410bc2d4a0beb47205568a0a4676eae9ac7b` |
+| Environment approval | required and granted manually |
+| OIDC claim inspection | passed |
+| AWS role assumption | passed |
+| AWS identity assertion | account and role ARN passed |
+| Result | success in 9 seconds |
+
+The claim inspector asserted the issuer, AWS audience, immutable subject,
+repository and owner IDs, workflow and workflow ref, `master` ref,
+`development` environment, public visibility, event type, run ID, and commit
+SHA. It emitted only those allow-listed claims and never emitted the JWT or its
+request token.
+
+The AWS identity assertion verified:
+
+```text
+arn:aws:sts::454921778743:assumed-role/serverless-order-integration-github-deployer/github-30277647600
+```
+
+The final AWS inventory contained only the bootstrap stack. No application
+stack or application resource was created.
+
 ## Cost boundary
 
 IAM OIDC providers, IAM roles, IAM policies, and AWS STS have no additional AWS
@@ -226,16 +261,8 @@ charge. The three deployed identity resources have expected AWS cost `$0`:
 This approval does not include an artifact bucket, application resources,
 smoke-test traffic, or retained logs.
 
-## Remaining verification and teardown
-
-The remaining step 6.2 checks are:
-
-1. configure the `development` GitHub environment protections;
-2. use a claim-only diagnostic job to verify the exact `sub`;
-3. verify the approved `master` + `development` job can assume only the
-   expected role;
-4. verify an unapproved ref or environment cannot assume it; and
-5. confirm no AWS access-key secret exists in GitHub.
+The public-repository diagnostic used nine seconds of GitHub-hosted runner time
+and made only OIDC and STS calls. Its expected AWS cost is `$0`.
 
 Teardown must delete the application and artifacts first. When no workflow
 depends on OIDC, the bootstrap stack can remove both roles and the provider.
@@ -244,7 +271,13 @@ immediately before deleting it.
 
 ## Next approval
 
-The next external action is to create the GitHub `development` environment,
-restrict it to `master`, configure its approval protection, and add a
-claim-only `Deploy development` diagnostic workflow. It will request short-lived
-credentials but will not deploy the application or access S3.
+Step 6.2 is complete. Step 6.3 must separately review:
+
+- the artifact bucket and object-lifecycle policy;
+- exact S3 permissions added to the two roles;
+- application parameters and secrets;
+- deployment and destruction workflow controls;
+- maximum test traffic and log retention; and
+- expected cost and teardown verification.
+
+No step 6.3 resource or permission is approved by this document.
