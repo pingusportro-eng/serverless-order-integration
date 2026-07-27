@@ -86,6 +86,7 @@ server from starting instead of silently falling back to success.
 | `timeout` | Accept and record the delivery, then delay the HTTP response for 10 seconds. |
 | `rate-limit` | Return `429` and do not accept the delivery. |
 | `server-error` | Return `500` and do not accept the delivery. |
+| `request-rejected` | Return `422` and do not accept the delivery. |
 | `malformed-response` | Accept and record the delivery, then return truncated JSON. |
 
 The timeout and malformed-response modes deliberately model an uncertain

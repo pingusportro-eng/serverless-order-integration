@@ -12,6 +12,7 @@ export const MOCK_VENDOR_SCENARIOS = [
   'timeout',
   'rate-limit',
   'server-error',
+  'request-rejected',
   'malformed-response',
 ] as const;
 
@@ -189,6 +190,10 @@ export async function startMockDeliveryVendor(
         }
         if (selectedScenario === 'server-error') {
           problem(response, 500, 'PROVIDER_ERROR', 'Mock provider failed unexpectedly.');
+          return;
+        }
+        if (selectedScenario === 'request-rejected') {
+          problem(response, 422, 'REQUEST_REJECTED', 'Mock provider rejected the delivery.');
           return;
         }
 

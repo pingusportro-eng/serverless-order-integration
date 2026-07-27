@@ -137,6 +137,13 @@ describe('mock delivery vendor contract', () => {
     await expect(response.json()).resolves.toMatchObject({ code: 'PROVIDER_ERROR' });
   });
 
+  it('returns a terminal error for the request-rejected scenario', async () => {
+    const response = await submit('request-rejected');
+
+    expect(response.status).toBe(422);
+    await expect(response.json()).resolves.toMatchObject({ code: 'REQUEST_REJECTED' });
+  });
+
   it('returns invalid JSON for the malformed-response scenario', async () => {
     const response = await submit('malformed-response');
 

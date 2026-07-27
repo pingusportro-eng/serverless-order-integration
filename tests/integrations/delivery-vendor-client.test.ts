@@ -64,6 +64,20 @@ describe('delivery vendor client', () => {
     );
   });
 
+  it('maps an unreachable provider to a retryable network error', async () => {
+    const client = await startClient('success');
+    await vendor?.close();
+    vendor = undefined;
+
+    await expect(
+      client.submitDelivery(createOrderFixture(), 'correlation-network'),
+    ).rejects.toMatchObject({
+      code: 'NETWORK_ERROR',
+      retryable: true,
+      message: 'Delivery provider could not be reached.',
+    });
+  });
+
   it('maps rate limiting and its bounded retry hint', async () => {
     const client = await startClient('rate-limit');
 
@@ -133,6 +147,19 @@ describe('delivery vendor client', () => {
       code: 'IDEMPOTENCY_CONFLICT',
       retryable: false,
       statusCode: 409,
+    });
+  });
+
+  it('maps another provider 4xx response to a terminal request rejection', async () => {
+    const client = await startClient('request-rejected');
+
+    await expect(
+      client.submitDelivery(createOrderFixture(), 'correlation-request-rejected'),
+    ).rejects.toMatchObject({
+      code: 'REQUEST_REJECTED',
+      retryable: false,
+      statusCode: 422,
+      message: 'Delivery provider rejected the submission.',
     });
   });
 });
