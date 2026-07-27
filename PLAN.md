@@ -427,21 +427,19 @@ For every step, the review should answer:
 
 ## Next step
 
-Proceed to **5.6 — Destroy or retain deliberately** after reviewing the completed
-cloud evidence. The SNS subscription-DLQ, stream-publisher poison record,
-transient vendor/DLQ/redrive, terminal vendor, operator retry, webhook,
-duplicate delivery, public error, and native API throttling journeys have all
-passed.
+Complete **5.6 — Destroy or retain deliberately** by reviewing and explicitly
+approving the destructive execution in the
+[development AWS teardown review](docs/infrastructure/teardown-review.md).
 
-The final terminal/retry campaign captured the complete version 1–6 event
-journey, found and corrected the real API Gateway `[operators]` claim
-representation defect, and finished with 51 native `429` responses inside 125
-total HTTP calls. Cleanup removed its synthetic DynamoDB data, two Cognito
-users, audit queue, and audit subscription. All four deployed queues are empty,
-the stack is `UPDATE_COMPLETE` and `IN_SYNC`, packaging is 22,174,164 bytes
-under the 50 MiB cap, and the budget view remains `$0.00` actual/forecast.
+The read-only inventory found 34 application-stack resources containing five
+synthetic DynamoDB items and one synthetic Cognito user. All four queues are
+empty and the five log groups report zero stored bytes. The separate,
+versioned SAM bucket contains exactly 49 object versions totalling 22,174,164
+bytes, all under this project's only prefix. No other active application stack
+or regional SAM bucket exists, so the managed packaging stack is not currently
+shared.
 
-The result and recovery notes are recorded in the
-[terminal failure and operator-retry campaign](docs/testing/terminal-retry-campaign.md).
-Do not destroy or retain the application stack by default; make that deliberate
-cost/lifecycle decision as the next reviewable step.
+No deletion has been executed. The next step requires explicit approval to
+delete the application stack, all versions in its exact SAM artifact bucket,
+and the SAM-managed stack. The account-level Budget, administrator, Git
+repository, and local DynamoDB volume are outside the deletion scope.

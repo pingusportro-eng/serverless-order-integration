@@ -214,6 +214,9 @@ records the complete resource inventory, recommended deployment parameters,
 bounded smoke-test estimate, and approval gates. The
 [development deployment record](docs/infrastructure/development-deployment.md)
 captures the non-secret stack outputs and deployment verification. The
+[development AWS teardown review](docs/infrastructure/teardown-review.md)
+records the exact deletion scope, ordering, safeguards, and approval boundary.
+The
 [cloud smoke-test record](docs/infrastructure/cloud-smoke-tests.md) captures the
 real service-boundary results, defects found, retry/DLQ recovery, and final
 cost evidence. The
