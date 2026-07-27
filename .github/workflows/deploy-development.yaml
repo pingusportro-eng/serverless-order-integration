@@ -1,0 +1,54 @@
+name: Deploy development
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: deploy-development
+  cancel-in-progress: false
+
+jobs:
+  oidc-diagnostic:
+    name: Verify GitHub OIDC identity
+    environment: development
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out the reviewed repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+
+      - name: Inspect allow-listed OIDC claims
+        run: node scripts/ci/inspect-github-oidc-claims.mjs
+
+      - name: Obtain short-lived AWS credentials
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
+        with:
+          aws-region: eu-central-1
+          role-to-assume: arn:aws:iam::454921778743:role/serverless-order-integration-github-deployer
+          role-session-name: github-${{ github.run_id }}
+          role-duration-seconds: 900
+          allowed-account-ids: '454921778743'
+          retry-max-attempts: 3
+
+      - name: Verify the assumed AWS identity
+        env:
+          EXPECTED_AWS_ACCOUNT_ID: '454921778743'
+          EXPECTED_AWS_ROLE_ARN: arn:aws:sts::454921778743:assumed-role/serverless-order-integration-github-deployer/github-${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          actual_account_id="$(aws sts get-caller-identity --query Account --output text)"
+          actual_role_arn="$(aws sts get-caller-identity --query Arn --output text)"
+          test "$actual_account_id" = "$EXPECTED_AWS_ACCOUNT_ID"
+          test "$actual_role_arn" = "$EXPECTED_AWS_ROLE_ARN"
+          jq --null-input \
+            --arg accountId "$actual_account_id" \
+            --arg roleArn "$actual_role_arn" \
+            '{accountId: $accountId, roleArn: $roleArn}'

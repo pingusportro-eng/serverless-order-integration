@@ -5,6 +5,7 @@ import { stdout } from 'node:process';
 import { parse } from 'yaml';
 
 const template = parse(await readFile('infrastructure/github-oidc-bootstrap.yaml', 'utf8'));
+const workflow = parse(await readFile('.github/workflows/deploy-development.yaml', 'utf8'));
 
 const resources = template.Resources;
 assert.deepEqual(Object.keys(resources).sort(), [
@@ -137,5 +138,52 @@ assert.equal(
 assert.deepEqual(resources.GitHubActionsOidcProvider.Properties.ClientIdList, [
   'sts.amazonaws.com',
 ]);
+
+assert.equal(workflow.name, 'Deploy development');
+assert.deepEqual(workflow.on, { workflow_dispatch: null });
+assert.deepEqual(workflow.permissions, {});
+assert.deepEqual(Object.keys(workflow.jobs), ['oidc-diagnostic']);
+
+const diagnosticJob = workflow.jobs['oidc-diagnostic'];
+assert.equal(diagnosticJob.environment, 'development');
+assert.equal(diagnosticJob['runs-on'], 'ubuntu-24.04');
+assert.equal(diagnosticJob['timeout-minutes'], 5);
+assert.deepEqual(diagnosticJob.permissions, {
+  contents: 'read',
+  'id-token': 'write',
+});
+
+const serializedWorkflow = JSON.stringify(workflow);
+for (const forbiddenValue of [
+  'pull_request',
+  'push',
+  'schedule',
+  'aws cloudformation',
+  'sam deploy',
+  's3:',
+]) {
+  assert.equal(
+    serializedWorkflow.includes(forbiddenValue),
+    false,
+    `The OIDC diagnostic workflow must not contain ${forbiddenValue}.`,
+  );
+}
+
+assert.equal(
+  serializedWorkflow.includes('actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803'),
+  true,
+);
+assert.equal(
+  serializedWorkflow.includes(
+    'aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c',
+  ),
+  true,
+);
+assert.equal(
+  serializedWorkflow.includes(
+    'arn:aws:iam::454921778743:role/serverless-order-integration-github-deployer',
+  ),
+  true,
+);
 
 stdout.write('GitHub OIDC bootstrap invariants are valid.\n');
