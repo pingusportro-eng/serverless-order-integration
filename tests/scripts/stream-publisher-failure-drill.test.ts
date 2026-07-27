@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { access, chmod, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { access, chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
@@ -116,6 +116,13 @@ describe('stream-publisher failure drill harness', () => {
     await expect(
       access(join(fixture.fakeStateDirectory, 'temporary-queue-url')),
     ).resolves.toBeUndefined();
+    const statePath = join(fixture.drillStateDirectory, 'state.json');
+    const retainedState = JSON.parse(await readFile(statePath, 'utf8')) as {
+      startedAtMs: string;
+    };
+    expect(retainedState.startedAtMs).toMatch(/^\d{13}$/u);
+    retainedState.startedAtMs = '1785127907500873228';
+    await writeFile(statePath, `${JSON.stringify(retainedState)}\n`);
 
     const recovery = await execFileAsync('bash', [drillScript, 'cleanup'], {
       cwd: projectRoot,

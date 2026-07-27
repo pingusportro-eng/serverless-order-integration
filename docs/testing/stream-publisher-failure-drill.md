@@ -1,6 +1,6 @@
 # Stream-publisher failure drill
 
-Status: guarded harness implemented and locally verified; AWS execution pending approval
+Status: passed in AWS; temporary resources, messages, and drill item removed
 
 Reviewed: 2026-07-27
 
@@ -232,8 +232,8 @@ diagnosis, and interrupted-run recovery. They do not increase the strict
 side-effect limits: one item, one repair, one conditional delete, one queue,
 and one subscription.
 
-The owner approved this design and these increased diagnostic caps on
-2026-07-27. Real AWS execution remains a later, separate approval gate.
+The owner approved this design, the real AWS mutation, and the increased
+diagnostic caps on 2026-07-27.
 
 ## Harness
 
@@ -261,5 +261,50 @@ resources. It covers:
   recovery.
 
 The local `run` simulation, forced-interruption recovery, shell syntax checks,
-and full project verification pass. The real `run` command must not be used
-until its AWS mutation receives separate explicit approval.
+and full project verification pass.
+
+## AWS execution record
+
+The approved drill ran on 2026-07-27 in account `454921778743` and Region
+`eu-central-1`. The malformed item produced one discarded invocation record
+whose stream sequence resolved back to the exact synthetic key and marker.
+CloudWatch contained exactly three structured `stream.record.failed` entries
+for that sequence: the initial attempt and two configured retries.
+
+Repairing that same item produced the expected `order.cancelled` event in the
+isolated recovery queue. This proved that processing continued on the same
+stream shard after retry exhaustion. The deployed delivery subscription
+filtered the event out, so the delivery worker and vendor were not called.
+
+The execution exposed two compatibility cases:
+
+- this machine's `date +%s%3N` output combined epoch seconds with nine
+  nanosecond digits instead of producing the 13-digit epoch-millisecond value
+  required by CloudWatch Logs; and
+- Lambda text-format log messages prefix the structured JSON with timestamp,
+  request ID, and log-level fields separated by tabs.
+
+The first issue caused the initial log query to search in the future. The
+second would have prevented parsing even with a corrected start time. The
+harness now generates milliseconds arithmetically, repairs the old saved
+timestamp during recovery, and extracts the final tab-separated JSON field.
+The fake AWS fixture reproduces the real Lambda log format, and the recovery
+test locks both behaviors.
+
+Final evidence:
+
+- the verified publisher-failure and recovery messages were deleted;
+- the marked DynamoDB item was conditionally deleted;
+- the temporary SNS subscription and SQS queue no longer exist;
+- the recovery-state file no longer exists;
+- the delivery queue and all three failure queues report zero visible,
+  in-flight, and delayed messages;
+- no stream-publisher drill item or drill-named queue remains;
+- the publisher event-source mapping reports `Enabled` and `OK`;
+- the stack is `UPDATE_COMPLETE` and its fresh drift result is `IN_SYNC`; and
+- the `$1` zero-spend budget reports `$0.00` actual and forecast spend.
+
+Across the interrupted run and successful recovery, the harness used 26 SQS,
+5 SNS, 10 DynamoDB, 2 DynamoDB Streams, 25 CloudWatch Logs, and 5 Lambda
+control-plane requests. Every cap remained intact, and the incremental
+estimate remains below `$0.001`.

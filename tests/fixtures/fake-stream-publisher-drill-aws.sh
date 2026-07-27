@@ -227,8 +227,6 @@ case "$service:$operation" in
     if [[ -f "$FAKE_AWS_STATE_DIRECTORY/item.json" ]]; then
       jq -cn --slurpfile item "$FAKE_AWS_STATE_DIRECTORY/item.json" \
         '{Item: $item[0]}'
-    else
-      printf '{}\n'
     fi
     ;;
 
@@ -500,14 +498,18 @@ case "$service:$operation" in
           1, 2, 3
         ] | map({
           timestamp: 1785110400000,
-          message: ({
-            timestamp: "2026-07-27T00:00:00.000Z",
-            level: "error",
-            event: "stream.record.failed",
-            requestId: $sequence,
-            operation: "parseOrderStreamRecord",
-            exceptionName: "Error"
-          } | tojson)
+          message: (
+            "2026-07-27T00:00:00.000Z\tfake-lambda-request\tINFO\t" +
+            ({
+              timestamp: "2026-07-27T00:00:00.000Z",
+              level: "error",
+              event: "stream.record.failed",
+              requestId: $sequence,
+              operation: "parseOrderStreamRecord",
+              exceptionName: "Error"
+            } | tojson) +
+            "\n"
+          )
         })
       }
     '

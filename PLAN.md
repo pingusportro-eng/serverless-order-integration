@@ -428,9 +428,9 @@ For every step, the review should answer:
 ## Next step
 
 Before **5.6 — Destroy or retain deliberately**, finish the approved bounded
-failure campaign. The SNS subscription DLQ's isolated client-error drill has
-passed, including cleanup and drift verification. The next proposed journey is
-the documented stream-publisher poison-record and same-shard recovery drill.
-Its guarded harness and interrupted-run recovery are locally verified; review
-and approve the real AWS mutation before execution. After the campaign, return
-to teardown and verify that no project resource remains.
+failure campaign. The SNS subscription-DLQ and stream-publisher poison-record
+drills have passed, including recovery, cleanup, and drift verification. The
+next proposed journey is one transient vendor failure (`429` or timeout)
+through SQS retry and the delivery-worker DLQ. Design its isolation, workload,
+cleanup, and cost boundary for review before any AWS mutation. After the
+campaign, return to teardown and verify that no project resource remains.

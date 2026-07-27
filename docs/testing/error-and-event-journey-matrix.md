@@ -120,7 +120,7 @@ those two actionable values.
 | API -> Lambda -> DynamoDB -> Stream -> publisher -> SNS -> delivery queue -> worker -> vendor -> DynamoDB | One accepted delivery, stable correlation/idempotency references, final `SUBMITTED` order | Passed in the first smoke test | Keep as the baseline |
 | Non-order transaction items -> Stream filter | Publisher is not invoked for idempotency and reference items | Inferred from logs and local mapping tests | Add an infrastructure filter assertion |
 | Non-actionable domain event -> SNS filter | Event is published but does not enter the delivery queue | Representative `order.submitted` path passed | Assert the exact allow-list locally; one cloud representative is sufficient |
-| Malformed order record -> publisher retries -> publisher failure queue | Structured failure logs, configured attempts exhausted, retained stream invocation record | Guarded harness implemented and locally verified; AWS execution pending | Run the approved one-item poison and same-shard recovery drill |
+| Malformed order record -> publisher retries -> publisher failure queue | Structured failure logs, configured attempts exhausted, retained stream invocation record | Passed with one marked malformed item; exact stream record and three attempts verified, then same-shard recovery proved and all artifacts removed | Keep as the controlled publisher poison-record proof |
 | Publisher -> SNS failure | Publisher returns the sequence number and logs safely | Covered locally | Do not break live IAM; local handler evidence is sufficient |
 | SNS -> SQS delivery exhaustion | Failed subscription delivery is retained for investigation | Passed with one isolated client-error marker; exact body recovered from the deployed subscription DLQ and deleted | Keep as the controlled failure-path proof |
 | Delivery queue mixed batch -> worker partial response | Successful record is removed while only the failed record retries | Covered locally | Use a small two-message AWS batch only if timing can be deterministic |
@@ -133,7 +133,7 @@ those two actionable values.
 
 The controlled SNS client-error procedure is specified separately in the
 [SNS subscription-DLQ failure drill](sns-subscription-dlq-drill.md).
-The proposed poison-record and same-shard recovery procedure is specified in
+The completed poison-record and same-shard recovery procedure is recorded in
 the [stream-publisher failure drill](stream-publisher-failure-drill.md).
 
 ## SNS subscription failure safeguard

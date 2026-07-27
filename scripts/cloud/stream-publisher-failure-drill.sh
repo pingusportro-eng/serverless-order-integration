@@ -486,11 +486,14 @@ item_key_json() {
 }
 
 read_drill_item() {
-  aws_call dynamodb dynamodb get-item \
+  local result
+  result="$(aws_call dynamodb dynamodb get-item \
     --table-name "$table_name" \
     --key "$(item_key_json)" \
     --consistent-read \
-    --output json
+    --output json)"
+  [[ -n "$result" ]] || result='{}'
+  printf '%s\n' "$result"
 }
 
 assert_item_absent() {
@@ -807,6 +810,12 @@ verify_failure_logs() {
   local count
   sequence="$(state_string failureSequenceNumber)"
   start_time="$(state_string startedAtMs)"
+  if [[ ! "$start_time" =~ ^[0-9]{13}$ ]]; then
+    [[ "$start_time" =~ ^[0-9]{10,}$ ]] ||
+      fail 'saved drill start time is not a Unix timestamp'
+    start_time="${start_time:0:10}000"
+    state_set_string startedAtMs "$start_time"
+  fi
 
   for _ in {1..24}; do
     response="$(aws_call logs logs filter-log-events \
@@ -818,6 +827,8 @@ verify_failure_logs() {
       --arg sequence "$sequence" '
         [
           .events[]?.message |
+          split("\t") |
+          .[-1] |
           fromjson? |
           select(
             .event == "stream.record.failed" and
@@ -1246,7 +1257,7 @@ run_drill() {
   item_pk="$drill_item_prefix$suffix"
   item_sk="ORDER#$order_id"
   queue_name="$drill_queue_prefix$suffix"
-  started_at_ms="$(date +%s%3N)"
+  started_at_ms="$(( $(date +%s) * 1000 ))"
 
   state_create \
     "$marker" \
