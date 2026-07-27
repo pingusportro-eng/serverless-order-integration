@@ -80,6 +80,13 @@ requests that do not carry the test header. This lets an unmodified vendor
 client exercise one deterministic mode. Invalid configured values prevent the
 server from starting instead of silently falling back to success.
 
+For controlled cloud drills, `MOCK_VENDOR_ATTEMPT_LOG` optionally enables an
+append-only JSON-lines journal. Each authenticated attempt contains only its
+timestamp, selected scenario, correlation ID, SHA-256 idempotency-key digest,
+and response status. It excludes the bearer token, raw idempotency key, request
+body, addresses, and provider response. The option is absent during ordinary
+local use.
+
 | Value | Behavior |
 | --- | --- |
 | `success` or absent | Accept and return valid JSON. |

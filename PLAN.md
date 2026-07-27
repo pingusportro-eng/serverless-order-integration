@@ -431,8 +431,8 @@ Before **5.6 — Destroy or retain deliberately**, finish the approved bounded
 failure campaign. The SNS subscription-DLQ and stream-publisher poison-record
 drills have passed, including recovery, cleanup, and drift verification. The
 next proposed journey is the documented deterministic vendor `429` through SQS
-retry, the delivery-worker DLQ, and managed redrive. Review its choice of
-failure, temporary vendor-parameter update, one-item injection, cleanup, and
-`< $0.001` estimate before implementing its guarded harness. No AWS mutation is
-authorized yet. After the campaign, return to teardown and verify that no
+retry, the delivery-worker DLQ, and managed redrive. Its safe attempt journal,
+guarded harness, fake AWS/process boundaries, and interruption recovery pass
+locally. Review and approve the real bounded `run` separately; no AWS mutation
+is authorized yet. After the campaign, return to teardown and verify that no
 project resource remains.

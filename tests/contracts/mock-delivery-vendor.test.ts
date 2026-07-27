@@ -4,6 +4,7 @@ import {
   parseMockVendorScenario,
   startMockDeliveryVendor,
   type MockDeliverySubmission,
+  type MockVendorAttempt,
   type RunningMockDeliveryVendor,
 } from '../../src/mock-vendor/mock-delivery-vendor.js';
 
@@ -28,12 +29,15 @@ const SUBMISSION: MockDeliverySubmission = {
 
 describe('mock delivery vendor contract', () => {
   let vendor: RunningMockDeliveryVendor;
+  let attempts: MockVendorAttempt[];
 
   beforeEach(async () => {
+    attempts = [];
     vendor = await startMockDeliveryVendor({
       authToken: AUTH_TOKEN,
       timeoutDelayMs: 100,
       now: () => '2026-07-22T10:30:00.000Z',
+      onAttempt: (attempt) => attempts.push(attempt),
     });
   });
 
@@ -136,6 +140,27 @@ describe('mock delivery vendor contract', () => {
     expect(response.status).toBe(429);
     expect(response.headers.get('retry-after')).toBe('1');
     await expect(response.json()).resolves.toMatchObject({ code: 'RATE_LIMITED' });
+    expect(attempts).toEqual([
+      {
+        timestamp: '2026-07-22T10:30:00.000Z',
+        scenario: 'rate-limit',
+        correlationId: 'correlation-contract-123',
+        idempotencyKeyDigest: 'eccd9613057d50304233deb383c2ac5a57b3c99cec0d18ccf25abb4d69dd2f29',
+        statusCode: 429,
+      },
+    ]);
+    const serialized = JSON.stringify(attempts);
+    expect(serialized).not.toContain(AUTH_TOKEN);
+    expect(serialized).not.toContain('submission-contract-123');
+    expect(serialized).not.toContain(SUBMISSION.pickup.addressLine);
+    expect(serialized).not.toContain(SUBMISSION.dropoff.addressLine);
+  });
+
+  it('does not journal unauthenticated requests', async () => {
+    const response = await submit('rate-limit', { token: 'wrong-token' });
+
+    expect(response.status).toBe(401);
+    expect(attempts).toEqual([]);
   });
 
   it('returns a provider error for the server-error scenario', async () => {

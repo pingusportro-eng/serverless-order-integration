@@ -38,6 +38,7 @@
     "test:sam": "bash scripts/sam/smoke-local.sh",
     "test:stream-publisher": "vitest run tests/events/order-stream-event.test.ts tests/lambda/stream-publisher.test.ts",
     "test:vendor-client": "vitest run tests/integrations/delivery-vendor-client.test.ts",
+    "test:vendor-rate-limit-drill": "vitest run tests/scripts/vendor-rate-limit-dlq-drill.test.ts",
     "test:webhook": "vitest run tests/application/provider-webhook-validation.test.ts tests/lambda/vendor-webhook.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"

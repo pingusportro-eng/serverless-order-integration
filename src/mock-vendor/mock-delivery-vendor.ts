@@ -29,11 +29,20 @@ export interface StartMockDeliveryVendorOptions {
   readonly timeoutDelayMs?: number;
   readonly defaultScenario?: MockVendorScenario;
   readonly now?: () => string;
+  readonly onAttempt?: (attempt: MockVendorAttempt) => void;
 }
 
 export interface RunningMockDeliveryVendor {
   readonly baseUrl: string;
   close(): Promise<void>;
+}
+
+export interface MockVendorAttempt {
+  readonly timestamp: string;
+  readonly scenario: MockVendorScenario;
+  readonly correlationId?: string;
+  readonly idempotencyKeyDigest?: string;
+  readonly statusCode: number;
 }
 
 interface AcceptedSubmission {
@@ -155,6 +164,10 @@ function providerOrderId(idempotencyKey: string): string {
   return `delivery_${digest}`;
 }
 
+function idempotencyKeyDigest(value: string | undefined): string | undefined {
+  return value === undefined ? undefined : createHash('sha256').update(value).digest('hex');
+}
+
 function wait(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -172,6 +185,24 @@ export async function startMockDeliveryVendor(
 
   const server = createServer((request, response) => {
     void (async () => {
+      let selectedScenario: MockVendorScenario | undefined;
+      let attemptRecorded = false;
+      const recordAttempt = (statusCode: number): void => {
+        if (selectedScenario === undefined || attemptRecorded) {
+          return;
+        }
+        attemptRecorded = true;
+        const correlationId = header(request, 'x-correlation-id');
+        const digest = idempotencyKeyDigest(header(request, 'idempotency-key'));
+        options.onAttempt?.({
+          timestamp: now(),
+          scenario: selectedScenario,
+          ...(correlationId === undefined ? {} : { correlationId }),
+          ...(digest === undefined ? {} : { idempotencyKeyDigest: digest }),
+          statusCode,
+        });
+      };
+
       try {
         if (request.method !== 'POST' || request.url !== '/deliveries') {
           throw new RequestError(404, 'NOT_FOUND', 'Use POST /deliveries.');
@@ -181,18 +212,21 @@ export async function startMockDeliveryVendor(
           throw new RequestError(401, 'UNAUTHORIZED', 'A valid bearer token is required.');
         }
 
-        const selectedScenario = scenarioFrom(request, options.defaultScenario ?? 'success');
+        selectedScenario = scenarioFrom(request, options.defaultScenario ?? 'success');
         if (selectedScenario === 'rate-limit') {
+          recordAttempt(429);
           problem(response, 429, 'RATE_LIMITED', 'Mock provider rate limit exceeded.', {
             'Retry-After': '1',
           });
           return;
         }
         if (selectedScenario === 'server-error') {
+          recordAttempt(500);
           problem(response, 500, 'PROVIDER_ERROR', 'Mock provider failed unexpectedly.');
           return;
         }
         if (selectedScenario === 'request-rejected') {
+          recordAttempt(422);
           problem(response, 422, 'REQUEST_REJECTED', 'Mock provider rejected the delivery.');
           return;
         }
@@ -210,6 +244,7 @@ export async function startMockDeliveryVendor(
         const requestFingerprint = fingerprint(requestBody);
         const existing = acceptedSubmissions.get(idempotencyKey);
         if (existing !== undefined && existing.fingerprint !== requestFingerprint) {
+          recordAttempt(409);
           throw new RequestError(
             409,
             'IDEMPOTENCY_CONFLICT',
@@ -237,6 +272,7 @@ export async function startMockDeliveryVendor(
           await wait(timeoutDelayMs);
         }
         if (selectedScenario === 'malformed-response') {
+          recordAttempt(201);
           response.writeHead(201, {
             ...responseHeaders,
             'Content-Type': 'application/json',
@@ -245,12 +281,15 @@ export async function startMockDeliveryVendor(
           return;
         }
 
+        recordAttempt(201);
         json(response, 201, accepted.response, responseHeaders);
       } catch (error: unknown) {
         if (error instanceof RequestError) {
+          recordAttempt(error.statusCode);
           problem(response, error.statusCode, error.code, error.message);
           return;
         }
+        recordAttempt(500);
         problem(response, 500, 'PROVIDER_ERROR', 'Mock provider failed unexpectedly.');
       }
     })();

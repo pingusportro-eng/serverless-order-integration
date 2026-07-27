@@ -1,6 +1,6 @@
 # Vendor rate-limit and worker-DLQ drill
 
-Status: design proposed; no harness or AWS mutation approved yet
+Status: guarded harness implemented and locally verified; AWS execution pending approval
 
 Reviewed: 2026-07-27
 
@@ -142,9 +142,8 @@ files are removed after successful cleanup.
 
 ## Safe vendor-attempt evidence
 
-Before implementing the cloud harness, the local mock runner will gain an
-optional append-only attempt journal. For each authenticated request it may
-record only:
+The local mock runner accepts an optional `MOCK_VENDOR_ATTEMPT_LOG` path and
+appends one JSON object for each authenticated attempt. It records only:
 
 - timestamp;
 - selected scenario;
@@ -152,8 +151,8 @@ record only:
 - SHA-256 digest of the idempotency key; and
 - final HTTP status.
 
-It must not record the bearer token, raw idempotency key, request body,
-addresses, or provider response. Local tests will prove these exclusions.
+It does not record the bearer token, raw idempotency key, request body,
+addresses, or provider response. Contract tests prove these exclusions.
 
 The drill must require:
 
@@ -218,6 +217,8 @@ Before any mutation, the future harness must:
    redrive policy from CloudFormation and AWS.
 5. Refuse an existing drill item, local recovery file, mock process, tunnel
    process, or active DLQ move task.
+6. Reach the public tunnel without credentials and require `401` before
+   configuring Lambda or injecting the order.
 
 During the drill:
 
@@ -284,15 +285,64 @@ The conservative incremental estimate is below `$0.001`:
 No fixed-cost resource is added. This fits inside both the approved `$0.02`
 failure-campaign ceiling and the project's `$5` monthly budget.
 
+## Harness
+
+The guarded implementation is
+[`scripts/cloud/vendor-rate-limit-dlq-drill.sh`](../../scripts/cloud/vendor-rate-limit-dlq-drill.sh).
+It has no default execution mode:
+
+```bash
+npm run test:vendor-rate-limit-drill
+scripts/cloud/vendor-rate-limit-dlq-drill.sh run
+scripts/cloud/vendor-rate-limit-dlq-drill.sh cleanup
+```
+
+Real mode:
+
+- generates the temporary token without printing it;
+- supplies secrets to CloudFormation through mode-`0600` files rather than
+  command arguments;
+- requires a one-resource, in-place worker change set;
+- waits for `EXECUTE_COMPLETE` and reads back the non-secret worker URL before
+  injection;
+- writes the one valid order with a no-overwrite condition;
+- matches the exact DLQ event before restoring visibility or redriving;
+- compares safe worker logs with the local vendor-attempt journal;
+- limits managed redrive to one message per second;
+- conditionally deletes the recovered order and provider lookup in one
+  transaction; and
+- retains validated recovery state after interruption.
+
+The automated test replaces both AWS and local process control with stateful
+fakes and creates no AWS resource, tunnel, or server. It covers:
+
+- refusal without explicit `run` or `cleanup`;
+- one empty DLQ receive before the marked message appears;
+- three `429` attempts with one stable correlation ID and key digest;
+- Lambda text-log prefix parsing and exact safe failure-log correlation;
+- a completed managed-redrive result whose task handle is no longer returned;
+- one successful recovery attempt and two-item conditional cleanup;
+- interruption immediately after the order write followed by cleanup;
+- interruption after change-set creation, proving that setup processes stop
+  and the unexecuted change set is deleted; and
+- interruption after AWS accepted redrive but before its handle was saved,
+  followed by timestamp-based task reconciliation without a second redrive.
+
+The fake change-set boundary also verifies that the two vendor parameters are
+the only new values, every other parameter uses its deployed value, and no
+64-character token appears in command logs.
+
 ## Approval boundary
 
-This document does not authorize implementation, starting the public tunnel,
-updating the stack, inserting the item, invoking the vendor, or starting
-managed redrive.
+The design and local implementation were approved on 2026-07-27. This document
+still does not authorize starting the public tunnel, updating the stack,
+inserting the item, invoking the cloud worker, or starting managed redrive.
 
-The next review should approve or change these four decisions:
+The owner has approved these four design decisions:
 
 1. use deterministic `429` instead of timeout;
 2. rotate only the existing worker URL and token through CloudFormation;
 3. inject one valid order item at DynamoDB rather than create an API user/order;
 4. recover the exact DLQ message with SQS managed redrive.
+
+The next review gate is the real `run` command and its bounded AWS mutations.
