@@ -214,7 +214,10 @@ bounded smoke-test estimate, and approval gates. The
 captures the non-secret stack outputs and deployment verification. The
 [cloud smoke-test record](docs/infrastructure/cloud-smoke-tests.md) captures the
 real service-boundary results, defects found, retry/DLQ recovery, and final
-cost evidence.
+cost evidence. The
+[error and event-journey test matrix](docs/testing/error-and-event-journey-matrix.md)
+tracks every stable error contract, the local coverage gaps, and the bounded
+AWS failure scenarios still to run.
 
 The editable [full AWS cloud stack diagram](docs/architecture/full-cloud-stack.drawio)
 shows both paths and their security, observability, and failure boundaries.
