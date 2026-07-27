@@ -56,15 +56,15 @@ describe('HTTP responses', () => {
   it('omits optional Problem Details fields and preserves safe response headers', () => {
     const response = problemResponse(
       {
-        status: 503,
-        code: 'SERVICE_UNAVAILABLE',
-        title: 'Service unavailable',
-        headers: { 'Retry-After': '2' },
+        status: 412,
+        code: 'VERSION_MISMATCH',
+        title: 'Version mismatch',
+        headers: { ETag: '"2"' },
       },
       'request-456',
     );
 
-    expect(response.headers['Retry-After']).toBe('2');
+    expect(response.headers['ETag']).toBe('"2"');
     expect(response.body).not.toHaveProperty('detail');
     expect(response.body).not.toHaveProperty('errors');
   });

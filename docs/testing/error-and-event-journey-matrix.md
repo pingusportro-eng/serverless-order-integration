@@ -41,13 +41,11 @@ application's Problem Details shape.
 | `PRECONDITION_REQUIRED` | Operator mutation without `If-Match` | Covered in the status-handler test | None | Reproduce through the operator route |
 | `VALIDATION_ERROR` | Invalid create, list, status, or webhook values | Covered at each application handler | Add a compact route-level matrix for representative invalid bodies and queries | Reproduce one case per public route |
 | `INTERNAL_ERROR` | Safe ID-collision response or unexpected Lambda boundary failure | Covered for create collision and unexpected webhook repository failure | Add an Orders Lambda unexpected-failure/log-safety test | Do not deliberately break live IAM merely to manufacture a `500` |
-| `RATE_LIMITED` | No application HTTP handler emits this code | Only the separate mock-vendor/vendor-client contract uses this name | Decide whether to remove it from `ProblemCode` and OpenAPI | API Gateway throttling must be tested as a platform response, not this application code |
-| `SERVICE_UNAVAILABLE` | No application HTTP handler emits this code | Only generic response construction is tested | Decide whether to remove it or implement a real application path | Not reproducible until the design decision is made |
-
-The recommended contract correction is to remove `RATE_LIMITED` and
-`SERVICE_UNAVAILABLE` from the application's `ProblemCode` and OpenAPI list
-until an application handler can actually emit them. The vendor client's
-`RATE_LIMITED` code remains valid in its separate internal contract.
+`RATE_LIMITED` and `SERVICE_UNAVAILABLE` were removed from the application
+Problem Details contract because no handler can emit them. API Gateway `429`
+remains documented as a platform-native response and must be captured in the
+cloud campaign without expecting an application `code`. The vendor client's
+separate internal `RATE_LIMITED` code remains valid.
 
 ## Delivery vendor-client failures
 

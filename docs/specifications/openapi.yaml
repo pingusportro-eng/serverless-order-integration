@@ -10,8 +10,10 @@ info:
     Merchant identity is derived from the authenticated client. A caller cannot
     select an arbitrary `merchantId` in a request body.
 
-    Error responses use RFC 9457 Problem Details. The `code` extension is the
-    stable machine-readable application error; clients must not parse `detail`.
+    Application-generated error responses use RFC 9457 Problem Details. The
+    `code` extension is the stable machine-readable application error; clients
+    must not parse `detail`. Responses generated before Lambda invocation, such
+    as API Gateway throttling, use the platform's native error shape.
 
 servers:
   - url: http://localhost:3000
@@ -98,11 +100,9 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationFailed'
         '429':
-          $ref: '#/components/responses/RateLimited'
+          $ref: '#/components/responses/PlatformRateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
 
     get:
       tags:
@@ -135,7 +135,7 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationFailed'
         '429':
-          $ref: '#/components/responses/RateLimited'
+          $ref: '#/components/responses/PlatformRateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -173,7 +173,7 @@ paths:
         '404':
           $ref: '#/components/responses/OrderNotFound'
         '429':
-          $ref: '#/components/responses/RateLimited'
+          $ref: '#/components/responses/PlatformRateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -231,7 +231,7 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationFailed'
         '429':
-          $ref: '#/components/responses/RateLimited'
+          $ref: '#/components/responses/PlatformRateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -276,7 +276,7 @@ paths:
         '422':
           $ref: '#/components/responses/ValidationFailed'
         '429':
-          $ref: '#/components/responses/RateLimited'
+          $ref: '#/components/responses/PlatformRateLimited'
         '500':
           $ref: '#/components/responses/InternalError'
 
@@ -395,13 +395,6 @@ components:
       schema:
         type: string
         example: req_01JABCDEF0123456789
-
-    RetryAfter:
-      description: Seconds the client should wait before retrying.
-      schema:
-        type: integer
-        minimum: 1
-        example: 2
 
   schemas:
     OrderId:
@@ -782,9 +775,8 @@ components:
             `INVALID_WEBHOOK_SIGNATURE`, `ORDER_NOT_FOUND`,
             `IDEMPOTENCY_CONFLICT`, `MERCHANT_REFERENCE_CONFLICT`,
             `INVALID_STATUS_TRANSITION`, `EVENT_ID_CONFLICT`,
-            `VERSION_MISMATCH`, `PRECONDITION_REQUIRED`,
-            `VALIDATION_ERROR`, `RATE_LIMITED`, `INTERNAL_ERROR`, and
-            `SERVICE_UNAVAILABLE`.
+            `VERSION_MISMATCH`, `PRECONDITION_REQUIRED`, `VALIDATION_ERROR`,
+            and `INTERNAL_ERROR`.
           pattern: '^[A-Z][A-Z0-9_]*$'
           example: VALIDATION_ERROR
         requestId:
@@ -890,35 +882,23 @@ components:
           schema:
             $ref: '#/components/schemas/ProblemDetails'
 
-    RateLimited:
-      description: The caller exceeded an applicable rate limit.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/RequestId'
-        Retry-After:
-          $ref: '#/components/headers/RetryAfter'
+    PlatformRateLimited:
+      description: |
+        API Gateway rejected the request before Lambda invocation because an
+        applicable throttle was exceeded. This platform response does not use
+        the application's Problem Details contract.
       content:
-        application/problem+json:
+        application/json:
           schema:
-            $ref: '#/components/schemas/ProblemDetails'
+            type: object
+            additionalProperties: true
+            description: Service-native API Gateway error body.
 
     InternalError:
       description: An unexpected internal failure occurred.
       headers:
         X-Request-Id:
           $ref: '#/components/headers/RequestId'
-      content:
-        application/problem+json:
-          schema:
-            $ref: '#/components/schemas/ProblemDetails'
-
-    ServiceUnavailable:
-      description: A required service is temporarily unavailable.
-      headers:
-        X-Request-Id:
-          $ref: '#/components/headers/RequestId'
-        Retry-After:
-          $ref: '#/components/headers/RetryAfter'
       content:
         application/problem+json:
           schema:

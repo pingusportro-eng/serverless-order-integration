@@ -1,6 +1,6 @@
 import type { HttpHeaders, HttpResponse } from './response.js';
 
-export type ProblemStatus = 400 | 401 | 403 | 404 | 409 | 412 | 422 | 428 | 429 | 500 | 503;
+export type ProblemStatus = 400 | 401 | 403 | 404 | 409 | 412 | 422 | 428 | 500;
 
 export type ProblemCode =
   | 'MALFORMED_REQUEST'
@@ -15,9 +15,7 @@ export type ProblemCode =
   | 'VERSION_MISMATCH'
   | 'PRECONDITION_REQUIRED'
   | 'VALIDATION_ERROR'
-  | 'RATE_LIMITED'
-  | 'INTERNAL_ERROR'
-  | 'SERVICE_UNAVAILABLE';
+  | 'INTERNAL_ERROR';
 
 export interface ValidationIssue {
   readonly detail: string;
