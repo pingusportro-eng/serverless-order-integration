@@ -21,8 +21,8 @@ The owner approved this design before implementation:
 
 The implementation commit changed only local Infrastructure as Code and
 workflow definitions. The later reviewed bootstrap update created the artifact
-bucket and applied the scoped policies. GitHub secrets are not configured and
-the application is not deployed.
+bucket and applied the scoped policies. The three GitHub environment secrets
+are configured, but the application is not deployed.
 
 The expected AWS cost before the first application deployment is effectively
 zero:
@@ -156,7 +156,7 @@ The existing stack restrictions remain unchanged:
 
 ## Secret boundary
 
-The GitHub `development` environment will contain:
+The GitHub `development` environment contains:
 
 - `CURSOR_SIGNING_SECRET`;
 - `WEBHOOK_SIGNING_SECRET`; and
@@ -167,6 +167,32 @@ prepare step after environment approval and are written to a permission-limited
 temporary parameter file. The file is deleted by a shell trap. The values are
 passed to CloudFormation parameters marked `NoEcho`; they are not committed,
 printed, placed in a workflow artifact, or stored in AWS Secrets Manager.
+
+The three independent 48-byte random values were generated without terminal
+output and stored in the unlocked GNOME login keyring with these attributes:
+
+```text
+project=serverless-order-integration
+environment=development
+name=<GitHub secret name>
+```
+
+This local copy is necessary because GitHub environment secrets are write-only,
+while the local mock vendor and signed-webhook tests must use the same vendor
+and webhook values. The project values were transferred through the encrypted
+SSH connection using the terminal's OSC 52 clipboard mechanism, added one at a
+time, and removed from the client clipboard afterward.
+
+The GitHub environment page was visually checked to contain exactly:
+
+- `CURSOR_SIGNING_SECRET`;
+- `WEBHOOK_SIGNING_SECRET`; and
+- `VENDOR_AUTH_TOKEN`.
+
+Post-setup checks retrieved each local entry without displaying it, verified
+the minimum length, and confirmed that the artifact bucket remained empty, the
+application stack remained absent, and the Budget still reported `$0.00`
+actual and forecast spend.
 
 `vendor_base_url` is a non-secret manual input. The prepare script accepts only
 a root `https://*.trycloudflare.com` URL and verifies that it reaches the mock
@@ -277,8 +303,8 @@ The deployment validator locks:
 No further external step is authorized merely by this document. Continue in
 small, reviewable operations:
 
-1. add the three GitHub `development` environment secrets;
-2. start the local mock vendor and Quick Tunnel;
+1. start the local mock vendor with the keyring-backed vendor token;
+2. start a temporary Quick Tunnel and capture its public HTTPS URL;
 3. manually run `prepare` and inspect its change set;
 4. separately approve and run `execute`;
 5. inspect the live application and billing view;

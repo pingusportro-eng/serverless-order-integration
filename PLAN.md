@@ -450,6 +450,12 @@ stack remains absent and the Budget reports `$0.00` actual and forecast. The
 full record is in
 [the workflow review](docs/infrastructure/deployment-workflows.md).
 
-Next, configure the three GitHub `development` environment secrets without
-printing or committing their values. Application preparation, execution, and
-destruction each remain separate manual approvals.
+The three independent random values are now stored in the GNOME login keyring
+and configured as GitHub `development` environment secrets. Their values were
+never printed or committed, the client clipboard was cleared, the artifact
+bucket remains empty, and the application stack remains absent.
+
+Next, start the local mock vendor with the keyring-backed token and expose it
+through a temporary Quick Tunnel. Then manually run the non-executing `prepare`
+operation with the tunnel URL. Application execution and destruction remain
+separate manual approvals.
