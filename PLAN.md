@@ -364,7 +364,7 @@ For every step, the review should answer:
 
 ## Phase 6: GitHub Actions CI/CD
 
-- [ ] **6.1 — Add pull-request checks**
+- [x] **6.1 — Add pull-request checks**
   - Run formatting, linting, type-checking, unit tests, integration tests that can
     run locally, build, and template validation.
   - Verification: intentionally fail and then pass each important check.
@@ -427,20 +427,18 @@ For every step, the review should answer:
 
 ## Next step
 
-Proceed to **6.1 — Add pull-request checks**. The development application stack,
-its 34 resources, all 49 versions in the project-only SAM artifact bucket, and
-the SAM-managed packaging stack were permanently deleted in the approved
-order.
+Proceed to **6.2 — Configure GitHub-to-AWS OIDC**. Step 6.1 added a
+least-privilege pull-request workflow for formatting, linting, type-checking,
+unit coverage, TypeScript build, DynamoDB Local integration, SAM template
+validation, and a local deployable SAM build.
 
-The final authoritative-service audit found zero active stacks, project
-buckets, APIs, Lambda functions, DynamoDB tables, Cognito pools, SNS topics,
-SQS queues, log groups, and IAM roles. No local vendor/tunnel process,
-container, or recovery state remains. The account-level Budget and
-administrator, Git repository, and local DynamoDB volume were preserved. The
-Budget view remains `$0.00` actual/forecast.
+The workflow has read-only repository permission, does not request an OIDC
+token, does not configure AWS credentials, and contains no deployment command.
+Its expected AWS cost is `$0`. Its checks, cleanup behavior, and local
+equivalent are documented in
+[pull-request checks](docs/infrastructure/pull-request-checks.md).
 
-The exact scope, safeguards, deletion evidence, and one stale
-resource-tagging-index observation are recorded in the
-[development AWS teardown review](docs/infrastructure/teardown-review.md).
-Step 6.1 should add a GitHub Actions pull-request workflow that runs only local
-checks and creates no AWS resources.
+Before step 6.2 changes either GitHub or AWS, review the exact OIDC trust policy,
+deployment permissions, GitHub repository/environment settings, and any cost
+impact. Creating or deploying that integration requires a separate explicit
+approval.

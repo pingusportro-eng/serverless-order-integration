@@ -5,10 +5,10 @@ and asynchronous third-party integration with Node.js, TypeScript, and AWS.
 
 ## Status
 
-The project is entering **Phase 6: GitHub Actions CI/CD**. The bounded AWS
-campaigns passed, and the application and SAM packaging stacks were
-deliberately destroyed and independently verified absent. The next step is a
-pull-request workflow containing local checks only.
+The project is in **Phase 6: GitHub Actions CI/CD**. Pull requests targeting
+`master` now run local quality, test, DynamoDB Local integration, and SAM
+validation/build checks. The workflow uses no AWS credentials and creates no
+AWS resources.
 
 Work is divided into small reviewable steps. See [PLAN.md](PLAN.md) for the
 current checklist, architecture, verification criteria, and definition of done.
@@ -69,6 +69,10 @@ Run every local quality check:
 ```bash
 npm run check
 ```
+
+The same checks, plus DynamoDB Local integration and deployable SAM validation,
+run in the
+[pull-request workflow](docs/infrastructure/pull-request-checks.md).
 
 The individual commands are:
 
