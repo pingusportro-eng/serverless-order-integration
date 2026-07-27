@@ -39,6 +39,7 @@ queue_attributes() {
   local queue_arn
   local policy=''
   local retention='1209600'
+  local visible_messages='0'
 
   case "$queue_url" in
     "$delivery_queue_url")
@@ -71,6 +72,16 @@ queue_attributes() {
             }]
           }
         ')"
+      if [[ -f "$FAKE_AWS_STATE_DIRECTORY/marker-deleted" ]]; then
+        stale_check=1
+        if [[ -f "$FAKE_AWS_STATE_DIRECTORY/stale-empty-check" ]]; then
+          stale_check="$(( $(<"$FAKE_AWS_STATE_DIRECTORY/stale-empty-check") + 1 ))"
+        fi
+        printf '%s\n' "$stale_check" >"$FAKE_AWS_STATE_DIRECTORY/stale-empty-check"
+        if ((stale_check <= ${FAKE_AWS_STALE_EMPTY_CHECKS_AFTER_DELETE:-0})); then
+          visible_messages='1'
+        fi
+      fi
       ;;
     *)
       [[ -f "$FAKE_AWS_STATE_DIRECTORY/temporary-queue-url" ]] || exit 91
@@ -83,11 +94,12 @@ queue_attributes() {
   jq -cn \
     --arg queueArn "$queue_arn" \
     --arg policy "$policy" \
-    --arg retention "$retention" '
+    --arg retention "$retention" \
+    --arg visibleMessages "$visible_messages" '
       {
         Attributes: {
           QueueArn: $queueArn,
-          ApproximateNumberOfMessages: "0",
+          ApproximateNumberOfMessages: $visibleMessages,
           ApproximateNumberOfMessagesNotVisible: "0",
           ApproximateNumberOfMessagesDelayed: "0",
           MessageRetentionPeriod: $retention,
@@ -156,8 +168,6 @@ case "$service:$operation" in
     if [[ -f "$FAKE_AWS_STATE_DIRECTORY/temporary-queue-url" ]]; then
       jq -cn --arg url "$(<"$FAKE_AWS_STATE_DIRECTORY/temporary-queue-url")" \
         '{QueueUrls: [$url]}'
-    else
-      printf '{"QueueUrls":[]}\n'
     fi
     ;;
 
@@ -176,13 +186,18 @@ case "$service:$operation" in
     ;;
 
   sqs:receive-message)
-    if [[ -f "$FAKE_AWS_STATE_DIRECTORY/published-body" &&
+    receive_attempt=1
+    if [[ -f "$FAKE_AWS_STATE_DIRECTORY/receive-attempt" ]]; then
+      receive_attempt="$(( $(<"$FAKE_AWS_STATE_DIRECTORY/receive-attempt") + 1 ))"
+    fi
+    printf '%s\n' "$receive_attempt" >"$FAKE_AWS_STATE_DIRECTORY/receive-attempt"
+    if ((receive_attempt <= ${FAKE_AWS_EMPTY_RECEIVES_BEFORE_MESSAGE:-0})); then
+      exit 0
+    elif [[ -f "$FAKE_AWS_STATE_DIRECTORY/published-body" &&
       ! -f "$FAKE_AWS_STATE_DIRECTORY/marker-received" ]]; then
       jq -cn --arg body "$(<"$FAKE_AWS_STATE_DIRECTORY/published-body")" \
         '{Messages: [{MessageId: "fake-sqs-message-id", ReceiptHandle: "fake-receipt", Body: $body}]}'
       touch "$FAKE_AWS_STATE_DIRECTORY/marker-received"
-    else
-      printf '{}\n'
     fi
     ;;
 

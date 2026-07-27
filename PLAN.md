@@ -428,7 +428,7 @@ For every step, the review should answer:
 ## Next step
 
 Before **5.6 — Destroy or retain deliberately**, finish the approved bounded
-failure campaign. The SNS subscription DLQ is deployed and verified. The next
-small step is to review and approve execution of its implemented, locally
-verified isolated temporary-subscription failure drill. After the campaign,
-return to teardown and verify that no project resource remains.
+failure campaign. The SNS subscription DLQ's isolated client-error drill has
+passed, including cleanup and drift verification. The next small step is to
+select and review the next unverified journey from the failure matrix. After
+the campaign, return to teardown and verify that no project resource remains.

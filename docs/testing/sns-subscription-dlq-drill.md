@@ -1,6 +1,6 @@
 # SNS subscription-DLQ failure drill
 
-Status: guarded harness implemented and locally verified; real execution pending approval
+Status: passed in AWS; temporary resources and marker removed
 
 Reviewed: 2026-07-27
 
@@ -168,6 +168,39 @@ scripts/cloud/sns-subscription-dlq-drill.sh cleanup
 ```
 
 The test command uses a fake AWS CLI and creates no AWS resources. `run` is the
-real drill and must not be used until its temporary-resource execution receives
-separate explicit approval. `cleanup` is reserved for recovering an interrupted
-approved run from its validated state file.
+real drill and requires explicit temporary-resource execution approval.
+`cleanup` recovers an interrupted approved run from its validated state file.
+
+## AWS execution record
+
+The approved drill ran on 2026-07-27 in account `454921778743` and Region
+`eu-central-1`. SNS accepted exactly one marker with message ID
+`33f5d2b9-1ab4-5795-9be7-b059c5d782df`. The isolated target queue denied SNS
+delivery as designed, and the deployed subscription DLQ received the exact
+marker body.
+
+The first execution also exposed two AWS CLI behaviors that the fake harness
+did not originally reproduce:
+
+- an empty `list-queues` or `receive-message` result may contain no JSON
+  document rather than an object with an empty array; and
+- SQS approximate queue counters can briefly retain the pre-deletion value.
+
+The harness now normalizes empty CLI responses and retries queue-count reads at
+most three times. Its tests reproduce an empty receive followed by delivery and
+one stale post-delete count. Recovery mode positively matched and deleted only
+the saved marker.
+
+Final evidence:
+
+- the temporary subscription and target queue no longer exist;
+- the recovery-state file no longer exists;
+- the delivery queue and all three failure queues report zero visible,
+  in-flight, and delayed messages;
+- the stack is `UPDATE_COMPLETE` and its fresh drift result is `IN_SYNC`; and
+- the `$1` zero-spend budget reports `$0.00` actual and forecast spend.
+
+The run-mode caps were never exceeded. Compatibility diagnosis and recovery
+required additional read-only and cleanup requests, but the complete episode
+remained below 60 SQS calls, below 25 SNS calls, and exactly one publish. Its
+incremental estimate therefore remains below `$0.0001`.

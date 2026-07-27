@@ -25,6 +25,8 @@ async function testEnvironment() {
     drillStateDirectory,
     environment: {
       ...process.env,
+      FAKE_AWS_EMPTY_RECEIVES_BEFORE_MESSAGE: '1',
+      FAKE_AWS_STALE_EMPTY_CHECKS_AFTER_DELETE: '1',
       FAKE_AWS_STATE_DIRECTORY: fakeStateDirectory,
       SNS_DLQ_DRILL_AWS_CLI: fakeAws,
       SNS_DLQ_DRILL_POLL_SECONDS: '0',

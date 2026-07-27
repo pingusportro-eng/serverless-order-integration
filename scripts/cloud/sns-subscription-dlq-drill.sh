@@ -223,13 +223,20 @@ queue_arn() {
 assert_queue_empty() {
   local queue_url="$1"
   local attributes
-  attributes="$(queue_attributes "$queue_url")"
-  jq -e '
-    .Attributes.ApproximateNumberOfMessages == "0" and
-    .Attributes.ApproximateNumberOfMessagesNotVisible == "0" and
-    .Attributes.ApproximateNumberOfMessagesDelayed == "0"
-  ' <<<"$attributes" >/dev/null ||
-    fail "queue is not empty: $queue_url"
+
+  for attempt in {1..3}; do
+    attributes="$(queue_attributes "$queue_url")"
+    if jq -e '
+      .Attributes.ApproximateNumberOfMessages == "0" and
+      .Attributes.ApproximateNumberOfMessagesNotVisible == "0" and
+      .Attributes.ApproximateNumberOfMessagesDelayed == "0"
+    ' <<<"$attributes" >/dev/null; then
+      return
+    fi
+    ((attempt == 3)) || sleep "$poll_seconds"
+  done
+
+  fail "queue did not report empty after bounded consistency checks: $queue_url"
 }
 
 assert_deployed_queues_empty() {
@@ -252,6 +259,7 @@ assert_no_previous_drill_resources() {
   queue_urls="$(aws_call sqs sqs list-queues \
     --queue-name-prefix "$drill_queue_prefix" \
     --output json)"
+  [[ -n "$queue_urls" ]] || queue_urls='{}'
   [[ "$(jq '(.QueueUrls // []) | length' <<<"$queue_urls")" == '0' ]] ||
     fail 'a previous drill queue still exists; run cleanup before another drill'
 
@@ -275,7 +283,8 @@ resolve_and_verify_stack_resources() {
     fail "unexpected topic ARN: $topic_arn"
 
   delivery_queue_arn="$(queue_arn "$delivery_queue_url")"
-  subscription_dlq_arn="$(queue_arn "$subscription_dlq_url")"
+  subscription_dlq_attributes="$(queue_attributes "$subscription_dlq_url")"
+  subscription_dlq_arn="$(jq -er '.Attributes.QueueArn' <<<"$subscription_dlq_attributes")"
 
   local subscriptions
   subscriptions="$(aws_call sns sns list-subscriptions-by-topic \
@@ -303,9 +312,6 @@ resolve_and_verify_stack_resources() {
 }
 
 assert_subscription_dlq_policy() {
-  local attributes
-  attributes="$(queue_attributes "$subscription_dlq_url")"
-
   jq -e \
     --arg accountId "$expected_account_id" \
     --arg queueArn "$subscription_dlq_arn" \
@@ -323,7 +329,7 @@ assert_subscription_dlq_policy() {
           StringEquals: {"aws:SourceAccount": $accountId}
         }
       }]
-    ' <<<"$attributes" >/dev/null ||
+    ' <<<"$subscription_dlq_attributes" >/dev/null ||
     fail 'subscription DLQ policy does not authorize only the deployed topic contract'
 }
 
@@ -418,6 +424,7 @@ receive_matching_marker() {
       --attribute-names All \
       --message-attribute-names All \
       --output json)"
+    [[ -n "$response" ]] || response='{}'
     message_count="$(jq '(.Messages // []) | length' <<<"$response")"
     if [[ "$message_count" == '0' ]]; then
       continue
@@ -489,6 +496,7 @@ assert_no_residual_drill_resources() {
   queue_urls="$(aws_call sqs sqs list-queues \
     --queue-name-prefix "$drill_queue_prefix" \
     --output json)"
+  [[ -n "$queue_urls" ]] || queue_urls='{}'
   [[ "$(jq '(.QueueUrls // []) | length' <<<"$queue_urls")" == '0' ]] ||
     fail 'temporary drill queue remains after cleanup'
 
