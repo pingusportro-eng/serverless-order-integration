@@ -614,14 +614,27 @@ assert_tunnel_reachable() {
     return
   fi
 
-  for _ in {1..30}; do
+  local hostname="${url#https://}"
+  local last_status='DNS_PENDING'
+  for _ in {1..90}; do
+    local address
+    address="$(dig +time=2 +tries=1 +short @1.1.1.1 "$hostname" A | head -1 || true)"
+    if [[ -z "$address" ]]; then
+      sleep 1
+      continue
+    fi
+
     local status
     status="$(curl --silent --output /dev/null --write-out '%{http_code}' \
+      --connect-timeout 5 \
+      --max-time 10 \
+      --resolve "$hostname:443:$address" \
       --request POST "$url/deliveries" || true)"
     [[ "$status" == '401' ]] && return
+    last_status="$status"
     sleep 1
   done
-  fail 'Quick Tunnel did not expose the authenticated mock-vendor boundary'
+  fail "Quick Tunnel did not expose the authenticated mock-vendor boundary; last status: $last_status"
 }
 
 process_stop_vendor() {
@@ -737,38 +750,55 @@ create_worker_change_set() {
     --change-set-name "$change_set_name" \
     --output json >/dev/null
 
+  if [[ "${FAKE_VENDOR_DRILL_INTERRUPT_AFTER_CHANGE_SET_EXECUTION:-0}" == '1' ]]; then
+    fail 'forced test interruption after change-set execution'
+  fi
+
   for _ in {1..60}; do
-    response="$(aws_call cloudformation cloudformation describe-change-set \
-      --stack-name "$stack_name" \
-      --change-set-name "$change_set_name" \
-      --output json)"
-    local execution_status
-    execution_status="$(jq -r '.ExecutionStatus' <<<"$response")"
-    [[ "$execution_status" != 'EXECUTE_FAILED' && "$execution_status" != 'OBSOLETE' ]] ||
-      fail "worker endpoint change-set execution failed: $execution_status"
     local status
     status="$(stack_status)"
-    if [[ "$execution_status" == 'EXECUTE_COMPLETE' && "$status" == 'UPDATE_COMPLETE' ]]; then
+    [[ "$status" != *'ROLLBACK'* && "$status" != *'FAILED'* ]] ||
+      fail "worker endpoint stack update failed: $status"
+    if [[ "$status" == 'UPDATE_COMPLETE' ]]; then
       local configuration
       configuration="$(aws_call lambda lambda get-function-configuration \
         --function-name "$worker_function_name" \
         --query '{State:State,LastUpdateStatus:LastUpdateStatus,VendorBaseUrl:Environment.Variables.VENDOR_BASE_URL}' \
         --output json)"
-      jq -e \
+      if jq -e \
         --arg url "$tunnel_url" '
           .State == "Active" and
           .LastUpdateStatus == "Successful" and
           .VendorBaseUrl == $url
-        ' <<<"$configuration" >/dev/null ||
-        fail 'delivery worker did not receive the reviewed temporary vendor URL'
-      state_set_boolean stackUpdated true
-      return
+        ' <<<"$configuration" >/dev/null; then
+        state_set_boolean stackUpdated true
+        return
+      fi
     fi
-    [[ "$status" != *'ROLLBACK'* && "$status" != *'FAILED'* ]] ||
-      fail "worker endpoint stack update failed: $status"
     sleep "$poll_seconds"
   done
   fail 'worker endpoint stack update did not complete within the bounded wait'
+}
+
+reconcile_stack_update() {
+  [[ "$(state_boolean stackUpdated)" == 'false' ]] || return 0
+  local tunnel_url
+  tunnel_url="$(state_string tunnelUrl)"
+  [[ -n "$tunnel_url" ]] || return 0
+
+  local configuration
+  configuration="$(aws_call lambda lambda get-function-configuration \
+    --function-name "$worker_function_name" \
+    --query '{State:State,LastUpdateStatus:LastUpdateStatus,VendorBaseUrl:Environment.Variables.VENDOR_BASE_URL}' \
+    --output json)"
+  if jq -e \
+    --arg url "$tunnel_url" '
+      .State == "Active" and
+      .LastUpdateStatus == "Successful" and
+      .VendorBaseUrl == $url
+    ' <<<"$configuration" >/dev/null; then
+    state_set_boolean stackUpdated true
+  fi
 }
 
 cleanup_unexecuted_change_set() {
@@ -938,9 +968,15 @@ reconcile_redrive() {
     state_set_boolean redriveStarted true
   fi
   if [[ "$status" == 'COMPLETED' ]]; then
-    jq -e '.ApproximateNumberOfMessagesMoved == 1' <<<"$task" >/dev/null ||
-      fail 'retained managed redrive did not move exactly one message'
-    state_set_boolean redriveCompleted true
+    local moved
+    moved="$(jq -er '.ApproximateNumberOfMessagesMoved // 0' <<<"$task")"
+    [[ "$moved" =~ ^[0-9]+$ ]] ||
+      fail 'retained managed redrive returned an invalid moved-message count'
+    ((moved <= 1)) ||
+      fail 'retained managed redrive moved more than one message'
+    if ((moved == 1)); then
+      state_set_boolean redriveCompleted true
+    fi
   fi
 }
 
@@ -1123,10 +1159,16 @@ wait_for_redrive() {
         ' <<<"$response")"
     fi
     if [[ "$(jq -r '.Status // ""' <<<"$task")" == 'COMPLETED' ]]; then
-      jq -e '.ApproximateNumberOfMessagesMoved == 1' <<<"$task" >/dev/null ||
-        fail 'managed redrive completed without moving exactly one message'
-      state_set_boolean redriveCompleted true
-      return
+      local moved
+      moved="$(jq -er '.ApproximateNumberOfMessagesMoved // 0' <<<"$task")"
+      [[ "$moved" =~ ^[0-9]+$ ]] ||
+        fail 'managed redrive returned an invalid moved-message count'
+      ((moved <= 1)) ||
+        fail 'managed redrive moved more than one message'
+      if ((moved == 1)); then
+        state_set_boolean redriveCompleted true
+        return
+      fi
     fi
     [[ "$(jq -r '.Status // ""' <<<"$task")" != 'FAILED' ]] ||
       fail 'managed redrive task failed'
@@ -1437,6 +1479,7 @@ cleanup_drill() {
   resolve_resources
   assert_worker_contract
   assert_recovery_resources_match
+  reconcile_stack_update
   reconcile_order_write
 
   if [[ "$(state_boolean orderWritten)" == 'true' ]]; then
@@ -1467,6 +1510,7 @@ main() {
   else
     require_command cloudflared
     require_command curl
+    require_command dig
     require_command node
     require_command ps
   fi

@@ -1,6 +1,6 @@
 # Error and event-journey test matrix
 
-Status: inventory complete; additional tests pending
+Status: inventory complete; transient-vendor AWS journey passed; additional tests pending
 
 Last reviewed: 2026-07-27
 
@@ -124,18 +124,18 @@ those two actionable values.
 | Publisher -> SNS failure | Publisher returns the sequence number and logs safely | Covered locally | Do not break live IAM; local handler evidence is sufficient |
 | SNS -> SQS delivery exhaustion | Failed subscription delivery is retained for investigation | Passed with one isolated client-error marker; exact body recovered from the deployed subscription DLQ and deleted | Keep as the controlled failure-path proof |
 | Delivery queue mixed batch -> worker partial response | Successful record is removed while only the failed record retries | Covered locally | Use a small two-message AWS batch only if timing can be deterministic |
-| Transient vendor failure -> queue retries -> worker DLQ | Same submission key on every attempt, bounded receive count, retained message | Guarded `429` and managed-redrive harness is locally verified; no real vendor transient yet | Review and approve the bounded AWS run |
+| Transient vendor failure -> queue retries -> worker DLQ | Same submission key on every attempt, bounded receive count, retained message | Passed with three real `429` attempts using one correlation ID and idempotency-key digest; exact message and worker logs verified in the DLQ | Keep as the representative transient-vendor proof |
 | Terminal vendor failure -> DynamoDB `SUBMISSION_FAILED` -> acknowledgement | Failure details persisted, `order.submission_failed` published, no worker DLQ entry | Covered locally only | Run one authentication or request-rejection scenario |
 | Operator retry -> `order.submission_retry_requested` -> delivery queue -> success | Failed order returns to `PENDING_SUBMISSION`, actionable retry event reaches worker, final `SUBMITTED` | Not tested in AWS | Run after the terminal-failure journey |
 | Duplicate delivery event | No second external effect and message is acknowledged | Covered locally; provider idempotency observed during recovery | Add a deterministic AWS duplicate only if the harness can count vendor submissions |
-| Worker DLQ -> managed redrive -> delivery queue -> worker | AWS-managed move task completes and the recovered message is consumed | Previous recovery used manual send-then-delete; guarded managed-redrive recovery is locally verified | Cover with the approved real `429` drill |
+| Worker DLQ -> managed redrive -> delivery queue -> worker | AWS-managed move task completes and the recovered message is consumed | Passed: one managed move completed, one `201` recovery used the same idempotency key, and the order reached `SUBMITTED` version 2 | Keep as the managed-redrive recovery proof |
 | Webhook -> DynamoDB -> Stream -> SNS filter | Applied, duplicate, stale, and conflicting provider events produce correct order state and no delivery resubmission | Applied and duplicate paths passed; stale/conflict mostly local | Add stale and event-ID conflict HTTP cases; one non-actionable routing assertion is enough |
 
 The controlled SNS client-error procedure is specified separately in the
 [SNS subscription-DLQ failure drill](sns-subscription-dlq-drill.md).
 The completed poison-record and same-shard recovery procedure is recorded in
 the [stream-publisher failure drill](stream-publisher-failure-drill.md).
-The proposed transient-vendor and managed-redrive procedure is specified in the
+The completed transient-vendor and managed-redrive procedure is recorded in the
 [vendor rate-limit and worker-DLQ drill](vendor-rate-limit-dlq-drill.md).
 
 ## SNS subscription failure safeguard

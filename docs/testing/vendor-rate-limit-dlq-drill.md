@@ -1,6 +1,6 @@
 # Vendor rate-limit and worker-DLQ drill
 
-Status: guarded harness implemented and locally verified; AWS execution pending approval
+Status: passed in AWS; recovery, cleanup, drift, and budget checks passed
 
 Reviewed: 2026-07-27
 
@@ -69,6 +69,12 @@ Read-only inspection on 2026-07-27 confirmed:
 Quick Tunnels generate a new random `trycloudflare.com` hostname each time they
 start, so the old deployed hostname cannot be restarted:
 <https://developers.cloudflare.com/tunnel/setup/#quick-tunnels-development>.
+
+The real run also showed that the workstation resolver can retain the initial
+negative DNS answer after the new hostname becomes available through public
+DNS. The harness therefore waits up to 90 seconds for an A record from
+Cloudflare's public resolver and pins only its unauthenticated readiness request
+to that address. Lambda still resolves the public hostname normally.
 
 ## Isolation and input
 
@@ -196,6 +202,12 @@ After the exact DLQ message is verified:
    and acceptance time.
 6. Require the delivery queue and worker DLQ to finish empty.
 
+`ListMessageMoveTasks` fields are approximate. In the real run, the task first
+reported `COMPLETED` while `ApproximateNumberOfMessagesMoved` was still zero,
+then converged to one. The harness polls this completed state within its bounded
+wait, accepts only one moved message, and fails immediately if the count exceeds
+one.
+
 AWS managed redrive assigns a new message ID and enqueue time and can route a
 DLQ message back to its original source:
 <https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-configure-dead-letter-queue-redrive.html>.
@@ -303,8 +315,8 @@ Real mode:
 - supplies secrets to CloudFormation through mode-`0600` files rather than
   command arguments;
 - requires a one-resource, in-place worker change set;
-- waits for `EXECUTE_COMPLETE` and reads back the non-secret worker URL before
-  injection;
+- waits for stack `UPDATE_COMPLETE` and reads back the non-secret worker URL
+  before injection;
 - writes the one valid order with a no-overwrite condition;
 - matches the exact DLQ event before restoring visibility or redriving;
 - compares safe worker logs with the local vendor-attempt journal;
@@ -325,6 +337,10 @@ fakes and creates no AWS resource, tunnel, or server. It covers:
 - interruption immediately after the order write followed by cleanup;
 - interruption after change-set creation, proving that setup processes stop
   and the unexecuted change set is deleted; and
+- interruption after change-set execution, proving that cleanup reconciles the
+  deployed worker URL even if AWS has already removed the executed change set;
+- a completed redrive whose approximate moved count is initially stale and
+  then converges to one; and
 - interruption after AWS accepted redrive but before its handle was saved,
   followed by timestamp-based task reconciliation without a second redrive.
 
@@ -332,17 +348,46 @@ The fake change-set boundary also verifies that the two vendor parameters are
 the only new values, every other parameter uses its deployed value, and no
 64-character token appears in command logs.
 
-## Approval boundary
+## AWS execution record
 
-The design and local implementation were approved on 2026-07-27. This document
-still does not authorize starting the public tunnel, updating the stack,
-inserting the item, invoking the cloud worker, or starting managed redrive.
+The owner approved the bounded AWS mutations and the drill ran on 2026-07-27.
+The real journey proved:
 
-The owner has approved these four design decisions:
+- three authenticated vendor attempts returned `429`;
+- every failed attempt used one correlation ID and one idempotency-key digest;
+- the order remained `PENDING_SUBMISSION`, version 1, during those failures;
+- the exact `order.created` message reached the worker DLQ with an
+  `ApproximateReceiveCount` greater than 3;
+- three correlated safe worker-failure logs matched the vendor journal;
+- SQS managed redrive completed with exactly one message moved;
+- recovery made one `201` vendor call with the same idempotency-key digest;
+- the order reached `SUBMITTED`, version 2, with its provider lookup; and
+- conditional cleanup deleted only the marked order and provider item.
 
-1. use deterministic `429` instead of timeout;
-2. rotate only the existing worker URL and token through CloudFormation;
-3. inject one valid order item at DynamoDB rather than create an API user/order;
-4. recover the exact DLQ message with SQS managed redrive.
+Two environment compatibility defects were found and fixed during the guarded
+run:
 
-The next review gate is the real `run` command and its bounded AWS mutations.
+1. the new Quick Tunnel hostname was available in public DNS while the local
+   resolver still held a negative answer; and
+2. CloudFormation removed an executed change set before a follow-up describe,
+   even though the stack update had completed.
+
+The second case required one additional reviewed in-place worker configuration
+update with a fresh Quick Tunnel. Both updates changed only the existing vendor
+URL and token parameters and created no resource.
+
+The final independent audit found:
+
+| Check | Result |
+| --- | --- |
+| Delivery queue, worker DLQ, publisher failure queue, subscription DLQ | All `0` visible, `0` in flight, `0` delayed |
+| Marked DynamoDB records | `0` |
+| Local vendor/tunnel processes | None |
+| Recovery and token files | Absent |
+| Worker SQS mapping | Enabled; batch size 2; partial failures; maximum concurrency 2 |
+| Stack | `UPDATE_COMPLETE`; `IN_SYNC` |
+| Managed redrive | `COMPLETED`; one message moved |
+| Budget | `$0.00` actual; `$0.00` forecast against the `$1` alert |
+
+The synthetic order and provider mapping were permanently deleted. The safe,
+ignored attempt journal remains available for local review.

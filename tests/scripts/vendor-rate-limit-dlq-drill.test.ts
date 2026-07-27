@@ -62,7 +62,9 @@ describe('vendor rate-limit and worker-DLQ drill harness', () => {
   });
 
   it('proves bounded 429 attempts, managed redrive, recovery, and cleanup', async () => {
-    const fixture = await testEnvironment();
+    const fixture = await testEnvironment({
+      FAKE_VENDOR_DRILL_STALE_REDRIVE_COUNT_ONCE: '1',
+    });
 
     const result = await execFileAsync('bash', [drillScript, 'run'], {
       cwd: projectRoot,
@@ -185,6 +187,35 @@ describe('vendor rate-limit and worker-DLQ drill harness', () => {
       access(join(fixture.fakeStateDirectory, 'change-set-deleted')),
     ).resolves.toBeUndefined();
     await expect(access(join(fixture.drillStateDirectory, 'state.json'))).rejects.toThrow();
+  });
+
+  it('reconciles an executed stack update before cleaning an interrupted setup', async () => {
+    const fixture = await testEnvironment({
+      FAKE_VENDOR_DRILL_INTERRUPT_AFTER_CHANGE_SET_EXECUTION: '1',
+    });
+
+    await expect(
+      execFileAsync('bash', [drillScript, 'run'], {
+        cwd: projectRoot,
+        env: fixture.environment,
+      }),
+    ).rejects.toThrow();
+    await expect(
+      access(join(fixture.fakeStateDirectory, 'stack-updated')),
+    ).resolves.toBeUndefined();
+
+    const recovery = await execFileAsync('bash', [drillScript, 'cleanup'], {
+      cwd: projectRoot,
+      env: {
+        ...fixture.environment,
+        FAKE_VENDOR_DRILL_INTERRUPT_AFTER_CHANGE_SET_EXECUTION: '0',
+      },
+    });
+
+    expect(recovery.stdout).toContain('Vendor rate-limit drill cleanup completed.');
+    await expect(access(join(fixture.fakeStateDirectory, 'change-set-deleted'))).rejects.toThrow();
+    await expect(access(join(fixture.drillStateDirectory, 'state.json'))).rejects.toThrow();
+    await expect(access(join(fixture.drillStateDirectory, 'vendor-token.json'))).rejects.toThrow();
   });
 
   it('reconciles a completed redrive when interrupted before its handle was saved', async () => {

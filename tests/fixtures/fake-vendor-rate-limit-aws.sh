@@ -353,14 +353,20 @@ case "$service:$operation" in
   sqs:list-message-move-tasks)
     if [[ -f "$FAKE_VENDOR_DRILL_STATE_DIRECTORY/redrive-completed" ]]; then
       started_at="$(<"$FAKE_VENDOR_DRILL_STATE_DIRECTORY/redrive-started-at")"
+      moved=1
+      if [[ "${FAKE_VENDOR_DRILL_STALE_REDRIVE_COUNT_ONCE:-0}" == '1' ]] &&
+        [[ "$(increment_counter redrive-list-attempt)" == '1' ]]; then
+        moved=0
+      fi
       jq -cn \
         --arg sourceArn "$worker_dlq_arn" \
+        --argjson moved "$moved" \
         --argjson startedAt "$started_at" '
           {
             Results: [{
               Status: "COMPLETED",
               SourceArn: $sourceArn,
-              ApproximateNumberOfMessagesMoved: 1,
+              ApproximateNumberOfMessagesMoved: $moved,
               ApproximateNumberOfMessagesToMove: 0,
               StartedTimestamp: $startedAt
             }]

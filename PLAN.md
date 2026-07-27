@@ -430,9 +430,14 @@ For every step, the review should answer:
 Before **5.6 — Destroy or retain deliberately**, finish the approved bounded
 failure campaign. The SNS subscription-DLQ and stream-publisher poison-record
 drills have passed, including recovery, cleanup, and drift verification. The
-next proposed journey is the documented deterministic vendor `429` through SQS
-retry, the delivery-worker DLQ, and managed redrive. Its safe attempt journal,
-guarded harness, fake AWS/process boundaries, and interruption recovery pass
-locally. Review and approve the real bounded `run` separately; no AWS mutation
-is authorized yet. After the campaign, return to teardown and verify that no
-project resource remains.
+deterministic vendor `429` journey through SQS retries, the delivery-worker DLQ,
+and managed redrive has also passed in AWS: three failures were retained, one
+managed move recovered the order, cleanup removed its two marked DynamoDB
+items, all four queues finished empty, the stack was `IN_SYNC`, and budget
+actual/forecast remained `$0.00`.
+
+The next smallest journey is one terminal vendor failure followed by the
+operator retry path. First review a bounded design that proves
+`SUBMISSION_FAILED`, `order.submission_failed`, no worker-DLQ message, then
+`order.submission_retry_requested` routing and final `SUBMITTED`. After the
+campaign, return to teardown and verify that no project resource remains.
