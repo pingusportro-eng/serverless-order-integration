@@ -439,13 +439,17 @@ GitHub environment secrets, non-executing change-set preparation, commit-bound
 execution with two smoke requests, and exact stack-and-prefix teardown.
 
 The first reviewed bootstrap update rolled back safely because its proposed S3
-bucket name was 64 characters, one above the S3 limit. No bucket or policy
-change remains. The corrected 39-character name and a rendered-length
-regression assertion are now local changes documented in
+bucket name was 64 characters, one above the S3 limit. The corrected
+39-character name added a rendered-length regression assertion. A second
+reviewed change set then reached `UPDATE_COMPLETE`.
+
+Post-update checks verified the empty non-versioned bucket, encryption, public
+access block, ownership, one-day lifecycle, exact effective IAM policies,
+unchanged OIDC trust, and intended IAM allow/deny simulations. The application
+stack remains absent and the Budget reports `$0.00` actual and forecast. The
+full record is in
 [the workflow review](docs/infrastructure/deployment-workflows.md).
 
-Commit that correction, then create and inspect a new non-executing bootstrap
-change set. Execution requires another explicit approval. After the effective
-AWS configuration is verified, configure the three GitHub environment secrets.
-Application preparation, execution, and destruction each remain separate
-manual approvals.
+Next, configure the three GitHub `development` environment secrets without
+printing or committing their values. Application preparation, execution, and
+destruction each remain separate manual approvals.
