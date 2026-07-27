@@ -8,7 +8,8 @@ and asynchronous third-party integration with Node.js, TypeScript, and AWS.
 The project is in **Phase 6: GitHub Actions CI/CD**. Pull requests targeting
 `master` now run local quality, test, DynamoDB Local integration, and SAM
 validation/build checks. The workflow uses no AWS credentials and creates no
-AWS resources.
+AWS resources. The next OIDC boundary has been reviewed but remains
+unconfigured until the exact GitHub repository identity is available.
 
 Work is divided into small reviewable steps. See [PLAN.md](PLAN.md) for the
 current checklist, architecture, verification criteria, and definition of done.
@@ -73,6 +74,10 @@ npm run check
 The same checks, plus DynamoDB Local integration and deployable SAM validation,
 run in the
 [pull-request workflow](docs/infrastructure/pull-request-checks.md).
+
+The proposed short-lived GitHub-to-AWS identity boundary and its explicit
+approval gate are recorded in the
+[GitHub OIDC review](docs/infrastructure/github-oidc-review.md).
 
 The individual commands are:
 

@@ -427,18 +427,18 @@ For every step, the review should answer:
 
 ## Next step
 
-Proceed to **6.2 — Configure GitHub-to-AWS OIDC**. Step 6.1 added a
-least-privilege pull-request workflow for formatting, linting, type-checking,
-unit coverage, TypeScript build, DynamoDB Local integration, SAM template
-validation, and a local deployable SAM build.
+Continue **6.2 — Configure GitHub-to-AWS OIDC** after establishing the GitHub
+repository identity. The read-only review found no existing IAM OIDC provider,
+matching IAM role, active stack, or local Git remote.
 
-The workflow has read-only repository permission, does not request an OIDC
-token, does not configure AWS credentials, and contains no deployment command.
-Its expected AWS cost is `$0`. Its checks, cleanup behavior, and local
-equivalent are documented in
-[pull-request checks](docs/infrastructure/pull-request-checks.md).
+The proposed trust binds the AWS account, exact GitHub subject, immutable owner
+and repository IDs, `development` environment, and `master` ref. The GitHub role
+will operate only the application stack through one fixed CloudFormation
+service role; it will not be able to modify its own identity bootstrap.
 
-Before step 6.2 changes either GitHub or AWS, review the exact OIDC trust policy,
-deployment permissions, GitHub repository/environment settings, and any cost
-impact. Creating or deploying that integration requires a separate explicit
-approval.
+The full design, permission split, cost boundary, verification, and teardown
+plan are in the
+[GitHub OIDC review](docs/infrastructure/github-oidc-review.md). The next safe
+input is the exact GitHub repository URL and its public/private visibility.
+After those values are verified, create and review the bootstrap template
+locally. Any GitHub or AWS mutation still requires separate explicit approval.

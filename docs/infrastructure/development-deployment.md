@@ -128,5 +128,6 @@ authoritative-service audit found no operational project resource. The exact
 evidence is in the
 [development AWS teardown review](teardown-review.md).
 
-The next boundary is Phase 6.1: add GitHub Actions pull-request checks that run
-locally and create no AWS resources.
+Phase 6.1 added GitHub Actions pull-request checks that run locally and create
+no AWS resources. The next boundary is the separately approval-gated
+[GitHub-to-AWS OIDC design](github-oidc-review.md).
