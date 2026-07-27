@@ -122,7 +122,7 @@ those two actionable values.
 | Non-actionable domain event -> SNS filter | Event is published but does not enter the delivery queue | Representative `order.submitted` path passed | Assert the exact allow-list locally; one cloud representative is sufficient |
 | Malformed order record -> publisher retries -> publisher failure queue | Structured failure logs, configured attempts exhausted, retained stream invocation record | Not tested; queue remained empty | Inject one synthetic malformed order item, then repair it and verify the shard continues |
 | Publisher -> SNS failure | Publisher returns the sequence number and logs safely | Covered locally | Do not break live IAM; local handler evidence is sufficient |
-| SNS -> SQS delivery exhaustion | Failed subscription delivery is retained for investigation | No SNS subscription DLQ exists | Architecture decision required before claiming complete failure retention |
+| SNS -> SQS delivery exhaustion | Failed subscription delivery is retained for investigation | Subscription DLQ and least-privilege policy are asserted locally; not deployed yet | Verify the deployed redrive policy and run one controlled client-error drill |
 | Delivery queue mixed batch -> worker partial response | Successful record is removed while only the failed record retries | Covered locally | Use a small two-message AWS batch only if timing can be deterministic |
 | Transient vendor failure -> queue retries -> worker DLQ | Same submission key on every attempt, bounded receive count, retained message | Poison-message DLQ path passed, but no real vendor transient did | Run one timeout or `429` scenario |
 | Terminal vendor failure -> DynamoDB `SUBMISSION_FAILED` -> acknowledgement | Failure details persisted, `order.submission_failed` published, no worker DLQ entry | Covered locally only | Run one authentication or request-rejection scenario |
@@ -131,22 +131,26 @@ those two actionable values.
 | Worker DLQ -> managed redrive -> delivery queue -> worker | AWS-managed move task completes and the recovered message is consumed | Previous recovery used manual send-then-delete because of the old CLI | Repeat once with `start-message-move-task` |
 | Webhook -> DynamoDB -> Stream -> SNS filter | Applied, duplicate, stale, and conflicting provider events produce correct order state and no delivery resubmission | Applied and duplicate paths passed; stale/conflict mostly local | Add stale and event-ID conflict HTTP cases; one non-actionable routing assertion is enough |
 
-## Architecture gap: SNS subscription failures
+## SNS subscription failure safeguard
 
 The publisher failure queue handles DynamoDB Stream records that the publisher
 cannot process. The worker DLQ handles messages that reached the delivery queue
 but the worker could not complete.
 
-There is currently no dead-letter queue on the SNS subscription itself. If SNS
-exhausts delivery to SQS, neither existing failure queue owns that failure.
-Before the expanded campaign, choose one of these explicit positions:
+The approved local template now adds a third failure queue directly to the SNS
+subscription. If SNS exhausts delivery to SQS, the subscription redrive policy
+retains the message there instead of leaving the failure unowned.
 
-1. Add an SNS subscription DLQ and test its policy and redrive behavior.
-2. Accept SNS-managed retries without retained terminal evidence and document
-   that limitation.
+The queue policy allows `sqs:SendMessage` only from the stack's domain-events
+topic and AWS account. The queue uses the existing one-day
+`FailureMessageRetentionSeconds` setting and SQS-managed encryption. Local
+template tests lock those relationships and the exact two-event subscription
+filter.
 
-Adding another SQS queue has no idle request charge, but it is an infrastructure
-and cost-model change and therefore requires review before implementation.
+The project owner approved this additional SQS queue on 2026-07-27. It has no
+fixed or idle request charge and has not yet been deployed. The cloud campaign
+must still verify the deployed attributes and perform a controlled failure
+drill without exceeding the workload boundary below.
 
 ## Initial cloud safety boundary
 

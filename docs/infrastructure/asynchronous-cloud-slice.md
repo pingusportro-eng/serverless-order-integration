@@ -1,7 +1,8 @@
 # Asynchronous cloud slice
 
-Status: defined, not deployed  
-Last reviewed: 2026-07-24
+Status: defined; subscription-DLQ update approved locally but not yet deployed
+
+Last reviewed: 2026-07-27
 
 ## Purpose
 
@@ -19,6 +20,7 @@ DynamoDB Stream -> Publisher Lambda -> SNS
                                   Worker DLQ
 
 Failed stream record -> Publisher failure queue
+Failed SNS subscription delivery -> Subscription DLQ
 ```
 
 See the editable
@@ -38,6 +40,7 @@ The asynchronous addition contains:
 - One standard SQS delivery queue
 - One standard SQS worker DLQ
 - One standard SQS stream-publisher failure queue
+- One standard SQS SNS-subscription DLQ
 - One 128 MB delivery-worker Lambda
 - Two CloudWatch log groups using the stack's reviewed retention parameter
 - Lambda event-source mappings for DynamoDB Streams and SQS
@@ -93,6 +96,16 @@ For delivery SQS:
 The failure queues retain data for investigation; they do not automatically
 replay it.
 
+For the SNS subscription:
+
+- SNS-managed delivery retries happen before the terminal failure path.
+- A delivery that SNS can no longer send to the delivery queue is retained in
+  the subscription DLQ instead of being discarded.
+- This DLQ belongs to the subscription, not to the SNS topic or delivery
+  worker.
+- It has no automatic consumer; investigation and replay remain deliberate
+  operator actions.
+
 ## IAM and transport boundaries
 
 | Function | Allowed actions |
@@ -100,15 +113,16 @@ replay it.
 | Stream publisher | Read the orders stream, list DynamoDB streams, publish only to the domain-events topic, and send discarded records only to its failure queue |
 | Delivery worker | Receive/delete messages only from the delivery queue, get orders from the table, and use transactional `PutItem`/`UpdateItem` for delivery outcomes |
 
-The delivery queue policy permits `sqs:SendMessage` only from the stack's SNS
-topic and account. Lambda functions are not placed in a VPC, so the worker can
-reach a reviewed public HTTPS vendor without a NAT Gateway.
+The delivery queue and subscription-DLQ policies permit `sqs:SendMessage` only
+from the stack's SNS topic and account. Lambda functions are not placed in a
+VPC, so the worker can reach a reviewed public HTTPS vendor without a NAT
+Gateway.
 
 The worker's DynamoDB write actions are constrained by
 `dynamodb:EnclosingOperation` to `TransactWriteItems`; they cannot be used as
 standalone writes.
 
-All three SQS queues use SQS-managed server-side encryption. The SNS topic does
+All four SQS queues use SQS-managed server-side encryption. The SNS topic does
 not use KMS encryption in this disposable synthetic-data environment; adding
 SNS KMS encryption would require a separate cost and IAM review. Domain events
 must continue to exclude secrets and personal data.
@@ -133,7 +147,7 @@ The asynchronous template requires these values and provides no defaults:
 | `DeliveryQueueVisibilityTimeoutSeconds` | Delay before a failed delivery message can retry |
 | `DeliveryQueueMaxReceiveCount` | Attempts before the worker DLQ |
 | `DeliveryMessageRetentionSeconds` | Retention for pending delivery work |
-| `FailureMessageRetentionSeconds` | Retention for both failure queues |
+| `FailureMessageRetentionSeconds` | Retention for all three failure queues |
 | `VendorTimeoutMs` | Maximum duration of one provider HTTP attempt |
 
 The cost review must enforce these relationships:
@@ -154,6 +168,7 @@ separate cloud-hosted mock and review its cost.
 ```bash
 npm run sam:cloud:validate
 npm run sam:cloud:build
+npx vitest run tests/infrastructure/cloud-template.test.ts
 npm run test:stream-publisher
 npm run test:delivery-worker
 ```

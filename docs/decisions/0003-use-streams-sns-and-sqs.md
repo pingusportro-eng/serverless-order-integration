@@ -51,8 +51,9 @@ global ordering guarantee.
 The DynamoDB Stream mapping and SQS mapping will enable partial batch responses.
 Publisher failures that outlive the configured stream retry policy require an
 on-failure SQS destination; worker messages that exceed the receive limit go to
-a separate worker dead-letter queue. Exact retry counts and timeouts will be
-reviewed with the infrastructure change.
+a separate worker dead-letter queue. An SNS subscription dead-letter queue
+retains messages that SNS can no longer deliver to the delivery queue. Exact
+retry counts and timeouts will be reviewed with the infrastructure change.
 
 DynamoDB Streams retains records for 24 hours, so monitoring and the publisher
 failure destination are required rather than relying on indefinite retries.
@@ -115,13 +116,14 @@ duplicates, stale versions, and invalid transitions.
 
 Streams, Lambda, SNS, and SQS are request-based and have no idle worker instance.
 At learning volume they are expected to remain within free allowances or cost
-only cents. Two failure queues add no fixed hourly cost, but all event fan-out,
-requests, payload sizes, retries, and log volume remain part of the deployment
-cost review.
+only cents. The publisher and worker failure queues add no fixed hourly cost.
+The later-approved SNS subscription DLQ brings the total to three failure
+queues and likewise adds no fixed hourly cost. All event fan-out, requests,
+payload sizes, retries, and log volume remain part of the deployment cost
+review.
 
 ## Reconsider when
 
 Use direct SQS when there will permanently be only one consumer. Consider
 EventBridge for complex routing or cross-account integration, and FIFO only when
 the business requires ordering that aggregate-version checks cannot provide.
-

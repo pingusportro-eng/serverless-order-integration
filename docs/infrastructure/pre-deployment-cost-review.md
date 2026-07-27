@@ -1,7 +1,9 @@
 # Pre-deployment cost review
 
-Status: approved and deployed; smoke tests not yet started
-Last reviewed: 2026-07-25  
+Status: original stack deployed; subscription-DLQ update approved but not deployed
+
+Last reviewed: 2026-07-27
+
 Deployment region: `eu-central-1` (Europe, Frankfurt)  
 Required AWS CLI profile: `pingusportro-admin`
 
@@ -47,7 +49,7 @@ AWS profile.
 | Lambda | Four 128 MB functions: orders API, webhook, stream publisher, and delivery worker | Invocations and GB-seconds |
 | DynamoDB | One Standard on-demand table, two sparse GSIs, and one `NEW_IMAGE` Stream | Reads, writes, indexed storage, and table storage |
 | SNS | One Standard topic and one filtered SQS subscription | Publish requests and deliveries |
-| SQS | Delivery queue, delivery-worker DLQ, and publisher failure queue | API requests and payload chunks |
+| SQS | Delivery queue, delivery-worker DLQ, publisher failure queue, and SNS subscription DLQ | API requests and payload chunks |
 | Cognito | One Lite user pool, one public app client, and one operators group | Monthly active users |
 | CloudWatch Logs | API access log group and four Lambda log groups | Ingestion, retained storage, and optional query scanning |
 | S3 deployment artifacts | One small SAM packaging bucket containing zipped Lambda artifacts | Storage and a small number of PUT/GET/LIST requests |
@@ -82,6 +84,20 @@ These exclusions remove the main fixed-hourly cost risks. They do not make the
 budget a hard cap: unexpected public traffic, excessive logging, or retained
 data could still generate usage charges.
 
+## Approved incremental SNS safeguard
+
+On 2026-07-27, the project owner approved adding one standard SQS queue as the
+delivery subscription's dead-letter queue.
+
+- The queue has no fixed hourly or idle request charge.
+- Successful SNS deliveries never write to it.
+- It reuses the approved one-day failure-message retention.
+- It uses SQS-managed encryption and introduces no KMS key or KMS request cost.
+- The bounded failure drill adds only a handful of SQS requests and remains
+  inside the existing `$0.02` incremental campaign ceiling.
+- This approval covers the template change, not deployment; deployment remains
+  a separate deliberate action.
+
 ## Recommended deployment parameters
 
 These values are **recommendations awaiting owner approval**:
@@ -102,7 +118,7 @@ These values are **recommendations awaiting owner approval**:
 | `DeliveryQueueVisibilityTimeoutSeconds` | `90` | Six times the worker timeout, following Lambda's SQS guidance |
 | `DeliveryQueueMaxReceiveCount` | `3` | Provides bounded learning retries and reaches the DLQ in a reasonable test time |
 | `DeliveryMessageRetentionSeconds` | `86400` | One day for pending synthetic delivery work |
-| `FailureMessageRetentionSeconds` | `86400` | One day to inspect either failure queue before teardown |
+| `FailureMessageRetentionSeconds` | `86400` | One day to inspect any of the three failure queues before teardown |
 | `VendorTimeoutMs` | `3000` | Two sequential worst-case vendor waits use 6 of the Lambda's 15 seconds |
 
 The relationships required by the asynchronous design hold:
@@ -258,7 +274,7 @@ After smoke testing:
 - [ ] Empty and delete the SAM artifact bucket and any SAM-managed packaging
       stack created specifically for this project.
 - [ ] Confirm the four Lambda functions, HTTP API, table, user pool, topic,
-      three queues, five log groups, roles, and event mappings are gone.
+      four queues, five log groups, roles, and event mappings are gone.
 - [ ] Check the billing dashboard and Budget status, allowing for reporting
       delay.
 

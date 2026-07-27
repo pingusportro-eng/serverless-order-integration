@@ -56,12 +56,13 @@ API Gateway -> Orders API Lambda -> DynamoDB orders table
                                         | domain events
                                         v
                                     SNS topic
-                                        |
-                                        | filtered subscription:
-                                        | order.created or
-                                        | order.submission_retry_requested
-                                        v
-                                  Delivery SQS queue ------> DLQ
+                     +------------------+------------------+
+                     |                                     |
+                     | filtered subscription:              | terminal subscription
+                     | order.created or                     | delivery failure
+                     | order.submission_retry_requested     v
+                     v                              SNS subscription DLQ
+              Delivery SQS queue ------> Worker DLQ
                                         |
                                         v
                                   Worker Lambda
@@ -425,7 +426,7 @@ For every step, the review should answer:
 
 ## Next step
 
-Continue with **5.6 — Destroy or retain deliberately**. Review the completed
-smoke-test record and current delayed billing view, then stop the local
-vendor/tunnel, delete the application stack and synthetic identity, remove the
-project SAM artifacts, and verify that no project resource remains.
+Before **5.6 — Destroy or retain deliberately**, finish the approved bounded
+failure campaign. The next small step is to review the pending stack update and
+obtain explicit approval before deploying the SNS subscription DLQ. After the
+campaign, return to teardown and verify that no project resource remains.

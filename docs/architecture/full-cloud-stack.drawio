@@ -79,6 +79,12 @@
                 <mxCell id="publisher-failure-queue-icon" value="" style="shape=mxgraph.aws4.sqs;fillColor=#E7157B;strokeColor=none;html=1;aspect=fixed;" parent="publisher-failure-queue" vertex="1" connectable="0">
                     <mxGeometry x="98" y="6" width="44" height="44" as="geometry"/>
                 </mxCell>
+                <mxCell id="subscription-dlq" value="&lt;b&gt;SNS subscription DLQ&lt;/b&gt;&lt;br&gt;Terminal SNS delivery failures&lt;br&gt;Manual investigation + replay" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#D04437;strokeWidth=2;fillColor=#FFEBE6;fontColor=#7A1F17;fontSize=13;verticalAlign=bottom;spacingBottom=5;" parent="1" vertex="1">
+                    <mxGeometry x="1807.5" y="455" width="235" height="110" as="geometry"/>
+                </mxCell>
+                <mxCell id="subscription-dlq-icon" value="" style="shape=mxgraph.aws4.sqs;fillColor=#E7157B;strokeColor=none;html=1;aspect=fixed;" parent="subscription-dlq" vertex="1" connectable="0">
+                    <mxGeometry x="95.5" y="6" width="44" height="44" as="geometry"/>
+                </mxCell>
                 <mxCell id="delivery-dlq" value="&lt;b&gt;Delivery worker DLQ&lt;/b&gt;&lt;br&gt;Messages exceeding maxReceiveCount&lt;br&gt;Manual investigation + replay" style="rounded=1;whiteSpace=wrap;html=1;strokeColor=#D04437;strokeWidth=2;fillColor=#FFEBE6;fontColor=#7A1F17;fontSize=13;verticalAlign=bottom;spacingBottom=5;" parent="1" vertex="1">
                     <mxGeometry x="2232.5" y="465" width="235" height="110" as="geometry"/>
                 </mxCell>
@@ -192,6 +198,9 @@
                     </mxGeometry>
                 </mxCell>
                 <mxCell id="edge-publisher-failure" value="Retries / age exhausted" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#D04437;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#FFFFFF;" parent="1" source="publisher" target="publisher-failure-queue" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge-sns-subscription-dlq" value="Subscription delivery exhausted" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#D04437;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#FFFFFF;" parent="1" source="sns" target="subscription-dlq" edge="1">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
                 <mxCell id="edge-queue-dlq" value="maxReceiveCount exceeded" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#D04437;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#FFFFFF;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" source="delivery-queue" target="delivery-dlq" edge="1">

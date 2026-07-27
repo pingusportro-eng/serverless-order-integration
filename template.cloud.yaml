@@ -104,7 +104,7 @@ Parameters:
     Type: Number
     MinValue: 60
     MaxValue: 1209600
-    Description: Cost-reviewed retention shared by the stream failure queue and worker DLQ.
+    Description: Cost-reviewed retention shared by all retained failure queues.
   VendorBaseUrl:
     Type: String
     AllowedPattern: '^https://.+'
@@ -340,6 +340,41 @@ Resources:
         - Key: FailurePath
           Value: stream-publisher
 
+  DeliverySubscriptionDeadLetterQueue:
+    Type: AWS::SQS::Queue
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      MessageRetentionPeriod: !Ref FailureMessageRetentionSeconds
+      SqsManagedSseEnabled: true
+      Tags:
+        - Key: Project
+          Value: serverless-order-integration
+        - Key: Environment
+          Value: !Ref EnvironmentName
+        - Key: FailurePath
+          Value: sns-subscription
+
+  DeliverySubscriptionDeadLetterQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref DeliverySubscriptionDeadLetterQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowDomainEventsTopicFailureDelivery
+            Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt DeliverySubscriptionDeadLetterQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !Ref DomainEventsTopic
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+
   DeliveryDeadLetterQueue:
     Type: AWS::SQS::Queue
     DeletionPolicy: Delete
@@ -396,12 +431,16 @@ Resources:
 
   DeliverySubscription:
     Type: AWS::SNS::Subscription
-    DependsOn: DeliveryQueuePolicy
+    DependsOn:
+      - DeliveryQueuePolicy
+      - DeliverySubscriptionDeadLetterQueuePolicy
     Properties:
       TopicArn: !Ref DomainEventsTopic
       Protocol: sqs
       Endpoint: !GetAtt DeliveryQueue.Arn
       RawMessageDelivery: true
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt DeliverySubscriptionDeadLetterQueue.Arn
       FilterPolicyScope: MessageAttributes
       FilterPolicy:
         eventType:
@@ -731,3 +770,6 @@ Outputs:
   StreamPublisherFailureQueueUrl:
     Description: SQS queue retaining discarded DynamoDB Stream records.
     Value: !Ref StreamPublisherFailureQueue
+  DeliverySubscriptionDeadLetterQueueUrl:
+    Description: SQS queue retaining domain events that SNS could not deliver.
+    Value: !Ref DeliverySubscriptionDeadLetterQueue
