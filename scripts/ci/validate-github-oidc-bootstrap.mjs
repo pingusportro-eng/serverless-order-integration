@@ -238,6 +238,29 @@ const executionMessagingPolicy = executionRole.Policies.find(
 assert.ok(executionMessagingPolicy);
 assert.deepEqual(
   executionMessagingPolicy.PolicyDocument.Statement.find(
+    (statement) => statement.Sid === 'ManageRegionalMessagingDiscoveryAndSubscriptions',
+  ),
+  {
+    Sid: 'ManageRegionalMessagingDiscoveryAndSubscriptions',
+    Effect: 'Allow',
+    Action: [
+      'sns:GetSubscriptionAttributes',
+      'sns:ListSubscriptions',
+      'sns:ListTopics',
+      'sns:SetSubscriptionAttributes',
+      'sns:Unsubscribe',
+      'sqs:ListQueues',
+    ],
+    Resource: '*',
+    Condition: {
+      StringEquals: {
+        'aws:RequestedRegion': 'eu-central-1',
+      },
+    },
+  },
+);
+assert.deepEqual(
+  executionMessagingPolicy.PolicyDocument.Statement.find(
     (statement) => statement.Sid === 'ManageHttpApiLogDelivery',
   ),
   {
@@ -319,10 +342,11 @@ const unrestrictedResourceStatements = roleStatements
   .sort();
 assert.deepEqual(unrestrictedResourceStatements, [
   'DescribeRegionalLogGroups',
-  'ListEventSourceMappings',
+  'ListRegionalLambdaResources',
   'ManageApplicationEventSourceMappings',
   'ManageApplicationUserPool',
   'ManageHttpApiLogDelivery',
+  'ManageRegionalMessagingDiscoveryAndSubscriptions',
   'ReadTemplateSummary',
 ]);
 

@@ -104,6 +104,7 @@ Resources:
                   - iam:GetRolePolicy
                   - iam:ListAttachedRolePolicies
                   - iam:ListRolePolicies
+                  - iam:ListRoleTags
                   - iam:PutRolePolicy
                   - iam:TagRole
                   - iam:UntagRole
@@ -161,14 +162,19 @@ Resources:
                   - lambda:CreateEventSourceMapping
                   - lambda:DeleteEventSourceMapping
                   - lambda:GetEventSourceMapping
+                  - lambda:ListTags
+                  - lambda:TagResource
+                  - lambda:UntagResource
                   - lambda:UpdateEventSourceMapping
                 Resource: '*'
                 Condition:
                   StringEquals:
                     aws:RequestedRegion: eu-central-1
-              - Sid: ListEventSourceMappings
+              - Sid: ListRegionalLambdaResources
                 Effect: Allow
-                Action: lambda:ListEventSourceMappings
+                Action:
+                  - lambda:ListEventSourceMappings
+                  - lambda:ListFunctions
                 Resource: '*'
                 Condition:
                   StringEquals:
@@ -214,17 +220,28 @@ Resources:
                 Action:
                   - sns:CreateTopic
                   - sns:DeleteTopic
-                  - sns:GetSubscriptionAttributes
                   - sns:GetTopicAttributes
+                  - sns:ListSubscriptionsByTopic
                   - sns:ListTagsForResource
-                  - sns:SetSubscriptionAttributes
                   - sns:SetTopicAttributes
                   - sns:Subscribe
                   - sns:TagResource
-                  - sns:Unsubscribe
                   - sns:UntagResource
                 Resource:
                   Fn::Sub: arn:${AWS::Partition}:sns:${AWS::Region}:${AWS::AccountId}:serverless-order-integration-dev-*
+              - Sid: ManageRegionalMessagingDiscoveryAndSubscriptions
+                Effect: Allow
+                Action:
+                  - sns:GetSubscriptionAttributes
+                  - sns:ListSubscriptions
+                  - sns:ListTopics
+                  - sns:SetSubscriptionAttributes
+                  - sns:Unsubscribe
+                  - sqs:ListQueues
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: eu-central-1
               - Sid: ManageApplicationLogGroups
                 Effect: Allow
                 Action:
@@ -290,7 +307,10 @@ Resources:
                   - cognito-idp:DescribeUserPool
                   - cognito-idp:DescribeUserPoolClient
                   - cognito-idp:GetGroup
+                  - cognito-idp:ListGroups
                   - cognito-idp:ListTagsForResource
+                  - cognito-idp:ListUserPoolClients
+                  - cognito-idp:ListUserPools
                   - cognito-idp:TagResource
                   - cognito-idp:UntagResource
                   - cognito-idp:UpdateGroup

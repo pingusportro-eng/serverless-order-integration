@@ -146,12 +146,14 @@ execution role has no OIDC-provider or CloudFormation-stack permissions, so it
 cannot mutate its own identity bootstrap.
 
 Some AWS creation and discovery APIs do not support useful resource-level
-scoping. The reviewed policy therefore has five deliberate `"Resource": "*"`
+scoping. The reviewed policy therefore has six deliberate `"Resource": "*"`
 boundaries:
 
 - Lambda event-source mapping management, constrained to `eu-central-1`;
 - Cognito user-pool provisioning, constrained to `eu-central-1`;
-- CloudWatch Logs group discovery, constrained to `eu-central-1`; and
+- regional messaging discovery and SNS subscription lifecycle, constrained to
+  `eu-central-1`;
+- CloudWatch Logs group discovery, constrained to `eu-central-1`;
 - HTTP API access-log delivery control, constrained to `eu-central-1`; and
 - the read-only CloudFormation `GetTemplateSummary`, constrained to
   `eu-central-1`.
