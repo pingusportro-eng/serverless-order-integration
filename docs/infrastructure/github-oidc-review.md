@@ -159,6 +159,14 @@ ID does not exist before creation. They are constrained to the reviewed region.
 These are residual provisioning privileges of the dedicated CloudFormation
 role, not permissions granted directly to GitHub.
 
+API Gateway V2 reports its tagging calls to IAM as `apigateway:TagResource` and
+`apigateway:UntagResource`. AWS IAM accepts and evaluates those actions, while
+the CloudFormation linter's API Gateway action catalog does not list them.
+`CloudFormationExecutionRole` therefore has a resource-local `W3037`
+suppression. The deployment validator pins the complete API Gateway action list
+and the exact suppression so an unrelated invalid action cannot be introduced
+silently.
+
 ## GitHub environment controls
 
 Before step 6.3, the public repository's `development` environment was

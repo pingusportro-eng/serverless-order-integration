@@ -70,6 +70,11 @@ Resources:
 
   CloudFormationExecutionRole:
     Type: AWS::IAM::Role
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks:
+            - W3037
     Properties:
       RoleName: serverless-order-integration-cloudformation-execution
       Description: Provisions only the reviewed serverless-order-integration application services.
@@ -246,6 +251,8 @@ Resources:
                   - apigateway:PATCH
                   - apigateway:POST
                   - apigateway:PUT
+                  - apigateway:TagResource
+                  - apigateway:UntagResource
                 Resource:
                   - Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis
                   - Fn::Sub: arn:${AWS::Partition}:apigateway:${AWS::Region}::/apis/*

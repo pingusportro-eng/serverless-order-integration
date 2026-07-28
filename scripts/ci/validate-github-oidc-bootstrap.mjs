@@ -153,6 +153,13 @@ assert.equal(
 );
 
 const executionRole = resources.CloudFormationExecutionRole.Properties;
+assert.deepEqual(resources.CloudFormationExecutionRole.Metadata, {
+  'cfn-lint': {
+    config: {
+      ignore_checks: ['W3037'],
+    },
+  },
+});
 const executionPolicy = JSON.stringify(executionRole.Policies);
 const expectedGeneratedLambdaRoleArns = [
   'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-integration-dev-*',
@@ -203,6 +210,25 @@ assert.deepEqual(
   ).Resource,
   expectedGeneratedLambdaFunctionArns,
   'ManageApplicationFunctions must cover only the function names that SAM and CloudFormation can generate.',
+);
+const executionApiPolicy = executionRole.Policies.find(
+  (policy) => policy.PolicyName === 'ManageApplicationApiAndIdentity',
+);
+assert.ok(executionApiPolicy);
+assert.deepEqual(
+  executionApiPolicy.PolicyDocument.Statement.find(
+    (statement) => statement.Sid === 'ManageRegionalHttpApiResources',
+  ).Action,
+  [
+    'apigateway:DELETE',
+    'apigateway:GET',
+    'apigateway:PATCH',
+    'apigateway:POST',
+    'apigateway:PUT',
+    'apigateway:TagResource',
+    'apigateway:UntagResource',
+  ],
+  'API Gateway provisioning must include explicit stage tag lifecycle permissions.',
 );
 for (const protectedName of [
   'serverless-order-integration-github-deployer',
