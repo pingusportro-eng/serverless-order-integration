@@ -1080,6 +1080,27 @@ async function followVendorLog(startOffset) {
   }
 }
 
+function captureTerminalInterrupt(onInterrupt) {
+  if (!process.stdin.isTTY || typeof process.stdin.setRawMode !== 'function') {
+    return () => {};
+  }
+  const wasRaw = process.stdin.isRaw === true;
+  const onData = (chunk) => {
+    if (chunk.includes('\u0003')) {
+      onInterrupt();
+    }
+  };
+  process.stdin.setEncoding('utf8');
+  process.stdin.setRawMode(true);
+  process.stdin.resume();
+  process.stdin.on('data', onData);
+  return () => {
+    process.stdin.off('data', onData);
+    process.stdin.setRawMode(wasRaw);
+    process.stdin.pause();
+  };
+}
+
 async function dispatchDestroy(head) {
   const runId = await dispatchWorkflow('destroy', { confirm_destroy: stackName }, head);
   await waitForWorkflow(runId, 'destroy');
@@ -1227,7 +1248,12 @@ async function deploy() {
     await saveState(state);
     printReady(state);
     const offset = statSync(vendorLogPath).size;
-    await followVendorLog(offset);
+    const stopCapturingTerminalInterrupt = captureTerminalInterrupt(signal);
+    try {
+      await followVendorLog(offset);
+    } finally {
+      stopCapturingTerminalInterrupt();
+    }
   } catch (error) {
     process.stderr.write(`${error instanceof Error ? error.message : String(error)}\n`);
     shutdownRequested = true;

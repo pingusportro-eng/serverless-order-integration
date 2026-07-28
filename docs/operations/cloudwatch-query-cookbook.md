@@ -1,6 +1,6 @@
 # CloudWatch Logs Insights query cookbook
 
-Status: queries defined and record parsing validated locally
+Status: queries defined, validated locally, and exercised against the development stack
 
 Reviewed: 2026-07-28
 
@@ -11,7 +11,10 @@ Application stack: `serverless-order-integration-dev`
 ## Cost and safety boundary
 
 Creating this cookbook and validating representative records locally costs
-`$0`. None of these queries was run in AWS.
+`$0`. The live validation described below used bounded CloudWatch Logs Insights
+queries over a 15–30 minute window. The final journey query scanned 10,306
+bytes, the application-failure query scanned 10,306 bytes, and the API-failure
+query scanned 1,089 bytes.
 
 CloudWatch Logs Insights charges for the uncompressed log data scanned. Before
 running a query:
@@ -72,13 +75,44 @@ Expected successful creation path:
 ```text
 http.request.started
 http.request.completed
-stream.event.published
-delivery.message.processed
-stream.event.published
+stream.event.published       eventType=order.created
+delivery.message.processed   outcome=submitted
+stream.event.published       eventType=order.submitted
 ```
 
-The final publication is normally `order.submitted`; SNS filters it out of the
-delivery queue, so there should be no second worker success for that event.
+The `order.submitted` publication is filtered out of the delivery queue, so
+there should be no second worker success for that event. When the mock vendor's
+automatic webhook journey is enabled, the same correlation then continues:
+
+```text
+webhook.request.started
+webhook.request.completed    eventType=DELIVERY_PICKED_UP outcome=applied
+stream.event.published       eventType=order.picked_up
+webhook.request.started
+webhook.request.completed    eventType=DELIVERY_DELIVERED outcome=applied
+stream.event.published       eventType=order.delivered
+```
+
+## Live validation evidence
+
+On 2026-07-28, the query above traced one synthetic order through all four
+application log groups using correlation ID `cookbook-lab-ms4tugxm`. It
+returned 11 ordered application records:
+
+- two Orders API records for the successful `POST /orders`;
+- four stream publications at aggregate versions 1 through 4;
+- one delivery-worker success at attempt 1;
+- two webhook request pairs, both applied successfully; and
+- no error-level application record for the bounded test window.
+
+The API access-failure query also returned the two intentional `401` probes
+made by the deployment smoke test: an unauthenticated protected order request
+and an unsigned webhook. These are expected security checks, not production
+failures.
+
+The stored order reached `DELIVERED` at version 4. The delivery queue, delivery
+DLQ, SNS subscription DLQ, and stream-publisher failure queue each reported zero
+visible, in-flight, and delayed messages after the journey.
 
 ## Trace one order across correlation branches
 
@@ -184,7 +218,7 @@ fields @timestamp, requestId, routeKey, status, responseLatency, integrationStat
 | limit 20
 ```
 
-## Local validation boundary
+## Validation boundary
 
 The automated observability test uses representative records for:
 
@@ -195,13 +229,14 @@ The automated observability test uses representative records for:
 - order selection across different correlation branches; and
 - failure selection by safe exception class.
 
-This validates the deployed record assumptions and the regular-expression
-extraction locally. It cannot execute or type-check the managed CloudWatch Logs
-Insights language. The query syntax follows the AWS documentation for
+The automated test validates the deployed record assumptions and the
+regular-expression extraction locally. The bounded live run additionally
+validated the managed CloudWatch Logs Insights syntax and returned the expected
+records. The query syntax follows the AWS documentation for
 [`parse`](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CWL_QuerySyntax-Parse.html),
 [`jsonParse` and structure access](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CWL_QuerySyntax-operations-functions.html),
 [discovered Lambda and JSON fields](https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CWL_AnalyzeLogData-discoverable-fields.html),
 and [Lambda text/JSON formats](https://docs.aws.amazon.com/lambda/latest/dg/monitoring-cloudwatchlogs-logformat.html).
 
-Actually running a query and validating its managed-service result remains a
-separate cost-reviewed cloud operation.
+Future live queries remain separate cost-reviewed cloud operations and should
+retain the narrow time and log-group boundaries above.
