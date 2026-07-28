@@ -1,0 +1,2 @@
+{"requestId":"api-request-trace-123","routeKey":"POST /orders","status":"201","responseLatency":"42","responseLength":"512","integrationStatus":"201"}
+{"requestId":"api-request-failure-456","routeKey":"POST /webhooks/vendor","status":"401","responseLatency":"7","responseLength":"245","integrationStatus":"401"}

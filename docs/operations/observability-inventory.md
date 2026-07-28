@@ -1,6 +1,6 @@
 # Observability inventory
 
-Status: safe successful-path signals implemented; query cookbook pending
+Status: safe successful-path signals and query cookbook complete locally
 
 Reviewed: 2026-07-28
 
@@ -114,8 +114,9 @@ The local `successful trace continuity` test now proves that one correlation ID
 selects the successful Orders API, stream publication, and delivery processing
 records while preserving event, order, version, outcome, and receive-attempt
 context. Component tests also prove webhook correlation fallback and safe
-outcome logging. Phase 7.1 still needs the operator query cookbook before it is
-complete.
+outcome logging. The operator query cookbook now covers those successful
+signals and the main failure pivots. Its text-prefix parsing is validated
+against representative records locally.
 
 ## Implemented local improvement
 
@@ -133,16 +134,19 @@ The first cost-free implementation:
 No request body, address, signing secret, authorization value, raw provider
 response, or free-form exception message was added to the log contract.
 
-## Remaining Phase 7.1 work
+## Query cookbook
 
-Add a small CloudWatch Logs Insights query cookbook for:
+The
+[CloudWatch Logs Insights query cookbook](cloudwatch-query-cookbook.md)
+documents:
 
 - one correlation journey;
 - one order across correlation branches;
 - one event or failed queue message;
-- retry attempts and terminal DLQ state; and
+- retry attempts and the separate terminal-DLQ check; and
 - HTTP or Lambda failures by safe exception class.
 
-Validate the query parsing against representative Lambda text-format log lines
-locally. Cloud verification, alarms, dashboards, and tracing remain separate
-cost-reviewed decisions.
+Its parsing assumptions are covered by local fixtures and tests. Running the
+queries against CloudWatch, changing the functions to Lambda-native JSON log
+format, or adding alarms, dashboards, and tracing remain separate cost-reviewed
+decisions.

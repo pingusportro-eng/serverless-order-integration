@@ -47,6 +47,9 @@ without requiring sensitive payloads.
 The current signal path, identifier semantics, native AWS signals, and known
 successful-trace gaps are recorded in the
 [observability inventory](docs/operations/observability-inventory.md).
+Practical correlation, order, event, retry, and failure investigations are in
+the
+[CloudWatch Logs Insights query cookbook](docs/operations/cloudwatch-query-cookbook.md).
 
 ## Repository layout
 

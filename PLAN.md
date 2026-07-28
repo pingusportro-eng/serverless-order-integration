@@ -386,7 +386,7 @@ For every step, the review should answer:
 
 ## Phase 7: Operations and interview preparation
 
-- [ ] **7.1 — Add production-minded observability**
+- [x] **7.1 — Add production-minded observability**
   - Confirm structured logs and correlation IDs across HTTP and messages.
   - Use existing service metrics first.
   - Review cost before adding custom metrics or paid alarms.
@@ -429,19 +429,20 @@ For every step, the review should answer:
 
 ## Next step
 
-Continue **7.1 — Add production-minded observability** by adding the
-CloudWatch Logs Insights query cookbook identified in the
-[observability inventory](docs/operations/observability-inventory.md).
+Begin **7.2 — Run failure drills** with a read-only inventory that maps the
+required Phase 7.2 scenarios to the extensive local and cloud evidence already
+captured in `docs/testing/`.
 
-The safe structured-log improvement is complete locally. Orders API logs always
-carry the effective correlation ID. Publisher, worker, and webhook completion
-records now carry the safe event, order, version, outcome, and retry context
-known at each boundary. A cross-boundary test proves that one correlation ID
-selects the successful API, publication, and worker records.
+Step 7.1 is complete locally. Safe structured records preserve the effective
+correlation, event, order, version, outcome, and retry context across the
+application boundaries. Cross-boundary tests prove the successful trace, and
+the
+[CloudWatch Logs Insights query cookbook](docs/operations/cloudwatch-query-cookbook.md)
+covers correlation, order, event, retry, Lambda failure, and API access
+investigations.
 
-The next documentation-and-test step defines practical correlation, order,
-event, retry, and failure queries and validates their parsing against
-representative Lambda text-format records. It creates no AWS resources and
-costs `$0`. Running queries in CloudWatch, adding custom metrics, alarms,
-dashboards or tracing, increasing retention, and deploying the extra success
-logs remain separate cost-reviewed decisions.
+The Phase 7.2 inventory creates no AWS resources and costs `$0`. It must reuse
+existing failure evidence before proposing another cloud drill. Running Logs
+Insights queries, deploying the extra success logs, or adding custom metrics,
+alarms, dashboards, tracing, or longer retention remains separately
+cost-reviewed.
