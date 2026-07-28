@@ -166,7 +166,9 @@ const expectedGeneratedLambdaRoleArns = [
   'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-OrdersApiFunctionRole-*',
   'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-VendorWebhookFunctionRole-*',
   'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-StreamPublisherFunctionRole-*',
+  'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-StreamPublisherFunctionRo-*',
   'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-DeliveryWorkerFunctionRole-*',
+  'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-DeliveryWorkerFunctionRol-*',
 ].map((arn) => ({ 'Fn::Sub': arn }));
 const executionIamPolicy = executionRole.Policies.find(
   (policy) => policy.PolicyName === 'ManageApplicationIamRoles',
@@ -230,6 +232,34 @@ assert.deepEqual(
   ],
   'API Gateway provisioning must include explicit stage tag lifecycle permissions.',
 );
+const executionMessagingPolicy = executionRole.Policies.find(
+  (policy) => policy.PolicyName === 'ManageApplicationMessagingAndLogs',
+);
+assert.ok(executionMessagingPolicy);
+assert.deepEqual(
+  executionMessagingPolicy.PolicyDocument.Statement.find(
+    (statement) => statement.Sid === 'ManageHttpApiLogDelivery',
+  ),
+  {
+    Sid: 'ManageHttpApiLogDelivery',
+    Effect: 'Allow',
+    Action: [
+      'logs:CreateLogDelivery',
+      'logs:DeleteLogDelivery',
+      'logs:DescribeResourcePolicies',
+      'logs:GetLogDelivery',
+      'logs:ListLogDeliveries',
+      'logs:PutResourcePolicy',
+      'logs:UpdateLogDelivery',
+    ],
+    Resource: '*',
+    Condition: {
+      StringEquals: {
+        'aws:RequestedRegion': 'eu-central-1',
+      },
+    },
+  },
+);
 for (const protectedName of [
   'serverless-order-integration-github-deployer',
   'serverless-order-integration-cloudformation-execution',
@@ -292,6 +322,7 @@ assert.deepEqual(unrestrictedResourceStatements, [
   'ListEventSourceMappings',
   'ManageApplicationEventSourceMappings',
   'ManageApplicationUserPool',
+  'ManageHttpApiLogDelivery',
   'ReadTemplateSummary',
 ]);
 

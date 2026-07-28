@@ -138,21 +138,28 @@ Application IAM access is name-scoped to the four SAM-generated Lambda function
 and role logical names under the `serverless-order-*` project prefix.
 CloudFormation can truncate the stack-name portion of generated names to
 satisfy service length limits, so the policy matches each exact logical-name
-suffix instead of assuming the complete
+suffix, including the two role logical names that can themselves be truncated,
+instead of assuming the complete
 `serverless-order-integration-dev-*` prefix survives. The generated roles may
 be passed only to Lambda. The suffixes exclude both bootstrap roles. The
 execution role has no OIDC-provider or CloudFormation-stack permissions, so it
 cannot mutate its own identity bootstrap.
 
 Some AWS creation and discovery APIs do not support useful resource-level
-scoping. The reviewed policy therefore has four deliberate `"Resource": "*"`
+scoping. The reviewed policy therefore has five deliberate `"Resource": "*"`
 boundaries:
 
 - Lambda event-source mapping management, constrained to `eu-central-1`;
 - Cognito user-pool provisioning, constrained to `eu-central-1`;
 - CloudWatch Logs group discovery, constrained to `eu-central-1`; and
+- HTTP API access-log delivery control, constrained to `eu-central-1`; and
 - the read-only CloudFormation `GetTemplateSummary`, constrained to
   `eu-central-1`.
+
+HTTP API access logging uses CloudWatch Logs delivery-control APIs. AWS requires
+the delivery lifecycle and account-level resource-policy actions to use
+`"Resource": "*"`. Log-group creation, tagging, retention, and deletion remain
+scoped to this project's explicit log-group path.
 
 API Gateway control-plane resources also require API-ID wildcards because the
 ID does not exist before creation. They are constrained to the reviewed region.

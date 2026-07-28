@@ -113,7 +113,9 @@ Resources:
                   - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-OrdersApiFunctionRole-*
                   - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-VendorWebhookFunctionRole-*
                   - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-StreamPublisherFunctionRole-*
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-StreamPublisherFunctionRo-*
                   - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-DeliveryWorkerFunctionRole-*
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-DeliveryWorkerFunctionRol-*
               - Sid: PassGeneratedRolesOnlyToLambda
                 Effect: Allow
                 Action: iam:PassRole
@@ -122,7 +124,9 @@ Resources:
                   - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-OrdersApiFunctionRole-*
                   - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-VendorWebhookFunctionRole-*
                   - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-StreamPublisherFunctionRole-*
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-StreamPublisherFunctionRo-*
                   - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-DeliveryWorkerFunctionRole-*
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-DeliveryWorkerFunctionRol-*
                 Condition:
                   StringEquals:
                     iam:PassedToService: lambda.amazonaws.com
@@ -235,6 +239,20 @@ Resources:
               - Sid: DescribeRegionalLogGroups
                 Effect: Allow
                 Action: logs:DescribeLogGroups
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    aws:RequestedRegion: eu-central-1
+              - Sid: ManageHttpApiLogDelivery
+                Effect: Allow
+                Action:
+                  - logs:CreateLogDelivery
+                  - logs:DeleteLogDelivery
+                  - logs:DescribeResourcePolicies
+                  - logs:GetLogDelivery
+                  - logs:ListLogDeliveries
+                  - logs:PutResourcePolicy
+                  - logs:UpdateLogDelivery
                 Resource: '*'
                 Condition:
                   StringEquals:
