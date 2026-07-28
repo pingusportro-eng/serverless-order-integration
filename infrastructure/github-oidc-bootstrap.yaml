@@ -141,7 +141,11 @@ Resources:
                   - lambda:UpdateFunctionCode
                   - lambda:UpdateFunctionConfiguration
                 Resource:
-                  Fn::Sub: arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-integration-dev-*
+                  - Fn::Sub: arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-integration-dev-*
+                  - Fn::Sub: arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-*-OrdersApiFunction-*
+                  - Fn::Sub: arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-*-VendorWebhookFunction-*
+                  - Fn::Sub: arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-*-StreamPublisherFunction-*
+                  - Fn::Sub: arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-*-DeliveryWorkerFunction-*
               - Sid: ManageApplicationEventSourceMappings
                 Effect: Allow
                 Action:

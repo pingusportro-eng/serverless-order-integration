@@ -186,6 +186,24 @@ assert.deepEqual(
     },
   },
 );
+const expectedGeneratedLambdaFunctionArns = [
+  'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-integration-dev-*',
+  'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-*-OrdersApiFunction-*',
+  'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-*-VendorWebhookFunction-*',
+  'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-*-StreamPublisherFunction-*',
+  'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-*-DeliveryWorkerFunction-*',
+].map((arn) => ({ 'Fn::Sub': arn }));
+const executionComputePolicy = executionRole.Policies.find(
+  (policy) => policy.PolicyName === 'ManageApplicationComputeAndData',
+);
+assert.ok(executionComputePolicy);
+assert.deepEqual(
+  executionComputePolicy.PolicyDocument.Statement.find(
+    (statement) => statement.Sid === 'ManageApplicationFunctions',
+  ).Resource,
+  expectedGeneratedLambdaFunctionArns,
+  'ManageApplicationFunctions must cover only the function names that SAM and CloudFormation can generate.',
+);
 for (const protectedName of [
   'serverless-order-integration-github-deployer',
   'serverless-order-integration-cloudformation-execution',
