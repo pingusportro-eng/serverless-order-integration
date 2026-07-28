@@ -306,3 +306,8 @@ Step 6.2 is complete. Step 6.3 must separately review:
 - expected cost and teardown verification.
 
 No step 6.3 resource or permission is approved by this document.
+
+Historical scope note: Phase 6.3 was subsequently reviewed, separately
+approved, exercised end to end, and destroyed. Its controls and evidence are
+recorded in the
+[controlled deployment workflow](deployment-workflows.md).

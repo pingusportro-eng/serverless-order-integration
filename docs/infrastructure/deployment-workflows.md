@@ -1,8 +1,8 @@
 # Controlled development deployment workflows
 
-Status: deployment bootstrap updated and verified; application not deployed
+Status: first controlled deployment cycle completed and destroyed
 
-Last reviewed: 2026-07-27
+Last reviewed: 2026-07-28
 
 AWS account: `454921778743`  
 Region: `eu-central-1`  
@@ -22,7 +22,8 @@ The owner approved this design before implementation:
 The implementation commit changed only local Infrastructure as Code and
 workflow definitions. The later reviewed bootstrap update created the artifact
 bucket and applied the scoped policies. The three GitHub environment secrets
-are configured, but the application is not deployed.
+are configured. A separately approved application deployment was subsequently
+created, smoke-tested, and destroyed.
 
 The expected AWS cost before the first application deployment is effectively
 zero:
@@ -294,16 +295,47 @@ The deployment validator locks:
 - absence of `sam deploy`, `--resolve-s3`, bucket deletion, recursive local
   deletion, or Secrets Manager use.
 
-## Remaining external steps
+## First controlled deployment result
 
-No further external step is authorized merely by this document. Continue in
-small, reviewable operations:
+The first complete GitHub Actions deployment cycle finished on 2026-07-28:
 
-1. start the local mock vendor with the ignored local environment file;
-2. start a temporary Quick Tunnel and capture its public HTTPS URL;
-3. manually run `prepare` and inspect its change set;
-4. separately approve and run `execute`;
-5. inspect the live application and billing view;
-6. separately approve and run `destroy`; and
-7. verify the application is absent, the prefix is empty, and no unexpected
-   billed resource remains.
+1. a temporary Quick Tunnel exposed the local mock vendor;
+2. `prepare` created the non-executing change set
+   `github-316bd9678109-30362002953`, bound to commit `316bd96`;
+3. the reviewed change set was separately approved and executed;
+4. all 34 application resources reached `CREATE_COMPLETE`;
+5. the unauthenticated orders request returned `401`;
+6. the unsigned webhook request returned `401`, and the webhook Lambda log
+   confirmed that it processed the request;
+7. the table and all four queues remained empty because the bounded smoke test
+   deliberately created no business data; and
+8. the separately approved `destroy` operation removed the application stack
+   and deployment artifacts.
+
+The early reviewed attempts exposed narrowly scoped CloudFormation execution
+role gaps for SAM-truncated role and function names, API Gateway stage tagging,
+CloudWatch Logs delivery configuration, and resource-provider read actions.
+Each failure rolled back without leaving a usable application stack. The
+permissions were expanded only for the observed resource patterns and actions,
+then validated with IAM simulations before the successful deployment.
+
+The final cleanup audit checked each owning AWS service rather than relying
+only on the Resource Groups Tagging API, which temporarily returned stale
+identifiers. It confirmed:
+
+- the application CloudFormation stack is absent;
+- the application Lambda functions, DynamoDB table, SQS queues, SNS topic,
+  HTTP API, Cognito user pool, log groups, IAM execution roles, and event source
+  mappings are absent;
+- the artifact prefix contains no objects or incomplete multipart uploads;
+- the local mock vendor and Quick Tunnel are stopped; and
+- the bootstrap stack remains `UPDATE_COMPLETE` with its empty, lifecycle-
+  managed artifact bucket and OIDC roles.
+
+No application resource remains active. The retained bootstrap resources have
+an expected recurring AWS cost of `$0` at the current empty learning scale.
+Billing data can arrive later, so the `$1` Budget remains the independent alert.
+
+Phase 6.3 is complete. Any future deployment is still a new external operation
+that requires the same separate preparation, execution, cost awareness, and
+destruction decisions.

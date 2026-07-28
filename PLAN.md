@@ -376,7 +376,7 @@ For every step, the review should answer:
   - Verification: inspect the effective trust and permission policies.
   - AWS cost: $0.
 
-- [ ] **6.3 — Add controlled deployment and destruction workflows**
+- [x] **6.3 — Add controlled deployment and destruction workflows**
   - Require manual invocation or environment approval for AWS changes.
   - Deploy, smoke-test, and expose a separate deliberate destroy action.
   - Approved local design and controls:
@@ -429,33 +429,20 @@ For every step, the review should answer:
 
 ## Next step
 
-Continue **6.3 — Add controlled deployment and destruction workflows** by
-reviewing the local implementation before any external change.
+Begin **7.1 — Add production-minded observability** with a read-only inventory
+of the structured logs, request and correlation identifiers, service metrics,
+and tracing evidence that already exist.
 
-The approved design is implemented in the
+Step 6.3 is complete. A reviewed GitHub Actions cycle prepared a non-executing
+change set bound to the committed revision, separately executed it, ran the
+bounded authorization smoke tests, and deliberately destroyed the application
+stack. The final audit confirmed that the application stack, its service
+resources, deployment artifacts, temporary Quick Tunnel, and local mock vendor
+were absent. The retained empty artifact bucket and OIDC bootstrap have no
+expected recurring AWS charge at this scale.
+
+The implementation, permission incidents, successful verification, and cleanup
+evidence are recorded in the
 [controlled deployment workflow](docs/infrastructure/deployment-workflows.md).
-It uses a dedicated non-versioned one-day S3 bucket, a permanent 50 MB cap,
-GitHub environment secrets, non-executing change-set preparation, commit-bound
-execution with two smoke requests, and exact stack-and-prefix teardown.
-
-The first reviewed bootstrap update rolled back safely because its proposed S3
-bucket name was 64 characters, one above the S3 limit. The corrected
-39-character name added a rendered-length regression assertion. A second
-reviewed change set then reached `UPDATE_COMPLETE`.
-
-Post-update checks verified the empty non-versioned bucket, encryption, public
-access block, ownership, one-day lifecycle, exact effective IAM policies,
-unchanged OIDC trust, and intended IAM allow/deny simulations. The application
-stack remains absent and the Budget reports `$0.00` actual and forecast. The
-full record is in
-[the workflow review](docs/infrastructure/deployment-workflows.md).
-
-The GitHub `development` environment retains its three deployment secrets.
-After the local keyring proved inconvenient across reboots, only the rotated
-vendor token was also placed in the ignored `.env.development.local` file with
-mode `0600`. Its value was not printed or committed.
-
-Next, start the local mock vendor from that environment file and expose it
-through a temporary Quick Tunnel. Then manually run the non-executing `prepare`
-operation with the tunnel URL. Application execution and destruction remain
-separate manual approvals.
+Any Phase 7 proposal for custom metrics, alarms, tracing, or longer retention
+must receive a cost review before it changes AWS resources.

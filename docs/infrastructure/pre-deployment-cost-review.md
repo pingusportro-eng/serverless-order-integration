@@ -275,13 +275,14 @@ Before deployment:
 
 After smoke testing:
 
-- [ ] Stop the Quick Tunnel and local mock vendor.
-- [ ] Delete the application CloudFormation stack.
-- [ ] Empty and delete the SAM artifact bucket and any SAM-managed packaging
-      stack created specifically for this project.
-- [ ] Confirm the four Lambda functions, HTTP API, table, user pool, topic,
+- [x] Stop the Quick Tunnel and local mock vendor.
+- [x] Delete the application CloudFormation stack.
+- [x] Empty and delete the original SAM artifact bucket and any SAM-managed
+      packaging stack created specifically for this project. The empty
+      lifecycle-managed Phase 6 artifact bucket is intentionally retained.
+- [x] Confirm the four Lambda functions, HTTP API, table, user pool, topic,
       four queues, five log groups, roles, and event mappings are gone.
-- [ ] Check the billing dashboard and Budget status, allowing for reporting
+- [x] Check the billing dashboard and Budget status, allowing for reporting
       delay.
 
 Approval of this document authorizes only the reviewed short deployment. Any
