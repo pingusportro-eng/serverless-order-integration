@@ -165,10 +165,7 @@ const executionIamPolicy = executionRole.Policies.find(
   (policy) => policy.PolicyName === 'ManageApplicationIamRoles',
 );
 assert.ok(executionIamPolicy);
-for (const statementSid of [
-  'ManageGeneratedLambdaRoles',
-  'PassGeneratedRolesOnlyToLambda',
-]) {
+for (const statementSid of ['ManageGeneratedLambdaRoles', 'PassGeneratedRolesOnlyToLambda']) {
   const statement = executionIamPolicy.PolicyDocument.Statement.find(
     (candidate) => candidate.Sid === statementSid,
   );
