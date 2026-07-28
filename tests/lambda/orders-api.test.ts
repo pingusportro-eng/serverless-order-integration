@@ -343,6 +343,57 @@ describe('orders API Lambda adapter', () => {
     expect(response.statusCode).toBe(200);
   });
 
+  it.each([
+    {
+      name: 'uses the platform request ID when the caller omits a correlation ID',
+      headers: {},
+      expectedCorrelationId: 'lambda-request-123',
+    },
+    {
+      name: 'preserves a caller correlation ID',
+      headers: { 'x-correlation-id': 'correlation-orders-api-123' },
+      expectedCorrelationId: 'correlation-orders-api-123',
+    },
+  ])('$name in every request log', async ({ headers, expectedCorrelationId }) => {
+    const logLines: string[] = [];
+    const observableHandler = createOrdersApiHandler({
+      repository,
+      merchantId,
+      cursorCodec: createOrderCursorCodec('lambda-test-cursor-signing-secret-0123456789'),
+      requireAccessToken: false,
+      requireOperatorGroup: false,
+      now: () => new Date('2026-07-22T12:00:00.000Z'),
+      logSink: (line) => {
+        logLines.push(line);
+      },
+    });
+
+    await observableHandler(
+      eventFixture({
+        routeKey: 'GET /orders',
+        method: 'GET',
+        path: '/orders',
+        headers,
+      }),
+    );
+
+    expect(
+      logLines.map((line): Record<string, unknown> => JSON.parse(line) as Record<string, unknown>),
+    ).toEqual([
+      expect.objectContaining({
+        event: 'http.request.started',
+        requestId: 'lambda-request-123',
+        correlationId: expectedCorrelationId,
+      }),
+      expect.objectContaining({
+        event: 'http.request.completed',
+        requestId: 'lambda-request-123',
+        correlationId: expectedCorrelationId,
+        statusCode: 200,
+      }),
+    ]);
+  });
+
   it('returns a safe internal error and logs only the unexpected exception class', async () => {
     const failure = new Error('Repository connection details must stay private.');
     failure.name = 'ProvisionedThroughputExceededException';

@@ -244,11 +244,11 @@ async function route(
 export function createOrdersApiHandler(dependencies: OrdersApiDependencies): OrdersApiHandler {
   return async (event) => {
     const requestId = createRequestId(event.requestContext.requestId);
-    const correlationId = header(event.headers, 'X-Correlation-Id');
+    const correlationId = header(event.headers, 'X-Correlation-Id') ?? requestId;
     const logger = createLogger(
       {
         requestId,
-        ...(correlationId === undefined ? {} : { correlationId }),
+        correlationId,
       },
       {
         ...(dependencies.now === undefined ? {} : { now: dependencies.now }),

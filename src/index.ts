@@ -181,6 +181,7 @@ export type {
 export { createDeliveryWorkerHandler } from './lambda/delivery-worker.js';
 export type {
   DeliveryMessageProcessor,
+  DeliveryMessageProcessingResult,
   DeliveryWorkerDependencies,
   DeliveryWorkerHandler,
 } from './lambda/delivery-worker.js';
@@ -210,6 +211,7 @@ export type {
   ProviderWebhookHandlerDependencies,
   ProviderWebhookHttpRequest,
   ProviderWebhookHttpResponse,
+  ProviderWebhookProcessingObservation,
 } from './http/provider-webhook-handler.js';
 export {
   InvalidWebhookSignatureError,

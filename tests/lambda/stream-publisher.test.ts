@@ -39,7 +39,13 @@ describe('DynamoDB stream publisher', () => {
       new URL('order-created.json', fixturesUrl),
     );
     const published: DomainEvent[] = [];
-    const handler = createStreamPublisherHandler({ publisher: capturingPublisher(published) });
+    const logLines: string[] = [];
+    const handler = createStreamPublisherHandler({
+      publisher: capturingPublisher(published),
+      logSink: (line) => {
+        logLines.push(line);
+      },
+    });
 
     await expect(handler(streamEvent)).resolves.toEqual({ batchItemFailures: [] });
     expect(published).toHaveLength(1);
@@ -58,6 +64,18 @@ describe('DynamoDB stream publisher', () => {
     });
     expect(published[0]?.eventId).toMatch(/^evt_[A-Za-z0-9_-]{43}$/);
     expect(validateEvent(published[0]), JSON.stringify(validateEvent.errors)).toBe(true);
+    expect(logLines.map((line): unknown => JSON.parse(line) as unknown)).toEqual([
+      expect.objectContaining({
+        event: 'stream.event.published',
+        requestId: '100000000000000000001',
+        correlationId: 'corr_01JABCDEF0123456789',
+        eventId: published[0]?.eventId,
+        eventType: 'order.created',
+        orderId: 'ord_01JABCDEF0123456789',
+        aggregateVersion: 1,
+        outcome: 'published',
+      }),
+    ]);
   });
 
   it('derives the same event ID when Lambda retries a stream record', async () => {
@@ -65,7 +83,10 @@ describe('DynamoDB stream publisher', () => {
       new URL('order-created.json', fixturesUrl),
     );
     const published: DomainEvent[] = [];
-    const handler = createStreamPublisherHandler({ publisher: capturingPublisher(published) });
+    const handler = createStreamPublisherHandler({
+      publisher: capturingPublisher(published),
+      logSink: () => undefined,
+    });
 
     await handler(streamEvent);
     await handler(streamEvent);
@@ -78,7 +99,10 @@ describe('DynamoDB stream publisher', () => {
       new URL('order-submitted.json', fixturesUrl),
     );
     const published: DomainEvent[] = [];
-    const handler = createStreamPublisherHandler({ publisher: capturingPublisher(published) });
+    const handler = createStreamPublisherHandler({
+      publisher: capturingPublisher(published),
+      logSink: () => undefined,
+    });
 
     await expect(handler(streamEvent)).resolves.toEqual({ batchItemFailures: [] });
     expect(published[0]).toMatchObject({
@@ -147,9 +171,12 @@ describe('DynamoDB stream publisher', () => {
       expect.objectContaining({
         event: 'stream.record.failed',
         requestId: '100000000000000000001',
+        correlationId: 'corr_01JABCDEF0123456789',
         operation: 'publishDomainEvent',
         eventId: publishedEvent?.eventId,
+        eventType: 'order.created',
         orderId: 'ord_01JABCDEF0123456789',
+        aggregateVersion: 1,
         exceptionName: 'Error',
       }),
     ]);

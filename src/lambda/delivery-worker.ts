@@ -2,7 +2,10 @@ import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
 import type { SQSBatchResponse, SQSEvent } from 'aws-lambda';
 
-import { processDeliveryEvent } from '../application/process-delivery-event.js';
+import {
+  processDeliveryEvent,
+  type ProcessDeliveryEventOutcome,
+} from '../application/process-delivery-event.js';
 import type { DeliveryRequestedEvent } from '../events/delivery-requested-event.js';
 import { parseDeliveryRequestedEvent } from '../events/delivery-requested-event.js';
 import { DynamoDbOrderRepository } from '../infrastructure/dynamodb/dynamodb-order-repository.js';
@@ -13,7 +16,12 @@ const LOCAL_ACCESS_KEY_ID = 'DUMMYIDEXAMPLE';
 const LOCAL_SECRET_ACCESS_KEY = 'DUMMYEXAMPLEKEY';
 
 export interface DeliveryMessageProcessor {
-  process(event: DeliveryRequestedEvent): Promise<void>;
+  process(event: DeliveryRequestedEvent): Promise<DeliveryMessageProcessingResult>;
+}
+
+export interface DeliveryMessageProcessingResult {
+  readonly outcome: ProcessDeliveryEventOutcome['outcome'];
+  readonly orderVersion: number;
 }
 
 export interface DeliveryWorkerDependencies {
@@ -34,6 +42,11 @@ function messageId(value: string): string {
   return value;
 }
 
+function receiveAttempt(value: string | undefined): number | undefined {
+  const attempt = Number(value);
+  return Number.isSafeInteger(attempt) && attempt > 0 ? attempt : undefined;
+}
+
 export function createDeliveryWorkerHandler(
   dependencies: DeliveryWorkerDependencies,
 ): DeliveryWorkerHandler {
@@ -42,13 +55,34 @@ export function createDeliveryWorkerHandler(
 
     for (const record of event.Records) {
       const itemIdentifier = messageId(record.messageId);
+      const attempt = receiveAttempt(record.attributes.ApproximateReceiveCount);
       let deliveryEvent: DeliveryRequestedEvent | undefined;
       try {
         deliveryEvent = parseDeliveryRequestedEvent(record.body);
-        await dependencies.processor.process(deliveryEvent);
+        const result = await dependencies.processor.process(deliveryEvent);
+        const logger = createLogger(
+          {
+            requestId: itemIdentifier,
+            correlationId: deliveryEvent.correlationId,
+          },
+          dependencies.logSink === undefined ? {} : { sink: dependencies.logSink },
+        );
+        logger.write('info', 'delivery.message.processed', {
+          operation: 'processDeliveryEvent',
+          eventId: deliveryEvent.eventId,
+          eventType: deliveryEvent.eventType,
+          orderId: deliveryEvent.aggregateId,
+          aggregateVersion: deliveryEvent.aggregateVersion,
+          orderVersion: result.orderVersion,
+          outcome: result.outcome,
+          ...(attempt === undefined ? {} : { attempt }),
+        });
       } catch (error) {
         const logger = createLogger(
-          { requestId: itemIdentifier },
+          {
+            requestId: itemIdentifier,
+            ...(deliveryEvent === undefined ? {} : { correlationId: deliveryEvent.correlationId }),
+          },
           dependencies.logSink === undefined ? {} : { sink: dependencies.logSink },
         );
         logger.write('error', 'delivery.message.failed', {
@@ -57,8 +91,11 @@ export function createDeliveryWorkerHandler(
             ? {}
             : {
                 eventId: deliveryEvent.eventId,
+                eventType: deliveryEvent.eventType,
                 orderId: deliveryEvent.aggregateId,
+                aggregateVersion: deliveryEvent.aggregateVersion,
               }),
+          ...(attempt === undefined ? {} : { attempt }),
           exceptionName: exceptionName(error),
         });
         batchItemFailures.push({ itemIdentifier });
@@ -113,8 +150,12 @@ function createDefaultHandler(): DeliveryWorkerHandler {
 
   return createDeliveryWorkerHandler({
     processor: {
-      async process(event): Promise<void> {
-        await processDeliveryEvent(processDependencies, event);
+      async process(event): Promise<DeliveryMessageProcessingResult> {
+        const result = await processDeliveryEvent(processDependencies, event);
+        return {
+          outcome: result.outcome,
+          orderVersion: result.order.version,
+        };
       },
     },
   });

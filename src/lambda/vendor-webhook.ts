@@ -59,6 +59,16 @@ function rawBody(event: APIGatewayProxyEventV2): string {
   return event.isBase64Encoded ? Buffer.from(event.body, 'base64').toString('utf8') : event.body;
 }
 
+function header(
+  headers: Readonly<Record<string, string | undefined>>,
+  expectedName: string,
+): string | undefined {
+  const entry = Object.entries(headers).find(
+    ([name, value]) => name.toLowerCase() === expectedName.toLowerCase() && value !== undefined,
+  );
+  return entry?.[1];
+}
+
 function serialize(response: ProviderWebhookHttpResponse): APIGatewayProxyStructuredResultV2 {
   return {
     statusCode: response.statusCode,
@@ -72,8 +82,9 @@ export function createVendorWebhookLambdaHandler(
 ): VendorWebhookLambdaHandler {
   return async (event) => {
     const requestId = createRequestId(event.requestContext.requestId);
+    const correlationId = header(event.headers, 'X-Correlation-Id') ?? requestId;
     const logger = createLogger(
-      { requestId },
+      { requestId, correlationId },
       {
         ...(dependencies.now === undefined ? {} : { now: dependencies.now }),
         ...(dependencies.logSink === undefined ? {} : { sink: dependencies.logSink }),
@@ -90,6 +101,15 @@ export function createVendorWebhookLambdaHandler(
       logger.write('info', 'webhook.request.completed', {
         route: event.routeKey,
         statusCode: response.statusCode,
+        ...(response.processing === undefined
+          ? {}
+          : {
+              eventId: response.processing.eventId,
+              eventType: response.processing.eventType,
+              orderId: response.processing.orderId,
+              orderVersion: response.processing.orderVersion,
+              outcome: response.processing.outcome,
+            }),
       });
       return serialize(response);
     } catch (error) {

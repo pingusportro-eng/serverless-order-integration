@@ -77,8 +77,8 @@ describe('SQS delivery worker', () => {
     const logLines: string[] = [];
     const handler = createDeliveryWorkerHandler({
       processor: {
-        async process(event): Promise<void> {
-          await processDeliveryEvent(
+        async process(event) {
+          const result = await processDeliveryEvent(
             {
               repository,
               vendorClient: { submitDelivery },
@@ -86,6 +86,10 @@ describe('SQS delivery worker', () => {
             },
             event,
           );
+          return {
+            outcome: result.outcome,
+            orderVersion: result.order.version,
+          };
         },
       },
       logSink: (line) => {
@@ -102,15 +106,44 @@ describe('SQS delivery worker', () => {
     expect(submitDelivery).toHaveBeenCalledTimes(2);
     expect(logLines.map((line): unknown => JSON.parse(line) as unknown)).toEqual([
       expect.objectContaining({
+        event: 'delivery.message.processed',
+        requestId: 'message-success-001',
+        correlationId: 'corr_01JABCDEF0123456789',
+        eventId: 'evt_01JABCDEF0123456789A',
+        eventType: 'order.created',
+        orderId: 'ord_01JABCDEF0123456789',
+        aggregateVersion: 1,
+        orderVersion: 2,
+        outcome: 'submitted',
+        attempt: 1,
+      }),
+      expect.objectContaining({
         event: 'delivery.message.failed',
         requestId: 'message-poison-002',
         exceptionName: 'Error',
+        attempt: 1,
+      }),
+      expect.objectContaining({
+        event: 'delivery.message.processed',
+        requestId: 'message-duplicate-003',
+        correlationId: 'corr_01JABCDEF0123456789',
+        eventId: 'evt_01JABCDEF0123456789A',
+        eventType: 'order.created',
+        orderId: 'ord_01JABCDEF0123456789',
+        aggregateVersion: 1,
+        orderVersion: 2,
+        outcome: 'duplicate_or_stale',
+        attempt: 2,
       }),
       expect.objectContaining({
         event: 'delivery.message.failed',
         requestId: 'message-transient-004',
+        correlationId: 'corr_01JABCDEF0123456790',
         eventId: 'evt_01JABCDEF0123456789B',
+        eventType: 'order.created',
         orderId: 'ord_01JABCDEF0123456790',
+        aggregateVersion: 1,
+        attempt: 1,
         exceptionName: 'VendorSubmissionError',
       }),
     ]);

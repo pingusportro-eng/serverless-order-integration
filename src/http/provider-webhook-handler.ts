@@ -1,12 +1,16 @@
 import {
   processProviderWebhook,
   type ProcessProviderWebhookDependencies,
+  type ProcessProviderWebhookResult,
 } from '../application/process-provider-webhook.js';
 import {
   ProviderEventIdConflictError,
   type ProviderWebhookRepository,
 } from '../application/provider-webhook-repository.js';
-import { validateProviderWebhookEvent } from '../application/provider-webhook-validation.js';
+import {
+  validateProviderWebhookEvent,
+  type ProviderWebhookEvent,
+} from '../application/provider-webhook-validation.js';
 import { OrderNotFoundError, OrderVersionConflictError } from '../application/order-repository.js';
 import { problemResponse, type ProblemDetails } from './problem-details.js';
 import type { HttpResponse } from './response.js';
@@ -24,7 +28,17 @@ export interface ProviderWebhookHttpRequest {
   readonly rawBody: string;
 }
 
-export type ProviderWebhookHttpResponse = HttpResponse<undefined | ProblemDetails>;
+export type ProviderWebhookProcessingObservation = {
+  readonly eventId: string;
+  readonly eventType: ProviderWebhookEvent['eventType'];
+  readonly orderId: string;
+  readonly orderVersion: number;
+  readonly outcome: ProcessProviderWebhookResult['outcome'];
+};
+
+export type ProviderWebhookHttpResponse = HttpResponse<undefined | ProblemDetails> & {
+  readonly processing?: ProviderWebhookProcessingObservation;
+};
 
 function header(
   headers: Readonly<Record<string, string | undefined>>,
@@ -36,11 +50,15 @@ function header(
   return entry?.[1];
 }
 
-function noContent(requestId: string): ProviderWebhookHttpResponse {
+function noContent(
+  requestId: string,
+  processing: ProviderWebhookProcessingObservation,
+): ProviderWebhookHttpResponse {
   return {
     statusCode: 204,
     headers: { 'X-Request-Id': requestId },
     body: undefined,
+    processing,
   };
 }
 
@@ -106,11 +124,17 @@ export async function handleProviderWebhook(
   }
 
   try {
-    await processProviderWebhook(dependencies, {
+    const result = await processProviderWebhook(dependencies, {
       event: validation.value,
       correlationId: header(request.headers, 'X-Correlation-Id') ?? request.requestId,
     });
-    return noContent(request.requestId);
+    return noContent(request.requestId, {
+      eventId: validation.value.eventId,
+      eventType: validation.value.eventType,
+      orderId: result.order.orderId,
+      orderVersion: result.order.version,
+      outcome: result.outcome,
+    });
   } catch (error: unknown) {
     if (error instanceof OrderNotFoundError) {
       return problemResponse(

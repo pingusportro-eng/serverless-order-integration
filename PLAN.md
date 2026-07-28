@@ -429,17 +429,19 @@ For every step, the review should answer:
 
 ## Next step
 
-Continue **7.1 — Add production-minded observability** by implementing the
-cost-free structured-log improvements identified in the
+Continue **7.1 — Add production-minded observability** by adding the
+CloudWatch Logs Insights query cookbook identified in the
 [observability inventory](docs/operations/observability-inventory.md).
 
-The inventory confirmed that correlation and causation metadata survive the
-API, stored mutation, domain event, queue, vendor request, and later order
-mutation. It also found that successful publisher and worker processing is not
-logged, and several boundary logs omit correlation or outcome fields. As a
-result, the successful journey cannot yet be reconstructed with one log query.
+The safe structured-log improvement is complete locally. Orders API logs always
+carry the effective correlation ID. Publisher, worker, and webhook completion
+records now carry the safe event, order, version, outcome, and retry context
+known at each boundary. A cross-boundary test proves that one correlation ID
+selects the successful API, publication, and worker records.
 
-The next implementation adds only safe allow-listed fields, structured success
-records, and local tests. It creates no AWS resources and costs `$0`. Custom
-metrics, alarms, dashboards, tracing, longer retention, and cloud verification
-remain separate cost-reviewed decisions.
+The next documentation-and-test step defines practical correlation, order,
+event, retry, and failure queries and validates their parsing against
+representative Lambda text-format records. It creates no AWS resources and
+costs `$0`. Running queries in CloudWatch, adding custom metrics, alarms,
+dashboards or tracing, increasing retention, and deploying the extra success
+logs remain separate cost-reviewed decisions.

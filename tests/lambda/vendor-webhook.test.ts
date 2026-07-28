@@ -93,13 +93,13 @@ describe('vendor webhook Lambda adapter', () => {
     });
   });
 
-  function handler() {
+  function handler(logSink: (line: string) => void = () => undefined) {
     return createVendorWebhookLambdaHandler({
       repository,
       signingSecret: SECRET,
       signatureToleranceSeconds: 300,
       now: () => NOW,
-      logSink: () => undefined,
+      logSink,
     });
   }
 
@@ -121,6 +121,68 @@ describe('vendor webhook Lambda adapter', () => {
     });
     expect(duplicate.statusCode).toBe(204);
     expect(storedOrder).toMatchObject({ status: 'PICKED_UP', version: 3 });
+  });
+
+  it('logs the effective correlation and safe processing outcome', async () => {
+    const rawBody = JSON.stringify({
+      eventId: 'provider-event-observable',
+      eventType: 'DELIVERY_PICKED_UP',
+      occurredAt: '2026-07-21T12:32:00.000Z',
+      providerOrderId: 'delivery-789',
+    });
+    const logLines: string[] = [];
+
+    const response = await handler((line) => {
+      logLines.push(line);
+    })(eventFixture(rawBody));
+    const entries = logLines.map(
+      (line): Record<string, unknown> => JSON.parse(line) as Record<string, unknown>,
+    );
+
+    expect(response.statusCode).toBe(204);
+    expect(entries).toEqual([
+      expect.objectContaining({
+        event: 'webhook.request.started',
+        requestId: 'webhook-request-123',
+        correlationId: 'corr_provider_webhook_123',
+      }),
+      expect.objectContaining({
+        event: 'webhook.request.completed',
+        requestId: 'webhook-request-123',
+        correlationId: 'corr_provider_webhook_123',
+        eventId: 'provider-event-observable',
+        eventType: 'DELIVERY_PICKED_UP',
+        orderId: order.orderId,
+        orderVersion: 3,
+        outcome: 'applied',
+        statusCode: 204,
+      }),
+    ]);
+    expect(logLines.join('')).not.toContain(SECRET);
+    expect(logLines.join('')).not.toContain('delivery-789');
+  });
+
+  it('uses the webhook request ID as correlation when the provider omits one', async () => {
+    const rawBody = JSON.stringify({
+      eventId: 'provider-event-fallback-correlation',
+      eventType: 'DELIVERY_PICKED_UP',
+      occurredAt: '2026-07-21T12:32:00.000Z',
+      providerOrderId: 'delivery-789',
+    });
+    const event = eventFixture(rawBody);
+    delete event.headers['x-correlation-id'];
+    const logLines: string[] = [];
+
+    const response = await handler((line) => {
+      logLines.push(line);
+    })(event);
+
+    expect(response.statusCode).toBe(204);
+    expect(
+      logLines
+        .map((line): Record<string, unknown> => JSON.parse(line) as Record<string, unknown>)
+        .every((entry) => entry['correlationId'] === 'webhook-request-123'),
+    ).toBe(true);
   });
 
   it('rejects an invalid signature without changing the order', async () => {

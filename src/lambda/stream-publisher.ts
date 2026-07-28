@@ -39,10 +39,28 @@ export function createStreamPublisherHandler(
         domainEvent = domainEventFromOrderStreamRecord(record);
         if (domainEvent !== undefined) {
           await dependencies.publisher.publish(domainEvent);
+          const logger = createLogger(
+            {
+              requestId: itemIdentifier,
+              correlationId: domainEvent.correlationId,
+            },
+            dependencies.logSink === undefined ? {} : { sink: dependencies.logSink },
+          );
+          logger.write('info', 'stream.event.published', {
+            operation: 'publishDomainEvent',
+            eventId: domainEvent.eventId,
+            eventType: domainEvent.eventType,
+            orderId: domainEvent.aggregateId,
+            aggregateVersion: domainEvent.aggregateVersion,
+            outcome: 'published',
+          });
         }
       } catch (error) {
         const logger = createLogger(
-          { requestId: itemIdentifier },
+          {
+            requestId: itemIdentifier,
+            ...(domainEvent === undefined ? {} : { correlationId: domainEvent.correlationId }),
+          },
           dependencies.logSink === undefined ? {} : { sink: dependencies.logSink },
         );
         logger.write('error', 'stream.record.failed', {
@@ -51,7 +69,9 @@ export function createStreamPublisherHandler(
             ? {}
             : {
                 eventId: domainEvent.eventId,
+                eventType: domainEvent.eventType,
                 orderId: domainEvent.aggregateId,
+                aggregateVersion: domainEvent.aggregateVersion,
               }),
           exceptionName: exceptionName(error),
         });

@@ -8,6 +8,10 @@ describe('structured logger', () => {
     const fields = {
       operation: 'createOrder',
       orderId: 'ord_123',
+      eventType: 'order.created',
+      aggregateVersion: 1,
+      orderVersion: 2,
+      outcome: 'created',
       statusCode: 201,
       exceptionName: 'ValidationException',
       authorization: 'Bearer secret-token',
@@ -34,6 +38,10 @@ describe('structured logger', () => {
       correlationId: 'correlation-123',
       operation: 'createOrder',
       orderId: 'ord_123',
+      eventType: 'order.created',
+      aggregateVersion: 1,
+      orderVersion: 2,
+      outcome: 'created',
       statusCode: 201,
       exceptionName: 'ValidationException',
     });

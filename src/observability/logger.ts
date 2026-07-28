@@ -15,6 +15,10 @@ export interface SafeLogFields {
   readonly merchantId?: string;
   readonly providerCode?: string;
   readonly eventId?: string;
+  readonly eventType?: string;
+  readonly aggregateVersion?: number;
+  readonly orderVersion?: number;
+  readonly outcome?: string;
   readonly errorCode?: string;
   readonly exceptionName?: string;
   readonly durationMs?: number;
@@ -48,6 +52,10 @@ const SAFE_FIELD_NAMES: ReadonlySet<keyof SafeLogFields> = new Set([
   'merchantId',
   'providerCode',
   'eventId',
+  'eventType',
+  'aggregateVersion',
+  'orderVersion',
+  'outcome',
   'errorCode',
   'exceptionName',
   'durationMs',
