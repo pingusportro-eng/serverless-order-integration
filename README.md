@@ -248,6 +248,62 @@ throttling results.
 The editable [full AWS cloud stack diagram](docs/architecture/full-cloud-stack.drawio)
 shows both paths and their security, observability, and failure boundaries.
 
+## Supervised cloud learning lab
+
+The normal repeated-learning path is terminal-driven:
+
+```bash
+npm run cloud:deploy
+```
+
+This command verifies the fixed AWS account, Region, Budget, repository, clean
+pushed commit, local secret-file permissions, and required tools. It starts a
+mock vendor on an automatically selected loopback port, starts a temporary
+Quick Tunnel, synchronizes the two mock-boundary secrets to the GitHub
+`development` environment without printing them, and drives the existing
+prepare/execute GitHub Actions workflow.
+
+The exact non-executing CloudFormation change set is printed in the terminal.
+Execution still requires typing `deploy`. After deployment, the command creates
+one temporary operator identity, prints a usable `POST /orders` command, and
+remains in the foreground as a live, safely redacted vendor exchange console.
+Use a second terminal to submit one generated synthetic order:
+
+```bash
+npm run cloud:order:create
+```
+
+Inspect the current local and AWS state without changing it:
+
+```bash
+npm run cloud:status
+```
+
+The first `Ctrl+C` in the deployment console requests an orderly teardown. The
+supervisor waits for any current workflow operation, runs and watches the
+GitHub destroy operation, verifies that the application stack and artifact
+prefix are absent, stops only its owned tunnel and vendor processes, removes
+temporary credentials, and prints the final cleanup status. A second interrupt
+is ignored while cleanup is running.
+
+If the terminal, computer, or network disappears before that verification can
+finish, recover idempotently with:
+
+```bash
+npm run cloud:destroy
+```
+
+An existing healthy lab-owned vendor/tunnel is reused. Stale owned processes
+are replaced. An unrelated mock server is never killed or reconfigured; the lab
+selects another free port. A stable existing application stack is reused only
+when both its reviewed commit and live vendor URL match, otherwise the workflow
+prepares an update. In-progress operations are allowed to settle, and unsafe
+CloudFormation failure states stop deployment and enter verified teardown.
+
+The command requires GitHub CLI authentication once (`gh auth login`). It uses
+GitHub OIDC for deployment; it never places long-lived AWS credentials in
+GitHub.
+
 ## Local mock delivery vendor
 
 Create the ignored local environment file once and restrict it to the current

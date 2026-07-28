@@ -1,9 +1,14 @@
+import { createServer } from 'node:http';
+
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import { signWebhook } from '../../src/http/webhook-signature.js';
 import {
+  formatMockVendorActivity,
   parseMockVendorScenario,
   startMockDeliveryVendor,
   type MockDeliverySubmission,
+  type MockVendorActivity,
   type MockVendorAttempt,
   type RunningMockDeliveryVendor,
 } from '../../src/mock-vendor/mock-delivery-vendor.js';
@@ -30,14 +35,17 @@ const SUBMISSION: MockDeliverySubmission = {
 describe('mock delivery vendor contract', () => {
   let vendor: RunningMockDeliveryVendor;
   let attempts: MockVendorAttempt[];
+  let activities: MockVendorActivity[];
 
   beforeEach(async () => {
     attempts = [];
+    activities = [];
     vendor = await startMockDeliveryVendor({
       authToken: AUTH_TOKEN,
       timeoutDelayMs: 100,
       now: () => '2026-07-22T10:30:00.000Z',
       onAttempt: (attempt) => attempts.push(attempt),
+      onActivity: (activity) => activities.push(activity),
     });
   });
 
@@ -96,6 +104,132 @@ describe('mock delivery vendor contract', () => {
     expect((body as Record<string, unknown>)['providerOrderId']).toMatch(
       /^delivery_[A-Za-z0-9_-]{24}$/,
     );
+    expect(activities).toEqual([
+      {
+        kind: 'delivery.request.received',
+        timestamp: '2026-07-22T10:30:00.000Z',
+        method: 'POST',
+        path: '/deliveries',
+        correlationId: 'correlation-contract-123',
+      },
+      {
+        kind: 'delivery.response.sent',
+        timestamp: '2026-07-22T10:30:00.000Z',
+        statusCode: 201,
+        correlationId: 'correlation-contract-123',
+        platformOrderId: 'ord_contract_123',
+        providerOrderId: (body as Record<string, string>)['providerOrderId'],
+        scenario: 'success',
+      },
+    ]);
+    const formatted = activities.map(formatMockVendorActivity).join('\n');
+    expect(formatted).toContain('[VENDOR <- WORKER]');
+    expect(formatted).toContain('[VENDOR -> WORKER]');
+    expect(formatted).not.toContain(AUTH_TOKEN);
+    expect(formatted).not.toContain(SUBMISSION.pickup.addressLine);
+  });
+
+  it('sends signed, correlated, ordered webhooks with bounded transient retry', async () => {
+    await vendor.close();
+    const received: Array<{
+      readonly body: string;
+      readonly correlationId?: string;
+      readonly signature?: string;
+      readonly timestamp?: string;
+    }> = [];
+    let pickupAttempts = 0;
+    const webhookServer = createServer((request, response) => {
+      void (async () => {
+        const chunks: Buffer[] = [];
+        for await (const chunk of request) {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array));
+        }
+        const body = Buffer.concat(chunks).toString('utf8');
+        const timestamp = request.headers['x-webhook-timestamp'];
+        const signature = request.headers['x-webhook-signature'];
+        const correlationId = request.headers['x-correlation-id'];
+        received.push({
+          body,
+          ...(typeof timestamp === 'string' ? { timestamp } : {}),
+          ...(typeof signature === 'string' ? { signature } : {}),
+          ...(typeof correlationId === 'string' ? { correlationId } : {}),
+        });
+        const event = JSON.parse(body) as { eventType: string };
+        if (event.eventType === 'DELIVERY_PICKED_UP') {
+          pickupAttempts += 1;
+        }
+        response.writeHead(
+          event.eventType === 'DELIVERY_PICKED_UP' && pickupAttempts === 1 ? 404 : 204,
+        );
+        response.end();
+      })();
+    });
+    await new Promise<void>((resolve, reject) => {
+      webhookServer.once('error', reject);
+      webhookServer.listen(0, '127.0.0.1', () => {
+        webhookServer.off('error', reject);
+        resolve();
+      });
+    });
+    const address = webhookServer.address();
+    if (address === null || typeof address === 'string') {
+      throw new Error('Webhook test server did not bind to TCP.');
+    }
+    const signingSecret = 'mock-webhook-contract-secret-0123456789';
+    activities = [];
+    vendor = await startMockDeliveryVendor({
+      authToken: AUTH_TOKEN,
+      onActivity: (activity) => activities.push(activity),
+      webhook: {
+        url: `http://127.0.0.1:${String(address.port)}/webhooks/vendor`,
+        signingSecret,
+        pickupDelayMs: 1,
+        deliveredDelayMs: 1,
+        retryDelayMs: 1,
+        timeoutMs: 1_000,
+        maximumAttempts: 3,
+      },
+    });
+
+    try {
+      const response = await submit();
+      expect(response.status).toBe(201);
+      await expect.poll(() => received.length, { timeout: 2_000 }).toBe(3);
+    } finally {
+      await new Promise<void>((resolve, reject) => {
+        webhookServer.close((error) => {
+          if (error) {
+            reject(error);
+          } else {
+            resolve();
+          }
+        });
+        webhookServer.closeAllConnections();
+      });
+    }
+
+    const parsed = received.map((entry) => JSON.parse(entry.body) as Record<string, string>);
+    expect(parsed.map((event) => event['eventType'])).toEqual([
+      'DELIVERY_PICKED_UP',
+      'DELIVERY_PICKED_UP',
+      'DELIVERY_DELIVERED',
+    ]);
+    expect(parsed[0]?.['eventId']).toBe(parsed[1]?.['eventId']);
+    expect(parsed[0]?.['eventId']).not.toBe(parsed[2]?.['eventId']);
+    for (const entry of received) {
+      expect(entry.correlationId).toBe('correlation-contract-123');
+      expect(entry.timestamp).toMatch(/^\d{10}$/);
+      expect(entry.signature).toBe(signWebhook(signingSecret, entry.timestamp ?? '', entry.body));
+    }
+    expect(
+      activities
+        .filter((activity) => activity.kind === 'webhook.request.sent')
+        .map((activity) => activity.eventType),
+    ).toEqual(['DELIVERY_PICKED_UP', 'DELIVERY_PICKED_UP', 'DELIVERY_DELIVERED']);
+    const formatted = activities.map(formatMockVendorActivity).join('\n');
+    expect(formatted).toContain('[VENDOR -> API]');
+    expect(formatted).toContain('[VENDOR <- API]');
+    expect(formatted).not.toContain(signingSecret);
   });
 
   it('returns the original acceptance for an idempotent retry', async () => {

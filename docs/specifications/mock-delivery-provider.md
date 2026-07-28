@@ -105,6 +105,14 @@ Error responses are small JSON objects with a stable `code` and safe `detail`.
 The exact retry classification and bounded retry policy are defined by the
 [delivery vendor client policy](vendor-client.md).
 
+The executable server can emit a safe live activity stream through its
+`onActivity` boundary. It records each inbound delivery request and response,
+plus each outbound webhook attempt and response. Records may contain method,
+path, status, scenario, correlation ID, platform/provider order IDs, event
+identity, event type, and attempt number. They never contain authorization
+values, signing values, raw idempotency keys, request bodies, addresses, or raw
+provider responses.
+
 ## Delivery-status webhook
 
 The provider sends status events to `POST /webhooks/vendor`. Each event has a
@@ -137,3 +145,22 @@ returns `204` without incrementing the order version. Reusing an event ID with
 different validated event values returns `409 EVENT_ID_CONFLICT`. A delayed
 event that would move the order backward is recorded as stale and returns `204`
 without changing the aggregate.
+
+When `MOCK_VENDOR_WEBHOOK_URL` and
+`MOCK_VENDOR_WEBHOOK_SECRET`/`WEBHOOK_SIGNING_SECRET` are configured together,
+the executable mock performs the provider side of this contract. A newly
+accepted delivery schedules:
+
+1. one signed `DELIVERY_PICKED_UP` callback after a short persistence delay;
+2. one signed `DELIVERY_DELIVERED` callback after pickup succeeds.
+
+Event IDs are deterministic for the accepted provider order and event type, and
+the original delivery correlation ID is propagated. Replaying the original
+delivery submission does not schedule another callback journey. A `404`, `429`,
+`5xx`, network error, or timeout receives at most three callback attempts with
+a bounded delay. Other `4xx` responses stop immediately. Delivery is not sent
+if pickup exhausts its attempts, which preserves provider event order.
+
+The delay plus retry covers the real integration race in which the delivery
+worker has received the provider's `201` but has not yet committed the
+`SUBMITTED` order/provider index needed by the webhook Lambda.

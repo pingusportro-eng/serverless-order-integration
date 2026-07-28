@@ -6,6 +6,8 @@ import { parse } from 'yaml';
 
 const template = parse(await readFile('infrastructure/github-oidc-bootstrap.yaml', 'utf8'));
 const workflow = parse(await readFile('.github/workflows/deploy-development.yaml', 'utf8'));
+const packageDocument = JSON.parse(await readFile('package.json', 'utf8'));
+const labSupervisor = await readFile('scripts/cloud/development-lab.mjs', 'utf8');
 const deploymentScripts = (
   await Promise.all(
     [
@@ -397,6 +399,56 @@ assert.deepEqual(job.permissions, {
   contents: 'read',
   'id-token': 'write',
 });
+
+assert.equal(
+  packageDocument.scripts['cloud:deploy'],
+  'node scripts/cloud/development-lab.mjs deploy',
+);
+assert.equal(
+  packageDocument.scripts['cloud:order:create'],
+  'node scripts/cloud/development-lab.mjs create-order',
+);
+assert.equal(
+  packageDocument.scripts['cloud:status'],
+  'node scripts/cloud/development-lab.mjs status',
+);
+assert.equal(
+  packageDocument.scripts['cloud:destroy'],
+  'node scripts/cloud/development-lab.mjs destroy',
+);
+
+for (const expectedLabControl of [
+  "const accountId = '454921778743'",
+  "const region = 'eu-central-1'",
+  "const profile = 'pingusportro-admin'",
+  'const maximumHttpRequests = 20',
+  "process.on('SIGINT', signal)",
+  'await destroyCloudAndLocal(state, head)',
+  'await verifyDestroyed()',
+  "process.kill(-savedProcess.pid, 'SIGTERM')",
+  'Type ${expected} to execute this exact change set',
+  'pending_deployments',
+]) {
+  assert.equal(
+    labSupervisor.includes(expectedLabControl),
+    true,
+    `Development lab is missing control: ${expectedLabControl}`,
+  );
+}
+
+for (const forbiddenLabControl of [
+  'sam deploy',
+  '--resolve-s3',
+  'AWS_ACCESS_KEY_ID',
+  'AWS_SECRET_ACCESS_KEY',
+  'rm -rf',
+]) {
+  assert.equal(
+    labSupervisor.includes(forbiddenLabControl),
+    false,
+    `Development lab must not contain ${forbiddenLabControl}.`,
+  );
+}
 
 const serializedWorkflow = JSON.stringify(workflow);
 for (const forbiddenValue of [

@@ -201,6 +201,49 @@ The workflow has only `workflow_dispatch`; it cannot run on a push, pull
 request, or schedule. Every operation uses the protected `development`
 environment and therefore requires its manual approval.
 
+### Terminal-supervised learning operation
+
+The manual operations remain the security and deployment primitives. For
+repeated observability sessions, `npm run cloud:deploy` drives them through the
+authenticated GitHub CLI:
+
+1. discover existing local processes, workflow runs, change sets, and the real
+   application stack;
+2. reuse only healthy lab-owned processes and matching cloud state;
+3. select a free loopback port rather than interfering with an unrelated mock;
+4. start and verify a Quick Tunnel without copying its URL;
+5. dispatch and terminal-approve the protected `prepare` job;
+6. print the exact CloudFormation resource changes;
+7. require the operator to type `deploy`;
+8. dispatch and terminal-approve `execute`;
+9. create a temporary Cognito operator and secure local header file;
+10. remain active as a live mock-vendor request/response console; and
+11. treat the first `Ctrl+C` as a request for verified `destroy`.
+
+The environment approval API removes browser navigation, but it does not merge
+prepare and execute or bypass the exact change-set guard. The meaningful human
+decision remains after the calculated resource changes are visible.
+
+The supervisor stores recovery state only under the ignored
+`.aws-sam/cloud-lab/` directory with user-only permissions. Authorization
+tokens and webhook signing material are never printed. The local webhook secret
+is generated for the lab and sent to the GitHub environment secret API over
+standard input. The local copy is deleted after verified teardown; a future lab
+run rotates the GitHub value again before preparing its stack.
+
+If a healthy stack already matches the pushed commit and active tunnel, it is
+attached rather than duplicated. A changed commit or tunnel creates an UPDATE
+change set. An exact available change set is resumed. Running workflow
+operations are reused or allowed to settle. Unrecoverable CloudFormation
+statuses stop deployment and enter the exact verified teardown path instead of
+being updated blindly.
+
+The first interrupt is not an immediate process exit. It starts or queues the
+destroy operation, streams its progress, verifies the stack and exact S3 prefix
+are absent, stops owned local processes, and prints the final status. Power
+loss, `SIGKILL`, or lost connectivity cannot guarantee automatic cleanup, so
+`npm run cloud:destroy` is the idempotent recovery command.
+
 ### `prepare`
 
 The prepare operation:
