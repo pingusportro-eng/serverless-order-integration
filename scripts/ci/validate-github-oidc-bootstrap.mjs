@@ -154,6 +154,41 @@ assert.equal(
 
 const executionRole = resources.CloudFormationExecutionRole.Properties;
 const executionPolicy = JSON.stringify(executionRole.Policies);
+const expectedGeneratedLambdaRoleArns = [
+  'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-integration-dev-*',
+  'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-OrdersApiFunctionRole-*',
+  'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-VendorWebhookFunctionRole-*',
+  'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-StreamPublisherFunctionRole-*',
+  'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-DeliveryWorkerFunctionRole-*',
+].map((arn) => ({ 'Fn::Sub': arn }));
+const executionIamPolicy = executionRole.Policies.find(
+  (policy) => policy.PolicyName === 'ManageApplicationIamRoles',
+);
+assert.ok(executionIamPolicy);
+for (const statementSid of [
+  'ManageGeneratedLambdaRoles',
+  'PassGeneratedRolesOnlyToLambda',
+]) {
+  const statement = executionIamPolicy.PolicyDocument.Statement.find(
+    (candidate) => candidate.Sid === statementSid,
+  );
+  assert.ok(statement);
+  assert.deepEqual(
+    statement.Resource,
+    expectedGeneratedLambdaRoleArns,
+    `${statementSid} must cover only the application role names that SAM and CloudFormation can generate.`,
+  );
+}
+assert.deepEqual(
+  executionIamPolicy.PolicyDocument.Statement.find(
+    (statement) => statement.Sid === 'PassGeneratedRolesOnlyToLambda',
+  ).Condition,
+  {
+    StringEquals: {
+      'iam:PassedToService': 'lambda.amazonaws.com',
+    },
+  },
+);
 for (const protectedName of [
   'serverless-order-integration-github-deployer',
   'serverless-order-integration-cloudformation-execution',

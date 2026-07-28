@@ -104,12 +104,20 @@ Resources:
                   - iam:UntagRole
                   - iam:UpdateAssumeRolePolicy
                 Resource:
-                  Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-integration-dev-*
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-integration-dev-*
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-OrdersApiFunctionRole-*
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-VendorWebhookFunctionRole-*
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-StreamPublisherFunctionRole-*
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-DeliveryWorkerFunctionRole-*
               - Sid: PassGeneratedRolesOnlyToLambda
                 Effect: Allow
                 Action: iam:PassRole
                 Resource:
-                  Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-integration-dev-*
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-integration-dev-*
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-OrdersApiFunctionRole-*
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-VendorWebhookFunctionRole-*
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-StreamPublisherFunctionRole-*
+                  - Fn::Sub: arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-DeliveryWorkerFunctionRole-*
                 Condition:
                   StringEquals:
                     iam:PassedToService: lambda.amazonaws.com

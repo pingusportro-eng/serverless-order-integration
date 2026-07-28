@@ -134,11 +134,14 @@ CloudFormation receives the service permissions needed by
 `template.cloud.yaml`: Lambda, DynamoDB, SQS, SNS, CloudWatch Logs, API Gateway,
 Cognito, and application Lambda-role provisioning.
 
-Application IAM access is name-scoped to
-`serverless-order-integration-dev-*`, and those roles may be passed only to
-Lambda. This prefix excludes both bootstrap roles. The execution role has no
-OIDC-provider or CloudFormation-stack permissions, so it cannot mutate its own
-identity bootstrap.
+Application IAM access is name-scoped to the four SAM-generated Lambda role
+logical names under the `serverless-order-*` project prefix. CloudFormation can
+truncate the stack-name portion of generated IAM role names to satisfy IAM's
+64-character limit, so the policy matches each exact role-name suffix instead
+of assuming the complete `serverless-order-integration-dev-*` prefix survives.
+Those roles may be passed only to Lambda. The suffixes exclude both bootstrap
+roles. The execution role has no OIDC-provider or CloudFormation-stack
+permissions, so it cannot mutate its own identity bootstrap.
 
 Some AWS creation and discovery APIs do not support useful resource-level
 scoping. The reviewed policy therefore has four deliberate `"Resource": "*"`
