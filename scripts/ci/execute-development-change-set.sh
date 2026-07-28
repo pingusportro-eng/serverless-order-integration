@@ -29,7 +29,7 @@ readarray -t change_set_metadata < <(
   aws cloudformation describe-change-set \
     --stack-name "$stack_name" \
     --change-set-name "$CHANGE_SET_NAME" \
-    --query '[Status,ExecutionStatus,Description,RoleARN,ChangeSetType]' \
+    --query '[Status,ExecutionStatus,Description]' \
     --output text \
     --region "$region" \
     --no-cli-pager |
@@ -42,10 +42,31 @@ readarray -t change_set_metadata < <(
   fail 'the change set is not available for execution.'
 [[ "${change_set_metadata[2]:-}" == "GitHub commit $GITHUB_SHA" ]] ||
   fail 'the change set description does not bind it to this commit.'
-[[ "${change_set_metadata[3]:-}" == "$execution_role_arn" ]] ||
+
+readarray -t stack_metadata < <(
+  aws cloudformation describe-stacks \
+    --stack-name "$stack_name" \
+    --query '[Stacks[0].StackStatus,Stacks[0].RoleARN]' \
+    --output text \
+    --region "$region" \
+    --no-cli-pager |
+    tr '\t' '\n'
+)
+
+[[ "${stack_metadata[1]:-}" == "$execution_role_arn" ]] ||
   fail 'the change set does not use the reviewed CloudFormation execution role.'
-[[ "${change_set_metadata[4]:-}" == 'CREATE' || "${change_set_metadata[4]:-}" == 'UPDATE' ]] ||
-  fail 'the change-set type is not CREATE or UPDATE.'
+
+case "${stack_metadata[0]:-}" in
+  REVIEW_IN_PROGRESS)
+    waiter='stack-create-complete'
+    ;;
+  CREATE_COMPLETE | UPDATE_COMPLETE | UPDATE_ROLLBACK_COMPLETE)
+    waiter='stack-update-complete'
+    ;;
+  *)
+    fail "the stack is not ready for execution (${stack_metadata[0]:-missing status})."
+    ;;
+esac
 
 aws cloudformation execute-change-set \
   --stack-name "$stack_name" \
@@ -53,17 +74,10 @@ aws cloudformation execute-change-set \
   --region "$region" \
   --no-cli-pager
 
-if [[ "${change_set_metadata[4]}" == 'CREATE' ]]; then
-  aws cloudformation wait stack-create-complete \
-    --stack-name "$stack_name" \
-    --region "$region" \
-    --no-cli-pager
-else
-  aws cloudformation wait stack-update-complete \
-    --stack-name "$stack_name" \
-    --region "$region" \
-    --no-cli-pager
-fi
+aws cloudformation wait "$waiter" \
+  --stack-name "$stack_name" \
+  --region "$region" \
+  --no-cli-pager
 
 bash scripts/ci/smoke-development-stack.sh
 

@@ -312,6 +312,7 @@ for (const expectedControl of [
   'maximum_artifact_bytes=$((50 * 1024 * 1024))',
   'sum(Contents[].Size || `[]`)',
   'length(Contents || `[]`)',
+  '[Stacks[0].StackStatus,Stacks[0].RoleARN]',
   'sam package',
   'create-change-set',
   'wait change-set-create-complete',
@@ -334,6 +335,7 @@ for (const forbiddenControl of [
   'aws s3 rb',
   'rm -rf',
   'secretsmanager',
+  '[Status,ExecutionStatus,Description,RoleARN,ChangeSetType]',
 ]) {
   assert.equal(
     deploymentScripts.includes(forbiddenControl),
