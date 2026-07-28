@@ -811,7 +811,6 @@ async function findPreparedChangeSet(head, vendorBaseUrl) {
 function printChangeSet(changeSet) {
   print('');
   print(`CloudFormation change set: ${changeSet.ChangeSetName}`);
-  print(`Type: ${changeSet.ChangeSetType}`);
   print('Reviewed resource changes:');
   for (const change of changeSet.Changes ?? []) {
     const resource = change.ResourceChange ?? {};
