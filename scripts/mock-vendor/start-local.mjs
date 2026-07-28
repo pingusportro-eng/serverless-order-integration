@@ -13,9 +13,14 @@ if (!Number.isSafeInteger(port) || port < 1 || port > 65_535) {
 }
 const scenario = parseMockVendorScenario(process.env['MOCK_VENDOR_SCENARIO'] ?? 'success');
 const attemptLog = process.env['MOCK_VENDOR_ATTEMPT_LOG']?.trim();
+const authToken =
+  process.env['MOCK_VENDOR_TOKEN']?.trim() ?? process.env['VENDOR_AUTH_TOKEN']?.trim();
+if (authToken === undefined || authToken.length < 32) {
+  throw new Error('MOCK_VENDOR_TOKEN or VENDOR_AUTH_TOKEN must contain at least 32 characters.');
+}
 
 const vendor = await startMockDeliveryVendor({
-  authToken: process.env['MOCK_VENDOR_TOKEN'] ?? 'local-development-token',
+  authToken,
   defaultScenario: scenario,
   port,
   ...(attemptLog

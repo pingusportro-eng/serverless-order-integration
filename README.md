@@ -243,19 +243,29 @@ shows both paths and their security, observability, and failure boundaries.
 
 ## Local mock delivery vendor
 
-Build and start the mock provider on `http://127.0.0.1:4000`:
+Create the ignored local environment file once and restrict it to the current
+Linux user:
+
+```bash
+cp .env.example .env.development.local
+chmod 600 .env.development.local
+```
+
+Replace the placeholder with the same `VENDOR_AUTH_TOKEN` configured in the
+GitHub `development` environment. Never commit or paste this value into logs or
+chat. Build and start the mock provider on `http://127.0.0.1:4000`:
 
 ```bash
 npm run mock-vendor:start
 ```
 
-The default `local-development-token` is deliberately local test data. Override
-it with `MOCK_VENDOR_TOKEN` when practising configuration, and use
-`MOCK_VENDOR_PORT` to select another port. Set `MOCK_VENDOR_SCENARIO` to
-`success`, `timeout`, `rate-limit`, `server-error`, `request-rejected`, or
-`malformed-response` to choose the default response mode for an unmodified
-vendor client. Invalid scenario values prevent startup. Stop the server with
-`Ctrl+C`.
+The command requires a token containing at least 32 characters; there is no
+default bearer token. Direct test harnesses may provide `MOCK_VENDOR_TOKEN`
+instead. Use `MOCK_VENDOR_PORT` to select another port. Set
+`MOCK_VENDOR_SCENARIO` to `success`, `timeout`, `rate-limit`, `server-error`,
+`request-rejected`, or `malformed-response` to choose the default response mode
+for an unmodified vendor client. Invalid scenario values prevent startup. Stop
+the server with `Ctrl+C`.
 
 The provider contract documents `POST /deliveries`, idempotency, authentication,
 and the deterministic success, timeout, `429`, `500`, and malformed-response

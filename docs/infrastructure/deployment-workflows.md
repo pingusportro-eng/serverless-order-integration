@@ -168,20 +168,18 @@ temporary parameter file. The file is deleted by a shell trap. The values are
 passed to CloudFormation parameters marked `NoEcho`; they are not committed,
 printed, placed in a workflow artifact, or stored in AWS Secrets Manager.
 
-The three independent 48-byte random values were generated without terminal
-output and stored in the unlocked GNOME login keyring with these attributes:
+`CURSOR_SIGNING_SECRET` and `WEBHOOK_SIGNING_SECRET` remain only in GitHub.
+The local mock needs the vendor bearer token after each reboot, so the rotated
+`VENDOR_AUTH_TOKEN` is also stored in `.env.development.local`. That file:
 
-```text
-project=serverless-order-integration
-environment=development
-name=<GitHub secret name>
-```
+- contains only the vendor token;
+- is covered by the repository's `.env.*` ignore rule;
+- has mode `0600`; and
+- is loaded by Node's built-in `--env-file` option.
 
-This local copy is necessary because GitHub environment secrets are write-only,
-while the local mock vendor and signed-webhook tests must use the same vendor
-and webhook values. The project values were transferred through the encrypted
-SSH connection using the terminal's OSC 52 clipboard mechanism, added one at a
-time, and removed from the client clipboard afterward.
+This is a deliberate personal-development tradeoff: processes running as the
+same Linux user and unencrypted backups can read the file. The value must never
+be committed, logged, or copied into documentation or chat.
 
 The GitHub environment page was visually checked to contain exactly:
 
@@ -189,10 +187,8 @@ The GitHub environment page was visually checked to contain exactly:
 - `WEBHOOK_SIGNING_SECRET`; and
 - `VENDOR_AUTH_TOKEN`.
 
-Post-setup checks retrieved each local entry without displaying it, verified
-the minimum length, and confirmed that the artifact bucket remained empty, the
-application stack remained absent, and the Budget still reported `$0.00`
-actual and forecast spend.
+Post-rotation checks inspected only the local file's mode, ignore rule, variable
+name, and value length. They did not display the token.
 
 `vendor_base_url` is a non-secret manual input. The prepare script accepts only
 a root `https://*.trycloudflare.com` URL and verifies that it reaches the mock
@@ -303,7 +299,7 @@ The deployment validator locks:
 No further external step is authorized merely by this document. Continue in
 small, reviewable operations:
 
-1. start the local mock vendor with the keyring-backed vendor token;
+1. start the local mock vendor with the ignored local environment file;
 2. start a temporary Quick Tunnel and capture its public HTTPS URL;
 3. manually run `prepare` and inspect its change set;
 4. separately approve and run `execute`;

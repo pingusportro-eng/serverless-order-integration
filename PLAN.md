@@ -450,12 +450,12 @@ stack remains absent and the Budget reports `$0.00` actual and forecast. The
 full record is in
 [the workflow review](docs/infrastructure/deployment-workflows.md).
 
-The three independent random values are now stored in the GNOME login keyring
-and configured as GitHub `development` environment secrets. Their values were
-never printed or committed, the client clipboard was cleared, the artifact
-bucket remains empty, and the application stack remains absent.
+The GitHub `development` environment retains its three deployment secrets.
+After the local keyring proved inconvenient across reboots, only the rotated
+vendor token was also placed in the ignored `.env.development.local` file with
+mode `0600`. Its value was not printed or committed.
 
-Next, start the local mock vendor with the keyring-backed token and expose it
+Next, start the local mock vendor from that environment file and expose it
 through a temporary Quick Tunnel. Then manually run the non-executing `prepare`
 operation with the tunnel URL. Application execution and destruction remain
 separate manual approvals.
