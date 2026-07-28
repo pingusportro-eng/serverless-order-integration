@@ -44,6 +44,10 @@ Do not log authorization values, secrets, full request bodies, delivery addresse
 or raw third-party responses. Request and correlation IDs provide traceability
 without requiring sensitive payloads.
 
+The current signal path, identifier semantics, native AWS signals, and known
+successful-trace gaps are recorded in the
+[observability inventory](docs/operations/observability-inventory.md).
+
 ## Repository layout
 
 ```text

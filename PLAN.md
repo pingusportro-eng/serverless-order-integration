@@ -429,20 +429,17 @@ For every step, the review should answer:
 
 ## Next step
 
-Begin **7.1 — Add production-minded observability** with a read-only inventory
-of the structured logs, request and correlation identifiers, service metrics,
-and tracing evidence that already exist.
+Continue **7.1 — Add production-minded observability** by implementing the
+cost-free structured-log improvements identified in the
+[observability inventory](docs/operations/observability-inventory.md).
 
-Step 6.3 is complete. A reviewed GitHub Actions cycle prepared a non-executing
-change set bound to the committed revision, separately executed it, ran the
-bounded authorization smoke tests, and deliberately destroyed the application
-stack. The final audit confirmed that the application stack, its service
-resources, deployment artifacts, temporary Quick Tunnel, and local mock vendor
-were absent. The retained empty artifact bucket and OIDC bootstrap have no
-expected recurring AWS charge at this scale.
+The inventory confirmed that correlation and causation metadata survive the
+API, stored mutation, domain event, queue, vendor request, and later order
+mutation. It also found that successful publisher and worker processing is not
+logged, and several boundary logs omit correlation or outcome fields. As a
+result, the successful journey cannot yet be reconstructed with one log query.
 
-The implementation, permission incidents, successful verification, and cleanup
-evidence are recorded in the
-[controlled deployment workflow](docs/infrastructure/deployment-workflows.md).
-Any Phase 7 proposal for custom metrics, alarms, tracing, or longer retention
-must receive a cost review before it changes AWS resources.
+The next implementation adds only safe allow-listed fields, structured success
+records, and local tests. It creates no AWS resources and costs `$0`. Custom
+metrics, alarms, dashboards, tracing, longer retention, and cloud verification
+remain separate cost-reviewed decisions.
