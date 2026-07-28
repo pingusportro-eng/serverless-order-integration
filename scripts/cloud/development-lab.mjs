@@ -196,12 +196,59 @@ async function httpHealth(url) {
   return result.code === 0 && result.stdout === '404';
 }
 
+async function quickTunnelHealth(publicUrl) {
+  if (typeof publicUrl !== 'string') {
+    return { healthy: false, status: 'URL_MISSING' };
+  }
+  const hostname = new URL(publicUrl).hostname;
+  const resolution = await command(
+    'dig',
+    ['+time=2', '+tries=1', '+short', '@1.1.1.1', hostname, 'A'],
+    { allowFailure: true },
+  );
+  const address = resolution.stdout.trim().split('\n')[0];
+  if (resolution.code !== 0 || address === '') {
+    return { healthy: false, status: 'DNS_PENDING' };
+  }
+  const result = await command(
+    'curl',
+    [
+      '--silent',
+      '--show-error',
+      '--output',
+      '/dev/null',
+      '--write-out',
+      '%{http_code}',
+      '--connect-timeout',
+      '5',
+      '--max-time',
+      '10',
+      '--resolve',
+      `${hostname}:443:${address}`,
+      '--request',
+      'POST',
+      `${publicUrl}/deliveries`,
+    ],
+    { allowFailure: true },
+  );
+  return { healthy: result.code === 0 && result.stdout === '401', status: result.stdout || '000' };
+}
+
 async function ownedProcessObservation(savedProcess, healthUrl) {
   const observation = processObservation(savedProcess);
   if (!observation.running || !observation.commandMatches) {
     return observation;
   }
   return { ...observation, healthy: await httpHealth(healthUrl) };
+}
+
+async function ownedTunnelObservation(savedProcess) {
+  const observation = processObservation(savedProcess);
+  if (!observation.running || !observation.commandMatches) {
+    return observation;
+  }
+  const health = await quickTunnelHealth(savedProcess.publicUrl);
+  return { ...observation, healthy: health.healthy };
 }
 
 async function acquireLock() {
@@ -529,30 +576,18 @@ async function startTunnel(localUrl) {
       45_000,
       processId,
     );
-    for (let attempt = 1; attempt <= 20; attempt += 1) {
-      const status = await command(
-        'curl',
-        [
-          '--silent',
-          '--show-error',
-          '--output',
-          '/dev/null',
-          '--write-out',
-          '%{http_code}',
-          '--connect-timeout',
-          '5',
-          '--max-time',
-          '10',
-          `${publicUrl}/`,
-        ],
-        { allowFailure: true },
-      );
-      if (status.stdout === '404') {
+    let lastStatus = 'DNS_PENDING';
+    for (let attempt = 1; attempt <= 90; attempt += 1) {
+      const health = await quickTunnelHealth(publicUrl);
+      if (health.healthy) {
         return { ...savedProcess, publicUrl, localUrl };
       }
+      lastStatus = health.status;
       await sleep(1_000);
     }
-    fail('Quick Tunnel did not expose the mock vendor within 20 seconds');
+    fail(
+      `Quick Tunnel did not expose the authenticated mock vendor within the bounded readiness wait; last status: ${lastStatus}`,
+    );
   } catch (error) {
     await stopOwnedProcess(savedProcess, 'Failed Quick Tunnel');
     throw error;
@@ -566,7 +601,7 @@ async function prepareLocalBoundary(state, localEnvironment, secrets) {
   );
   const tunnelDecision = decideOwnedProcess(
     state.tunnel,
-    await ownedProcessObservation(state.tunnel, state.tunnel?.publicUrl),
+    await ownedTunnelObservation(state.tunnel),
   );
   if (vendorDecision.action === 'blocked' || tunnelDecision.action === 'blocked') {
     fail(`${vendorDecision.reason}; ${tunnelDecision.reason}`);
@@ -1145,7 +1180,7 @@ async function deploy() {
   let cloudMayExist = false;
   try {
     await Promise.all(
-      ['aws', 'cloudflared', 'curl', 'gh', 'git', 'node', 'npm'].map(requireCommand),
+      ['aws', 'cloudflared', 'curl', 'dig', 'gh', 'git', 'node', 'npm'].map(requireCommand),
     );
     await assertIdentityAndBudget();
     head = await assertGitHubAndGit();
