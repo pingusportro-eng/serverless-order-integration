@@ -325,8 +325,8 @@ stack_status() {
 assert_stack_status() {
   local status
   status="$(stack_status)"
-  [[ "$status" == 'UPDATE_COMPLETE' ]] ||
-    fail "stack must be UPDATE_COMPLETE, received $status"
+  [[ "$status" == 'CREATE_COMPLETE' || "$status" == 'UPDATE_COMPLETE' ]] ||
+    fail "stack must be CREATE_COMPLETE or UPDATE_COMPLETE, received $status"
 }
 
 assert_stack_in_sync() {

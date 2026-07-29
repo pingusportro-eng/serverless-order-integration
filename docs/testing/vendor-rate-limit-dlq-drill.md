@@ -223,7 +223,8 @@ Before any mutation, the future harness must:
 
 1. Verify account `454921778743`, profile `pingusportro-admin`, and Region
    `eu-central-1`.
-2. Require stack status `UPDATE_COMPLETE` and fresh drift status `IN_SYNC`.
+2. Require a stable fresh or updated stack status (`CREATE_COMPLETE` or
+   `UPDATE_COMPLETE`) and fresh drift status `IN_SYNC`.
 3. Require all four deployed queues to be empty.
 4. Re-read the table, stream, topic, worker, mappings, queue attributes, and
    redrive policy from CloudFormation and AWS.
