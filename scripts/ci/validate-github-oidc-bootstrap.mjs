@@ -426,7 +426,7 @@ for (const expectedLabControl of [
   'await destroyCloudAndLocal(state, head)',
   'await verifyDestroyed()',
   "process.kill(-savedProcess.pid, 'SIGTERM')",
-  'Type ${expected} to execute this exact change set',
+  'Change set validated; execution will continue automatically.',
   'pending_deployments',
 ]) {
   assert.equal(

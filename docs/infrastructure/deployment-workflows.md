@@ -214,15 +214,16 @@ authenticated GitHub CLI:
 4. start and verify a Quick Tunnel without copying its URL;
 5. dispatch and terminal-approve the protected `prepare` job;
 6. print the exact CloudFormation resource changes;
-7. require the operator to type `deploy`;
-8. dispatch and terminal-approve `execute`;
+7. validate and automatically dispatch `execute` for that exact change set;
+8. terminal-approve the protected `execute` job;
 9. create a temporary Cognito operator and secure local header file;
 10. remain active as a live mock-vendor request/response console; and
 11. treat the first `Ctrl+C` as a request for verified `destroy`.
 
 The environment approval API removes browser navigation, but it does not merge
-prepare and execute or bypass the exact change-set guard. The meaningful human
-decision remains after the calculated resource changes are visible.
+prepare and execute or bypass the exact change-set guard. Invoking
+`npm run cloud:deploy` runs the complete guarded deployment without requiring
+later terminal input, so it can be left unattended.
 
 The supervisor stores recovery state only under the ignored
 `.aws-sam/cloud-lab/` directory with user-only permissions. Authorization

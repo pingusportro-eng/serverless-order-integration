@@ -821,32 +821,6 @@ function printChangeSet(changeSet) {
   print('');
 }
 
-async function promptExact(expected) {
-  if (shutdownRequested) {
-    return false;
-  }
-  process.stdout.write(`Type ${expected} to execute this exact change set: `);
-  process.stdin.setEncoding('utf8');
-  process.stdin.resume();
-  return await new Promise((resolve) => {
-    const onData = (chunk) => {
-      cleanup();
-      resolve(chunk.trim() === expected);
-    };
-    const onSignal = () => {
-      cleanup();
-      resolve(false);
-    };
-    const cleanup = () => {
-      process.stdin.off('data', onData);
-      process.off('SIGINT', onSignal);
-      process.stdin.pause();
-    };
-    process.stdin.once('data', onData);
-    process.once('SIGINT', onSignal);
-  });
-}
-
 async function deployStack(head, vendorBaseUrl, resume) {
   let stack = await waitForStableStack();
   let changeSet = resume.allowPrepared
@@ -895,11 +869,10 @@ async function deployStack(head, vendorBaseUrl, resume) {
     fail('the prepared change set is not available and bound to the reviewed commit');
   }
   printChangeSet(changeSet);
-  if (!(await promptExact('deploy'))) {
-    shutdownRequested = true;
-    print('Deployment execution declined; verified teardown will start.');
+  if (shutdownRequested) {
     return undefined;
   }
+  print('Change set validated; execution will continue automatically.');
 
   const executeRunId = await dispatchWorkflow(
     'execute',
