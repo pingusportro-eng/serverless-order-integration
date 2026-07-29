@@ -376,59 +376,117 @@ shows both paths and their security, observability, and failure boundaries.
 
 ## Supervised cloud learning lab
 
-The normal repeated-learning path is terminal-driven:
+The cloud lab is deliberately project-specific. It expects:
+
+- AWS CLI profile `pingusportro-admin` to resolve to account `454921778743`;
+- Region `eu-central-1`;
+- the `My Zero-Spend Budget` actual and forecast values to remain below its
+  `$1` alert threshold;
+- the reviewed GitHub OIDC and artifact-bucket bootstrap to exist;
+- GitHub CLI authentication for an account that can dispatch the repository
+  workflow, update development-environment secrets, and approve that
+  environment;
+- `cloudflared`, `curl`, `dig`, `gh`, `git`, Node.js, npm, and the AWS CLI;
+- a clean `master` branch whose current commit is pushed to `origin/master`;
+  and
+- `.env.development.local` with mode `0600` and a
+  `VENDOR_AUTH_TOKEN` containing at least 32 characters.
+
+Authenticate the GitHub CLI once if necessary:
+
+```bash
+gh auth login
+gh auth status
+```
+
+Start the complete lab from the repository root:
 
 ```bash
 npm run cloud:deploy
 ```
 
-This command verifies the fixed AWS account, Region, Budget, repository, clean
-pushed commit, local secret-file permissions, and required tools. It starts a
-mock vendor on an automatically selected loopback port, starts a temporary
-Quick Tunnel, synchronizes the two mock-boundary secrets to the GitHub
-`development` environment without printing them, and drives the existing
-prepare/execute GitHub Actions workflow.
+The command performs its preflight checks before creating the temporary cloud
+lab. It then:
 
-The exact non-executing CloudFormation change set is printed in the terminal.
-Execution still requires typing `deploy`. After deployment, the command creates
-one temporary operator identity, prints a usable `POST /orders` command, and
-remains in the foreground as a live, safely redacted vendor exchange console.
-Use a second terminal to submit one generated synthetic order:
+1. starts or safely reuses a lab-owned mock vendor on a free loopback port;
+2. exposes it through a temporary Cloudflare Quick Tunnel;
+3. generates the temporary webhook signing secret and synchronizes it and the
+   vendor token to the GitHub `development` environment without printing them;
+4. dispatches and monitors the GitHub `prepare` operation;
+5. records the protected-environment approval through the authenticated GitHub
+   account;
+6. prints the exact non-executing CloudFormation change set;
+7. validates and automatically dispatches `execute` for that exact change set;
+8. creates a temporary Cognito operator and local authorization header;
+9. reconnects the mock vendor to the deployed signed-webhook endpoint; and
+10. prints `AWS LAB READY` with the API and vendor endpoints.
+
+There is no later `deploy` prompt. Prepare and execute remain separate GitHub
+operations with an exact change-set guard, but the authenticated supervisor
+advances them automatically. The deployment can therefore be left unattended
+until `AWS LAB READY` appears, provided the terminal, computer, and network
+remain active.
+
+The supervisor then remains in the foreground as a live, safely redacted vendor
+exchange console. From a second terminal, submit a generated synthetic order:
 
 ```bash
 npm run cloud:order:create
 ```
 
-Inspect the current local and AWS state without changing it:
+Each invocation generates a new merchant reference, idempotency key, and
+correlation ID; it prints the API response and the two identifiers needed for
+CloudWatch investigation. The supervisor console shows the worker-to-vendor
+request, vendor response, and signed vendor-to-API webhook exchanges without
+printing secrets or order addresses.
+
+Inspect the lab supervisor, stack, API, vendor, and tunnel state without
+changing them:
 
 ```bash
 npm run cloud:status
 ```
 
-The first `Ctrl+C` in the deployment console requests an orderly teardown. The
-supervisor waits for any current workflow operation, runs and watches the
-GitHub destroy operation, verifies that the application stack and artifact
-prefix are absent, stops only its owned tunnel and vendor processes, removes
-temporary credentials, and prints the final cleanup status. A second interrupt
-is ignored while cleanup is running.
+### Teardown and recovery
+
+Press `Ctrl+C` once in the original deployment console when the learning
+session is finished. This requests teardown; it does not abruptly terminate
+the supervisor. The current operation first settles, then the supervisor:
+
+1. dispatches and monitors the GitHub `destroy` operation;
+2. verifies that the application stack is absent;
+3. verifies that the project deployment-artifact prefix is empty;
+4. removes the temporary Cognito user with the stack;
+5. stops only the tunnel and mock-vendor processes it owns;
+6. deletes its temporary local credentials and signing material; and
+7. prints `AWS LAB DESTROYED` with the verified final state.
+
+Wait for that final message before closing the terminal. A second interrupt is
+ignored while cleanup is running.
 
 If the terminal, computer, or network disappears before that verification can
-finish, recover idempotently with:
+finish, run the idempotent recovery command after connectivity returns:
 
 ```bash
 npm run cloud:destroy
 ```
 
-An existing healthy lab-owned vendor/tunnel is reused. Stale owned processes
-are replaced. An unrelated mock server is never killed or reconfigured; the lab
-selects another free port. A stable existing application stack is reused only
-when both its reviewed commit and live vendor URL match, otherwise the workflow
-prepares an update. In-progress operations are allowed to settle, and unsafe
-CloudFormation failure states stop deployment and enter verified teardown.
+If the original supervisor is still active, this command asks it to begin the
+same verified teardown and tells the operator to watch the original terminal.
+If the supervisor is gone, the command uses the permission-limited recovery
+state under `.aws-sam/cloud-lab/` to complete and verify cleanup directly.
 
-The command requires GitHub CLI authentication once (`gh auth login`). It uses
-GitHub OIDC for deployment; it never places long-lived AWS credentials in
-GitHub.
+Only one supervisor can own the lab at a time. A later run safely reuses healthy
+lab-owned processes and matching cloud state, replaces stale owned processes,
+and leaves unrelated mock servers untouched. A stable stack is reused only
+when its reviewed commit and temporary vendor boundary match; otherwise the
+workflow prepares an update. Unsafe CloudFormation states stop deployment and
+enter verified teardown instead of being updated blindly.
+
+GitHub Actions receives short-lived AWS credentials through OIDC. Long-lived
+AWS access keys are never copied into GitHub. The lab removes the temporary
+application stack, but deliberately retains the separately reviewed OIDC roles,
+empty deployment bucket, and AWS Budget used by future sessions.
 
 ## Local mock delivery vendor
 
