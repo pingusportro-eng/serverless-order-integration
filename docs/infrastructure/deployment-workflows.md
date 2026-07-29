@@ -109,6 +109,12 @@ Post-update verification confirmed:
 - the `$1` Budget reports `$0.00` actual and forecast spend, subject to normal
   billing delay.
 
+CloudFormation drift detection later began inspecting CloudWatch Logs field
+index policies for managed log groups. The execution role therefore also needs
+the read-only regional action `logs:DescribeIndexPolicies`; without it, drift
+detection ends as `DETECTION_FAILED` before it can report `IN_SYNC` or
+`DRIFTED`.
+
 ## Persistent deployment infrastructure
 
 The bootstrap template adds exactly one resource:

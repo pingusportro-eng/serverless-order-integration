@@ -240,6 +240,22 @@ const executionMessagingPolicy = executionRole.Policies.find(
 assert.ok(executionMessagingPolicy);
 assert.deepEqual(
   executionMessagingPolicy.PolicyDocument.Statement.find(
+    (statement) => statement.Sid === 'DescribeRegionalLogGroups',
+  ),
+  {
+    Sid: 'DescribeRegionalLogGroups',
+    Effect: 'Allow',
+    Action: ['logs:DescribeIndexPolicies', 'logs:DescribeLogGroups'],
+    Resource: '*',
+    Condition: {
+      StringEquals: {
+        'aws:RequestedRegion': 'eu-central-1',
+      },
+    },
+  },
+);
+assert.deepEqual(
+  executionMessagingPolicy.PolicyDocument.Statement.find(
     (statement) => statement.Sid === 'ManageRegionalMessagingDiscoveryAndSubscriptions',
   ),
   {

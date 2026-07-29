@@ -255,7 +255,9 @@ Resources:
                   Fn::Sub: arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/serverless-order-integration/serverless-order-integration-dev/*
               - Sid: DescribeRegionalLogGroups
                 Effect: Allow
-                Action: logs:DescribeLogGroups
+                Action:
+                  - logs:DescribeIndexPolicies
+                  - logs:DescribeLogGroups
                 Resource: '*'
                 Condition:
                   StringEquals:
