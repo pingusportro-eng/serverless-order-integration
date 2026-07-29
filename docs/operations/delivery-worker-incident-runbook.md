@@ -439,4 +439,4 @@ The drill procedure and complete failure-class inventory are:
 
 - [Vendor rate-limit and worker-DLQ drill](../testing/vendor-rate-limit-dlq-drill.md)
 - [Phase 7.2 failure-drill inventory](../testing/phase-7-failure-drill-inventory.md)
-
+- [Exercise postmortem: delivery-provider rate limit and worker DLQ](postmortem-2026-07-29-vendor-rate-limit.md)

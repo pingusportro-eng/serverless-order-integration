@@ -399,12 +399,14 @@ For every step, the review should answer:
   - Evidence:
     [Phase 7.2 failure-drill inventory](docs/testing/phase-7-failure-drill-inventory.md).
 
-- [ ] **7.3 — Write an incident runbook and postmortem**
+- [x] **7.3 — Write an incident runbook and postmortem**
   - Document how to inspect logs, queues, DLQ messages, and failed Lambda calls.
   - Write one concise example incident postmortem with root cause and follow-ups.
   - Verification: follow the runbook from a deliberately introduced failure.
   - Runbook:
     [Delivery-worker backlog and DLQ incident runbook](docs/operations/delivery-worker-incident-runbook.md).
+  - Postmortem:
+    [Delivery-provider rate limit and worker-DLQ exercise](docs/operations/postmortem-2026-07-29-vendor-rate-limit.md).
 
 - [ ] **7.4 — Finish the project documentation**
   - Add the final architecture, setup, local workflow, deployment, teardown, cost
@@ -433,14 +435,10 @@ For every step, the review should answer:
 
 ## Next step
 
-Continue **7.3 — Write an incident runbook and postmortem** with one concise
-postmortem for the completed vendor `429` -> worker retry -> DLQ ->
-managed-redrive journey.
-
-The runbook now documents detection, read-only triage, message-inspection
-hazards, failure classification, the managed-redrive decision gate, recovery,
-and verification. The postmortem should apply that structure to the validated
-exercise, distinguish the deliberate vendor failure from defects discovered in
-the drill tooling, and assign concrete follow-up actions.
+Begin **7.4 — Finish the project documentation** with a read-only README gap
+inventory mapped to the definition of done. Review whether a new developer can
+find and follow the final architecture, setup, local workflow, deployment,
+teardown, cost model, security decisions, limitations, and trade-offs before
+editing the README.
 
 This documentation step creates no AWS resources and costs `$0`.
