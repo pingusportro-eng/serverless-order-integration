@@ -392,10 +392,12 @@ For every step, the review should answer:
   - Review cost before adding custom metrics or paid alarms.
   - Verification: trace one order through every component.
 
-- [ ] **7.2 — Run failure drills**
+- [x] **7.2 — Run failure drills**
   - Exercise vendor timeout, `429`, `500`, duplicate delivery, poison message,
     invalid webhook, and conditional-write conflict scenarios.
   - Verification: capture detection, diagnosis, recovery, and prevention notes.
+  - Evidence:
+    [Phase 7.2 failure-drill inventory](docs/testing/phase-7-failure-drill-inventory.md).
 
 - [ ] **7.3 — Write an incident runbook and postmortem**
   - Document how to inspect logs, queues, DLQ messages, and failed Lambda calls.
@@ -429,20 +431,13 @@ For every step, the review should answer:
 
 ## Next step
 
-Begin **7.2 — Run failure drills** with a read-only inventory that maps the
-required Phase 7.2 scenarios to the extensive local and cloud evidence already
-captured in `docs/testing/`.
+Begin **7.3 — Write an incident runbook and postmortem** using the completed
+vendor `429` -> worker retry -> DLQ -> managed-redrive journey.
 
-Step 7.1 is complete locally. Safe structured records preserve the effective
-correlation, event, order, version, outcome, and retry context across the
-application boundaries. Cross-boundary tests prove the successful trace, and
-the
-[CloudWatch Logs Insights query cookbook](docs/operations/cloudwatch-query-cookbook.md)
-covers correlation, order, event, retry, Lambda failure, and API access
-investigations.
+The first small reviewable step is a runbook for detecting, diagnosing, and
+recovering a delivery-worker backlog without changing or deleting messages
+until their identity and failure class are verified. It will link the existing
+CloudWatch query cookbook and use the Phase 7.2 evidence instead of requiring
+another AWS deployment.
 
-The Phase 7.2 inventory creates no AWS resources and costs `$0`. It must reuse
-existing failure evidence before proposing another cloud drill. Running Logs
-Insights queries, deploying the extra success logs, or adding custom metrics,
-alarms, dashboards, tracing, or longer retention remains separately
-cost-reviewed.
+This documentation step creates no AWS resources and costs `$0`.
