@@ -124,15 +124,81 @@ the
 `-- tests/                   Automated tests
 ```
 
-Directories will gain content only when their corresponding plan step begins.
+## Prerequisites
 
-## Local development
+The local workflow has been verified on Linux and uses:
 
-Install the exact dependency versions recorded in `package-lock.json`:
+| Tool | Required version or capability | Used for |
+| --- | --- | --- |
+| Git | A current version | Cloning and source-control workflows |
+| Node.js | `24.x` | Application, tests, and build scripts |
+| npm | `11.x` | Locked dependency installation and project commands |
+| Docker | Docker Engine with Compose v2 | DynamoDB Local and SAM Lambda containers |
+| AWS CLI | Version 2 | Creating and inspecting the local DynamoDB table |
+| AWS SAM CLI | A current version supporting Node.js 24 | Building and running Lambda locally |
+| Bash and curl | Standard Linux versions | Local orchestration and HTTP smoke tests |
+
+Confirm the principal versions before setup:
 
 ```bash
+node --version
+npm --version
+docker --version
+docker compose version
+aws --version
+sam --version
+```
+
+An AWS account and AWS credentials are **not required** for local development.
+The DynamoDB scripts provide deliberately fake credentials and explicitly use
+the loopback-only local endpoint. Docker must be running before starting
+DynamoDB Local or AWS SAM.
+
+## Local quick start
+
+Clone the repository and install the exact dependency versions from
+`package-lock.json`:
+
+```bash
+git clone https://github.com/pingusportro-eng/serverless-order-integration.git
+cd serverless-order-integration
 npm ci
 ```
+
+Run the non-interactive local API journey:
+
+```bash
+npm run test:sam
+```
+
+This starts DynamoDB Local, creates its table, builds the Lambda code, starts
+the API on an available loopback port, and verifies order creation, retrieval,
+listing, status reconciliation, and a signed duplicate-safe webhook. It stops
+the temporary API automatically but leaves DynamoDB Local running so its data
+can be reused.
+
+For an interactive API instead, run:
+
+```bash
+npm run sam:local
+```
+
+After the ready message appears, verify it from a second terminal:
+
+```bash
+curl --silent --fail 'http://127.0.0.1:3000/orders?limit=1'
+```
+
+Stop the SAM API with `Ctrl+C`, then stop the local database:
+
+```bash
+npm run dynamodb:stop
+```
+
+This quick start creates no AWS resources and incurs no AWS cost. The detailed
+DynamoDB, SAM, test, and mock-vendor workflows follow.
+
+## Local quality checks
 
 Run every local quality check:
 
