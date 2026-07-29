@@ -443,6 +443,7 @@ for (const expectedLabControl of [
   'await verifyDestroyed()',
   "process.kill(-savedProcess.pid, 'SIGTERM')",
   'Change set validated; execution will continue automatically.',
+  "run.headSha !== head && operation !== 'destroy'",
   'pending_deployments',
 ]) {
   assert.equal(

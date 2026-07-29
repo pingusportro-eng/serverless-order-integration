@@ -251,6 +251,11 @@ are absent, stops owned local processes, and prints the final status. Power
 loss, `SIGKILL`, or lost connectivity cannot guarantee automatic cleanup, so
 `npm run cloud:destroy` is the idempotent recovery command.
 
+A destroy run is matched by its exact operation even if `master` advanced after
+the lab started. Prepare and execute remain bound to their reviewed commit, but
+teardown must not fail merely because a documentation or safety fix was pushed
+during a live lab.
+
 ### `prepare`
 
 The prepare operation:

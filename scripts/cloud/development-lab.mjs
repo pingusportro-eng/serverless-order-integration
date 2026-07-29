@@ -659,7 +659,7 @@ async function listWorkflowRuns() {
 async function findActiveWorkflow(head, operation) {
   const runs = await listWorkflowRuns();
   for (const run of runs) {
-    if (run.headSha !== head || run.status === 'completed') {
+    if ((run.headSha !== head && operation !== 'destroy') || run.status === 'completed') {
       continue;
     }
     const detail = parseJson(
@@ -717,12 +717,20 @@ async function dispatchWorkflow(operation, fields, head) {
 
   for (let attempt = 1; attempt <= 30; attempt += 1) {
     const runs = await listWorkflowRuns();
-    const run = runs.find(
-      (candidate) => candidate.headSha === head && !beforeIds.has(candidate.databaseId),
+    const candidates = runs.filter(
+      (candidate) =>
+        !beforeIds.has(candidate.databaseId) &&
+        (candidate.headSha === head || operation === 'destroy'),
     );
-    if (run !== undefined) {
-      print(`GitHub ${operation} run: ${String(run.databaseId)}`);
-      return run.databaseId;
+    for (const candidate of candidates) {
+      const detail = parseJson(
+        (await gh(['run', 'view', String(candidate.databaseId), '--json', 'jobs'])).stdout,
+        'dispatched GitHub workflow',
+      );
+      if ((detail.jobs ?? []).some((job) => job.name === `${operation} development`)) {
+        print(`GitHub ${operation} run: ${String(candidate.databaseId)}`);
+        return candidate.databaseId;
+      }
     }
     await sleep(1_000);
   }
