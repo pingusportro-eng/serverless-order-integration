@@ -403,6 +403,8 @@ For every step, the review should answer:
   - Document how to inspect logs, queues, DLQ messages, and failed Lambda calls.
   - Write one concise example incident postmortem with root cause and follow-ups.
   - Verification: follow the runbook from a deliberately introduced failure.
+  - Runbook:
+    [Delivery-worker backlog and DLQ incident runbook](docs/operations/delivery-worker-incident-runbook.md).
 
 - [ ] **7.4 — Finish the project documentation**
   - Add the final architecture, setup, local workflow, deployment, teardown, cost
@@ -431,13 +433,14 @@ For every step, the review should answer:
 
 ## Next step
 
-Begin **7.3 — Write an incident runbook and postmortem** using the completed
-vendor `429` -> worker retry -> DLQ -> managed-redrive journey.
+Continue **7.3 — Write an incident runbook and postmortem** with one concise
+postmortem for the completed vendor `429` -> worker retry -> DLQ ->
+managed-redrive journey.
 
-The first small reviewable step is a runbook for detecting, diagnosing, and
-recovering a delivery-worker backlog without changing or deleting messages
-until their identity and failure class are verified. It will link the existing
-CloudWatch query cookbook and use the Phase 7.2 evidence instead of requiring
-another AWS deployment.
+The runbook now documents detection, read-only triage, message-inspection
+hazards, failure classification, the managed-redrive decision gate, recovery,
+and verification. The postmortem should apply that structure to the validated
+exercise, distinguish the deliberate vendor failure from defects discovered in
+the drill tooling, and assign concrete follow-up actions.
 
 This documentation step creates no AWS resources and costs `$0`.
