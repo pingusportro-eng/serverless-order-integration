@@ -87,17 +87,84 @@ Most development and testing runs locally with AWS SAM, DynamoDB Local, and the
 mock vendor. Short-lived cloud labs verify the real AWS service integrations,
 IAM permissions, failure behavior, and cleanup.
 
-## Cost boundary
+## Cost controls
 
-The AWS budget is **$5 USD per month**. Before any deployment, we will review
-the resources, expected cost, and teardown procedure. Fixed-cost infrastructure
-requires explicit approval.
+The project ceiling is **$5 USD per month**. The account also has a `$1`
+`My Zero-Spend Budget`, and the cloud-lab supervisor refuses to deploy when its
+reported actual or forecast spend reaches that threshold. An AWS Budget is an
+alert and deployment gate here, not a hard service-side spending limit.
 
-The initial architecture deliberately excludes NAT Gateway, VPC-attached
-Lambda functions, API Gateway caching, WAF, custom domains, provisioned
-concurrency, and customer-managed KMS keys.
+The reviewed conservative estimate for one bounded deployment and smoke-test
+session is less than `$0.05`, without depending on every Free Tier allowance.
+Billing records can arrive late, so a `$0.00` Budget view immediately after a
+lab is evidence of the current billing view rather than proof that no usage
+charge will arrive.
 
-## Logging safety
+The main cost controls are:
+
+- local-first development and tests, which use no AWS resources;
+- a short-lived application stack with verified teardown after each cloud lab;
+- API throttling at one request per second with a burst of two;
+- DynamoDB on-demand capacity with maximum read and write request controls;
+- two-record worker batches, two concurrent workers, and bounded Lambda and
+  vendor timeouts;
+- one-day log and queue-message retention;
+- AWS-managed encryption without customer-managed KMS request charges;
+- no continuously running compute, database instance, or provisioned
+  concurrency;
+- a lifecycle-managed deployment bucket with a 50 MB project artifact cap; and
+- an explicit account, Region, stack name, and AWS CLI profile in every cloud
+  operation.
+
+The architecture deliberately excludes NAT Gateway, VPC-attached Lambda
+functions, VPC endpoints, load balancers, API Gateway caching, WAF, custom
+domains, provisioned DynamoDB capacity, DAX, global tables, provisioned event
+pollers, customer-managed KMS keys, Secrets Manager, paid custom metrics,
+alarms, dashboards, tracing, and synthetic canaries.
+
+The empty deployment bucket, GitHub OIDC provider, two deployment roles, and
+Budget remain between sessions and have an expected recurring cost of `$0` at
+the current learning scale. The detailed resource calculations, assumptions,
+and teardown gates are in the
+[pre-deployment cost review](docs/infrastructure/pre-deployment-cost-review.md)
+and
+[controlled deployment workflow](docs/infrastructure/deployment-workflows.md).
+Any future fixed-cost service, higher limit, longer retention, or materially
+larger test requires a new cost review.
+
+## Security decisions
+
+- **Client authentication:** API Gateway verifies Cognito access-token
+  signature, issuer, audience, and expiry before invoking authenticated order
+  routes.
+- **Authorization:** the MVP maps approved test identities to the fixed
+  `mrc_demo` merchant; status changes additionally require the Cognito
+  `operators` group.
+- **Vendor webhooks:** the public webhook verifies an HMAC over the timestamp
+  and raw request body using constant-time comparison, rejects requests outside
+  the five-minute replay window, and durably deduplicates provider event IDs.
+- **Deployment identity:** GitHub Actions obtains short-lived AWS credentials
+  through an immutable, wildcard-free OIDC trust. GitHub can operate only the
+  development application stack and pass only the dedicated CloudFormation
+  execution role.
+- **Runtime IAM:** each Lambda role is scoped to the table, stream, topic, or
+  queue operations that function needs. Provisioning permissions are isolated
+  in the CloudFormation role rather than granted to GitHub or application
+  code.
+- **Secrets:** application secrets are stored in the protected GitHub
+  `development` environment, passed as `NoEcho` CloudFormation parameters, and
+  handled through permission-limited temporary files. They are never committed
+  or placed in GitHub as long-lived AWS access keys.
+- **Encryption and exposure:** DynamoDB, SQS, and deployment artifacts use
+  service-managed encryption. The API has conservative throttling, while the
+  temporary vendor boundary requires a bearer token over HTTPS.
+
+The complete identity and permission analysis is in the
+[GitHub OIDC review](docs/infrastructure/github-oidc-review.md). Authentication
+and infrastructure choices are recorded in the
+[architecture decisions](docs/decisions/README.md).
+
+### Logging safety
 
 Application logs use stable event names and an allow-list of operational fields.
 Do not log authorization values, secrets, full request bodies, delivery addresses,
@@ -525,6 +592,54 @@ npm run test:mock-vendor
 See the [mock delivery provider contract](docs/specifications/mock-delivery-provider.md)
 for request examples and scenario controls. The server is local-only and does
 not contact AWS or incur AWS cost.
+
+## Limitations
+
+This is a production-minded learning system, not a production-ready delivery
+platform:
+
+- It supports one fixed merchant, `mrc_demo`; it does not derive a tenant from
+  a trusted identity claim or provide tenant isolation.
+- Cognito direct-user authentication represents synthetic operators, not
+  partner machine-to-machine credentials, scopes, federation, or credential
+  rotation.
+- The delivery provider is a local mock exposed temporarily through a
+  third-party Quick Tunnel. Cloud exercises depend on the developer computer
+  and network remaining available.
+- The cloud supervisor is intentionally bound to one AWS account, Region,
+  repository, branch, stack, Budget, and CLI profile.
+- API Gateway HTTP API does not provide the REST-API features omitted here,
+  including API keys and usage plans, gateway request validation, caching, WAF
+  integration, or private endpoints. Request validation therefore runs in
+  Lambda.
+- The single-region DynamoDB table has no point-in-time recovery, backups,
+  cross-region replication, or disaster-recovery design.
+- Standard SNS and SQS provide at-least-once delivery without global ordering
+  or an exactly-once guarantee. Application idempotency, aggregate versions,
+  conditional writes, and provider submission keys provide the safety model.
+- One-day log and failure-message retention supports short exercises, not
+  compliance archives or long-running incident investigations.
+- The stack has structured logs and native service metrics but no custom
+  alarms, dashboard, distributed tracing, or automated paging.
+- Local SAM and DynamoDB Local cannot prove IAM, Cognito authorization, managed
+  retries, service quotas, CloudWatch behavior, or real event-source wiring;
+  bounded cloud exercises remain necessary.
+
+## Architectural trade-offs
+
+| Decision | Benefit for this project | Accepted cost or limitation |
+| --- | --- | --- |
+| API Gateway HTTP API instead of REST API | Lower-cost serverless HTTPS routing with JWT authorization | Fewer API-management and gateway-validation features |
+| DynamoDB on-demand | No idle throughput charge or capacity forecasting | Every request is metered; good keys and request bounds still matter |
+| DynamoDB Streams, SNS, and SQS | Avoids the database/message dual write and demonstrates fan-out, buffering, retries, and DLQs | More services, IAM, eventual consistency, duplicate delivery, and operational paths |
+| Standard messaging instead of FIFO | Simple fan-out and scalable asynchronous delivery | Ordering and deduplication are application responsibilities |
+| SAM and CloudFormation | Concise serverless IaC plus local Lambda/API execution | AWS-specific tooling; Terraform remains a useful follow-up exercise |
+| Local-first layered tests | Fast feedback and `$0` normal development cost | Managed-service behavior still requires targeted AWS verification |
+| GitHub environment secrets instead of Secrets Manager | Avoids three continuously stored paid secrets in this learning stack | Secret rotation and local-file handling are operator responsibilities |
+| Temporary Quick Tunnel instead of a hosted vendor | Exercises real outbound HTTPS and webhooks without continuously deployed compute | Learning-only third-party dependency with no availability guarantee |
+
+The detailed alternatives and reconsideration conditions are maintained in the
+[architecture decision records](docs/decisions/README.md).
 
 ## Working agreement
 
