@@ -182,14 +182,55 @@ the
 
 ```text
 .
-|-- PLAN.md                  Project roadmap and progress
-|-- README.md                Project introduction
+|-- .github/workflows/       Pull-request checks and controlled cloud deployment
 |-- docs/
+|   |-- architecture/        Editable full-stack diagram
 |   |-- decisions/           Architecture decision records
-|   `-- specifications/      Business and API specifications
-|-- src/                     Application source code
-`-- tests/                   Automated tests
+|   |-- infrastructure/      Cost, IAM, deployment, test, and teardown reviews
+|   |-- operations/          Observability, query, incident, and postmortem guides
+|   |-- specifications/      Business, API, domain, event, data, and vendor contracts
+|   `-- testing/             Error matrix and repeatable failure-drill procedures
+|-- infrastructure/          Persistent GitHub OIDC and deployment-role bootstrap
+|-- scripts/
+|   |-- ci/                  Change-set, smoke-test, and teardown controls
+|   |-- cloud/               Learning-lab supervisor and cloud failure drills
+|   |-- dynamodb/            DynamoDB Local schema and bootstrap
+|   |-- mock-vendor/         Local provider process entry point
+|   `-- sam/                 Local SAM smoke journey
+|-- src/
+|   |-- application/         Use cases, ports, validation, and reconciliation
+|   |-- domain/              Order model and status-transition rules
+|   |-- events/              Versioned domain and AWS-event mapping
+|   |-- http/                Transport handlers and HTTP contracts
+|   |-- infrastructure/      DynamoDB and in-memory repository adapters
+|   |-- integrations/        Delivery-provider contract and HTTP client
+|   |-- lambda/              Four deployable Lambda entry points
+|   |-- mock-vendor/         Deterministic delivery-provider implementation
+|   `-- observability/       Structured logging and request identifiers
+|-- tests/                   Unit, contract, integration, handler, and script tests
+|-- compose.yaml             Loopback-only DynamoDB Local service
+|-- template.yaml            Local SAM API template; never deployed
+|-- template.cloud.yaml      Complete deployable application stack
+|-- PLAN.md                  Roadmap, completed evidence, and definition of done
+`-- package.json             Supported toolchain and executable project commands
 ```
+
+Generated output under `dist/`, `coverage/`, and `.aws-sam/`, local DynamoDB
+data, and `.env.development.local` are intentionally excluded from source
+control.
+
+## Documentation map
+
+| Question | Start here |
+| --- | --- |
+| What problem and API does the system implement? | [Business requirements](docs/specifications/business-requirements.md), [OpenAPI contract](docs/specifications/openapi.yaml), and [domain model](docs/specifications/domain-model.md) |
+| How are data and events modeled? | [DynamoDB access patterns](docs/specifications/dynamodb-access-patterns.md), [domain events](docs/specifications/domain-events.md), and [event JSON Schema](docs/specifications/domain-event.schema.json) |
+| Why were these AWS services selected? | [Architecture decision index](docs/decisions/README.md) and [full-stack diagram](docs/architecture/full-cloud-stack.drawio) |
+| How do I run it locally? | [Local quick start](#local-quick-start), [DynamoDB Local](#dynamodb-local), [local SAM API](#local-api-with-aws-sam), and [mock-vendor contract](docs/specifications/mock-delivery-provider.md) |
+| How is AWS deployment controlled and secured? | [Deployment workflow](docs/infrastructure/deployment-workflows.md), [OIDC review](docs/infrastructure/github-oidc-review.md), and [cost review](docs/infrastructure/pre-deployment-cost-review.md) |
+| What proves the real cloud wiring and failures? | [Cloud smoke-test record](docs/infrastructure/cloud-smoke-tests.md), [error and event-journey matrix](docs/testing/error-and-event-journey-matrix.md), and [failure-drill inventory](docs/testing/phase-7-failure-drill-inventory.md) |
+| How do I investigate and recover an incident? | [Observability inventory](docs/operations/observability-inventory.md), [CloudWatch query cookbook](docs/operations/cloudwatch-query-cookbook.md), [incident runbook](docs/operations/delivery-worker-incident-runbook.md), and [exercise postmortem](docs/operations/postmortem-2026-07-29-vendor-rate-limit.md) |
+| What remains to be done? | [Project plan](PLAN.md) |
 
 ## Prerequisites
 
