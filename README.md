@@ -5,27 +5,87 @@ and asynchronous third-party integration with Node.js, TypeScript, and AWS.
 
 ## Status
 
-The project is in **Phase 6: GitHub Actions CI/CD**. Pull requests targeting
-`master` now run local quality, test, DynamoDB Local integration, and SAM
-validation/build checks. The workflow uses no AWS credentials and creates no
-AWS resources. The exact GitHub OIDC provider and two IAM roles are deployed
-and verified at expected AWS cost `$0`. The protected GitHub `development`
-environment and claim-only authentication run also passed. Application
-deployment remains separately approval-gated.
+The implementation and AWS integration exercises are complete. The project is
+in **Phase 7.4: final project documentation**, followed by the interview
+walkthrough.
+
+The REST API, DynamoDB persistence, asynchronous event path, mock delivery
+integration, signed webhook reconciliation, failure queues, observability, and
+controlled CI/CD deployment have all been exercised locally and in the
+development AWS account. The completed cloud exercises include successful order
+delivery, provider failures, bounded retries, DLQ isolation, managed redrive,
+and verified teardown.
+
+Pull requests targeting `master` run local quality checks, tests, DynamoDB Local
+integration, and SAM validation and build checks without AWS credentials.
+Development deployments use short-lived GitHub OIDC credentials, reviewed
+CloudFormation change sets, and an automated teardown that verifies the
+application resources are absent.
 
 Work is divided into small reviewable steps. See [PLAN.md](PLAN.md) for the
 current checklist, architecture, verification criteria, and definition of done.
 
-## Planned system
+## Architecture
 
-The system will accept orders through API Gateway and Lambda, store them in
-DynamoDB, publish changes through DynamoDB Streams and SNS, process delivery
-requests through SQS and Lambda, and receive signed status webhooks from a mock
-delivery vendor.
+The deployed system has a synchronous REST boundary and an asynchronous
+delivery-integration path:
 
-Most development and testing will run locally using AWS SAM, DynamoDB Local,
-and a local mock vendor. Short deployments will verify the real AWS service
-integrations and IAM configuration.
+```text
+Client
+  |
+  v
+API Gateway HTTP API -> Orders API Lambda -> DynamoDB
+                                                |
+                                         DynamoDB Stream
+                                                |
+                                                v
+                                        Publisher Lambda
+                                                |
+                                                v
+                                              SNS
+                                                |
+                             filtered order events
+                                                |
+                                                v
+                                      Delivery SQS queue
+                                                |
+                                                v
+                                      Delivery Worker Lambda
+                                                |
+                                                v
+                                      Mock delivery vendor
+                                                |
+                                    signed status webhook
+                                                |
+                                                v
+API Gateway public webhook route -> Webhook Lambda -> DynamoDB
+```
+
+The order routes use Cognito JWT authentication; status changes additionally
+require the operators group. The public vendor-webhook route uses an HMAC
+signature, a five-minute replay window, and durable event deduplication.
+
+DynamoDB Streams captures committed order changes. The publisher converts
+those changes into versioned domain events and publishes them to SNS. An SNS
+subscription selects `order.created` and
+`order.submission_retry_requested` for the Delivery Queue. The delivery worker
+calls the vendor with bounded concurrency, an HTTP timeout, and a stable
+idempotency key, then records the outcome transactionally.
+
+The failure boundaries are independent: discarded stream records have a
+publisher failure queue, failed SNS deliveries have a subscription DLQ, and
+messages that exhaust Delivery Queue receives move to the worker DLQ. Lambda
+event-source mappings use partial-batch responses so successfully processed
+records do not need to be retried with a failed neighbor.
+
+The editable
+[full AWS cloud-stack diagram](docs/architecture/full-cloud-stack.drawio)
+includes the runtime paths, authentication, IAM, observability, retry behavior,
+and all three retained-failure boundaries.
+
+Most development and testing runs locally with AWS SAM, DynamoDB Local, and the
+mock vendor. Short-lived cloud labs verify the real AWS service integrations,
+IAM permissions, failure behavior, and cleanup.
 
 ## Cost boundary
 
