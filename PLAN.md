@@ -408,7 +408,7 @@ For every step, the review should answer:
   - Postmortem:
     [Delivery-provider rate limit and worker-DLQ exercise](docs/operations/postmortem-2026-07-29-vendor-rate-limit.md).
 
-- [ ] **7.4 — Finish the project documentation**
+- [x] **7.4 — Finish the project documentation**
   - Add the final architecture, setup, local workflow, deployment, teardown, cost
     model, security decisions, limitations, and trade-offs to the README.
   - Verification: a new developer can follow the documented workflow.
@@ -435,10 +435,10 @@ For every step, the review should answer:
 
 ## Next step
 
-Begin **7.4 — Finish the project documentation** with a read-only README gap
-inventory mapped to the definition of done. Review whether a new developer can
-find and follow the final architecture, setup, local workflow, deployment,
-teardown, cost model, security decisions, limitations, and trade-offs before
-editing the README.
+Begin **7.5 — Prepare the interview walkthrough** with a concise system-design
+explanation for the complete synchronous API, asynchronous delivery path,
+failure handling, security boundaries, CI/CD controls, and cost model. Then
+expand it into a deeper technical walkthrough and practise likely follow-up
+questions.
 
-This documentation step creates no AWS resources and costs `$0`.
+Interview preparation creates no AWS resources and costs `$0`.

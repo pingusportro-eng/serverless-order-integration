@@ -5,9 +5,9 @@ and asynchronous third-party integration with Node.js, TypeScript, and AWS.
 
 ## Status
 
-The implementation and AWS integration exercises are complete. The project is
-in **Phase 7.4: final project documentation**, followed by the interview
-walkthrough.
+The implementation, AWS integration exercises, and final project documentation
+are complete. The project is in **Phase 7.5: interview walkthrough
+preparation**.
 
 The REST API, DynamoDB persistence, asynchronous event path, mock delivery
 integration, signed webhook reconciliation, failure queues, observability, and
@@ -319,26 +319,32 @@ run in the
 [pull-request workflow](docs/infrastructure/pull-request-checks.md).
 
 The exact short-lived GitHub-to-AWS identity boundary, local bootstrap template,
-and explicit approval gate are recorded in the
+and protected environment gate are recorded in the
 [GitHub OIDC review](docs/infrastructure/github-oidc-review.md).
 
 The individual commands are:
 
 - `npm run format:check` — verify formatting
 - `npm run lint` — run ESLint
+- `npm run lint:fix` — apply safe ESLint fixes
 - `npm run typecheck` — type-check without emitting files
 - `npm test` — run the unit tests once
 - `npm run test:watch` — rerun relevant tests while developing
 - `npm run test:coverage` — run tests and enforce coverage thresholds
+- `npm run test:contracts` — verify the versioned domain-event contract
 - `npm run test:delivery-worker` — test SQS validation, idempotency, and partial failures
 - `npm run test:integration` — bootstrap DynamoDB Local and test its repository
 - `npm run test:mock-vendor` — exercise every mock provider response mode
 - `npm run test:vendor-client` — verify provider error and retry classification
 - `npm run test:webhook` — verify webhook signatures, replay protection, and status changes
+- `npm run test:cloud-drill` — test the SNS subscription-DLQ drill harness locally
+- `npm run test:publisher-failure-drill` — test publisher poison-record recovery locally
+- `npm run test:vendor-rate-limit-drill` — test worker retry, DLQ, and redrive orchestration locally
 - `npm run sam:validate` — lint and validate the local SAM template
-- `npm run sam:build` — bundle the Lambda handler for the Node.js 24 runtime
+- `npm run sam:build` — bundle the local Lambda handlers for the Node.js 24 runtime
 - `npm run sam:cloud:validate` — lint the deployable cloud template without deploying
-- `npm run sam:cloud:build` — bundle the deployable synchronous Lambda functions locally
+- `npm run sam:cloud:build` — bundle all deployable Lambda functions locally
+- `npm run deployment:validate` — verify deployment controls without contacting AWS
 - `npm run oidc:validate` — verify and lint the local GitHub OIDC bootstrap
 - `npm run test:sam` — exercise every current API route through local SAM HTTP
 - `npm run test:stream-publisher` — map saved DynamoDB Stream records and test partial failures
@@ -441,11 +447,11 @@ configuration file for real credentials. The Lambda adapters use fixed dummy
 credentials whenever that endpoint is present, so they do not load an AWS
 profile or contact the DynamoDB service in an AWS account.
 
-Local SAM does not reproduce the planned API Gateway JWT authorizer. It uses the
-fixed `mrc_demo` learning tenant and permits the operator route locally. Cognito,
-JWT validation, operator claims, IAM, and the deployable DynamoDB resource are
-part of the reviewed cloud-infrastructure phase; this local template must not
-be deployed as the cloud stack.
+Local SAM does not reproduce the deployed API Gateway JWT authorizer. It uses
+the fixed `mrc_demo` learning tenant and permits the operator route locally.
+Cognito, JWT validation, operator claims, IAM, and the AWS DynamoDB resource
+exist only in the reviewed cloud template; the local template must not be
+deployed as the cloud stack.
 
 ## Deployable cloud template
 
@@ -606,9 +612,10 @@ cp .env.example .env.development.local
 chmod 600 .env.development.local
 ```
 
-Replace the placeholder with the same `VENDOR_AUTH_TOKEN` configured in the
-GitHub `development` environment. Never commit or paste this value into logs or
-chat. Build and start the mock provider on `http://127.0.0.1:4000`:
+Replace the placeholder with a `VENDOR_AUTH_TOKEN` containing at least 32
+characters. The cloud-lab supervisor synchronizes this value to the GitHub
+`development` environment without printing it. Never commit or paste it into
+logs or chat. Build and start the mock provider on `http://127.0.0.1:4000`:
 
 ```bash
 npm run mock-vendor:start
