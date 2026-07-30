@@ -93,7 +93,7 @@ SNS -> SQS -> delivery worker
         v
 POST delivery vendor
   X-Correlation-Id = event correlationId
-  Idempotency-Key = submissionKey
+  Idempotency-Key = deliveryProviderSubmissionKey
         |
         v
 DynamoDB SUBMITTED mutation

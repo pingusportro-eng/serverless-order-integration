@@ -32,8 +32,12 @@ function validateEventAgainstOrder(event: DeliveryRequestedEvent, order: Order):
   if (order.merchantId !== event.payload.merchantId) {
     throw new Error('Delivery event merchant does not match the stored order.');
   }
-  if (order.provider.submissionKey !== event.payload.submissionKey) {
-    throw new Error('Delivery event submission key does not match the stored order.');
+  if (
+    order.provider.deliveryProviderSubmissionKey !== event.payload.deliveryProviderSubmissionKey
+  ) {
+    throw new Error(
+      'The delivery-provider submission key in the event does not match the stored order.',
+    );
   }
   if (order.version < event.aggregateVersion) {
     throw new Error('Delivery event refers to an order version that is not available.');
@@ -50,7 +54,7 @@ function safelyCompletedBefore(event: DeliveryRequestedEvent, order: Order): boo
   }
 
   return (
-    order.provider.providerOrderId !== undefined ||
+    order.provider.deliveryProviderOrderId !== undefined ||
     order.status === 'SUBMISSION_FAILED' ||
     (event.eventType === 'order.created' && order.status === 'PENDING_SUBMISSION')
   );
@@ -87,7 +91,7 @@ async function resolveVersionConflict(
 function intendedOutcomeWasRecorded(intended: Order, current: Order): boolean {
   if (intended.status === 'SUBMITTED') {
     return (
-      current.provider.providerOrderId === intended.provider.providerOrderId &&
+      current.provider.deliveryProviderOrderId === intended.provider.deliveryProviderOrderId &&
       current.provider.acceptedAt === intended.provider.acceptedAt
     );
   }
@@ -131,7 +135,7 @@ export async function processDeliveryEvent(
       order,
       {
         targetStatus: 'SUBMITTED',
-        providerOrderId: acceptance.providerOrderId,
+        deliveryProviderOrderId: acceptance.deliveryProviderOrderId,
         acceptedAt: acceptance.acceptedAt,
       },
       (dependencies.now ?? (() => new Date()))().toISOString(),

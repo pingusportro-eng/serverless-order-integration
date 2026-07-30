@@ -1,7 +1,7 @@
 import { createOrder, type CreateOrderDependencies } from '../application/create-order.js';
 import {
   IdempotencyConflictError,
-  MerchantReferenceConflictError,
+  MerchantOrderIdConflictError,
   OrderAlreadyExistsError,
 } from '../application/order-repository.js';
 import type { MerchantId } from '../domain/order.js';
@@ -32,7 +32,7 @@ function readHeader(
 
 function conflictResponse(
   requestId: string,
-  code: 'IDEMPOTENCY_CONFLICT' | 'MERCHANT_REFERENCE_CONFLICT',
+  code: 'IDEMPOTENCY_CONFLICT' | 'MERCHANT_ORDER_ID_CONFLICT',
   detail: string,
 ): CreateOrderHttpResponse {
   return problemResponse(
@@ -98,8 +98,8 @@ export async function handleCreateOrder(
       return conflictResponse(request.requestId, 'IDEMPOTENCY_CONFLICT', error.message);
     }
 
-    if (error instanceof MerchantReferenceConflictError) {
-      return conflictResponse(request.requestId, 'MERCHANT_REFERENCE_CONFLICT', error.message);
+    if (error instanceof MerchantOrderIdConflictError) {
+      return conflictResponse(request.requestId, 'MERCHANT_ORDER_ID_CONFLICT', error.message);
     }
 
     if (error instanceof OrderAlreadyExistsError) {

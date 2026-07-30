@@ -60,7 +60,7 @@ const MAX_RETRY_AFTER_MS = 60_000;
 function toSubmission(order: Order): DeliveryProviderSubmission {
   return {
     platformOrderId: order.orderId,
-    merchantOrderReference: order.merchantOrderReference,
+    merchantOrderId: order.merchantOrderId,
     items: order.items.map((item) => ({
       itemReference: item.itemReference,
       quantity: item.quantity,
@@ -77,9 +77,9 @@ function isAcceptance(value: unknown): value is DeliveryProviderAcceptance {
 
   const candidate = value as Record<string, unknown>;
   return (
-    typeof candidate['providerOrderId'] === 'string' &&
-    candidate['providerOrderId'].length >= 1 &&
-    candidate['providerOrderId'].length <= 128 &&
+    typeof candidate['deliveryProviderOrderId'] === 'string' &&
+    candidate['deliveryProviderOrderId'].length >= 1 &&
+    candidate['deliveryProviderOrderId'].length <= 128 &&
     candidate['status'] === 'ACCEPTED' &&
     typeof candidate['acceptedAt'] === 'string' &&
     Number.isFinite(Date.parse(candidate['acceptedAt']))
@@ -211,7 +211,7 @@ export function createDeliveryVendorClient(
           headers: {
             Authorization: `Bearer ${options.authToken}`,
             'Content-Type': 'application/json',
-            'Idempotency-Key': order.provider.submissionKey,
+            'Idempotency-Key': order.provider.deliveryProviderSubmissionKey,
             'X-Correlation-Id': correlationId,
           },
           body: JSON.stringify(toSubmission(order)),
@@ -249,7 +249,7 @@ export function createDeliveryVendorClient(
       }
 
       return {
-        providerOrderId: body.providerOrderId,
+        deliveryProviderOrderId: body.deliveryProviderOrderId,
         status: body.status,
         acceptedAt: body.acceptedAt,
       };

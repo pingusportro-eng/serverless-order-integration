@@ -1,7 +1,7 @@
 {
   "eventId": "evt_01JABCDEF0123456789C",
   "eventType": "order.delivery_failed",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "aggregateType": "ORDER",
   "aggregateId": "ord_01JABCDEF0123456789",
   "aggregateVersion": 4,
@@ -12,8 +12,8 @@
     "merchantId": "mrc_demo",
     "previousStatus": "PICKED_UP",
     "status": "DELIVERY_FAILED",
-    "providerCode": "mock-delivery",
-    "providerOrderId": "delivery-789",
+    "deliveryProviderCode": "mock-delivery",
+    "deliveryProviderOrderId": "delivery-789",
     "failure": {
       "stage": "DELIVERY",
       "reasonCode": "RECIPIENT_UNAVAILABLE",

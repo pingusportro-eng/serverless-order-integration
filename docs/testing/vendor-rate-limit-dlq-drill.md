@@ -17,7 +17,7 @@ Prove in AWS that one real `429` response from the mock delivery vendor:
 1. is classified as the retryable `RATE_LIMITED` vendor failure;
 2. makes the worker report only that SQS record as failed;
 3. keeps the order at `PENDING_SUBMISSION` without a status write;
-4. reuses one provider submission key across every attempt;
+4. reuses one delivery-provider submission key across every attempt;
 5. reaches the delivery-worker DLQ after the configured receive bound;
 6. can be inspected and redriven with the SQS managed-redrive API; and
 7. succeeds exactly once after the vendor recovers.
@@ -80,7 +80,7 @@ to that address. Lambda still resolves the public hostname normally.
 
 The drill will bypass the public API and conditionally insert exactly one valid
 synthetic order item into the deployed table. This avoids a Cognito user,
-idempotency record, merchant-reference record, and unrelated API cases while
+idempotency record, merchant order ID record, and unrelated API cases while
 still exercising the real asynchronous path:
 
 ```text
@@ -106,7 +106,7 @@ DynamoDB Stream -> publisher Lambda -> SNS -> delivery SQS queue
 
 The item will contain:
 
-- unique drill-prefixed order, merchant-reference, submission, correlation, and
+- unique drill-prefixed order, merchant order ID, submission, correlation, and
   causation identifiers;
 - only synthetic items, prices, and Bucharest test addresses;
 - status `PENDING_SUBMISSION`, version 1, and an `ORDER_CREATED` mutation;
@@ -178,7 +178,7 @@ It must inspect, without deleting:
 
 - exactly one DLQ message;
 - a body that parses as the expected `order.created` event;
-- the unique aggregate ID, submission key, correlation ID, and event version;
+- the unique aggregate ID, delivery-provider submission key, correlation ID, and event version;
 - an `ApproximateReceiveCount` greater than the configured bound; and
 - an order that remains `PENDING_SUBMISSION`, version 1, without provider
   acceptance or failure details.
@@ -198,7 +198,7 @@ After the exact DLQ message is verified:
 3. Call `StartMessageMoveTask` on the worker DLQ without a custom destination,
    which selects the message's original source queue.
 4. Poll `ListMessageMoveTasks` and require one completed move.
-5. Require the order to become `SUBMITTED`, version 2, with a provider order ID
+5. Require the order to become `SUBMITTED`, version 2, with a delivery-provider order ID
    and acceptance time.
 6. Require the delivery queue and worker DLQ to finish empty.
 
@@ -212,9 +212,9 @@ AWS managed redrive assigns a new message ID and enqueue time and can route a
 DLQ message back to its original source:
 <https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-configure-dead-letter-queue-redrive.html>.
 
-The successful worker transaction also creates a provider-order lookup item.
+The successful worker transaction also creates a delivery-provider-order lookup item.
 Cleanup must transactionally delete both the order and that lookup only after
-checking their exact drill identifiers, version, submission key, and provider
+checking their exact drill identifiers, version, delivery-provider submission key, and provider
 order ID. Their DynamoDB `REMOVE` records are excluded from publication.
 
 ## Guardrails and interruption recovery
@@ -390,5 +390,5 @@ The final independent audit found:
 | Managed redrive | `COMPLETED`; one message moved |
 | Budget | `$0.00` actual; `$0.00` forecast against the `$1` alert |
 
-The synthetic order and provider mapping were permanently deleted. The safe,
+The synthetic order and delivery-provider mapping were permanently deleted. The safe,
 ignored attempt journal remains available for local review.

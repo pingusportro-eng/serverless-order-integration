@@ -2,7 +2,7 @@ import {
   assertNextOrderVersion,
   assertOrderPageLimit,
   IdempotencyConflictError,
-  MerchantReferenceConflictError,
+  MerchantOrderIdConflictError,
   OrderAlreadyExistsError,
   OrderNotFoundError,
   OrderVersionConflictError,
@@ -14,7 +14,7 @@ import {
 } from '../../application/order-repository.js';
 import {
   ProviderEventIdConflictError,
-  ProviderOrderConflictError,
+  DeliveryProviderOrderIdConflictError,
   type ProviderWebhookRepository,
   type RecordProviderWebhookInput,
   type RecordProviderWebhookResult,
@@ -46,7 +46,7 @@ function orderListSortKey(order: Pick<Order, 'createdAt' | 'orderId'>): string {
 export class InMemoryOrderRepository implements OrderRepository, ProviderWebhookRepository {
   private readonly orders = new Map<string, Order>();
   private readonly idempotencyEntries = new Map<string, IdempotencyEntry>();
-  private readonly merchantReferences = new Map<string, OrderId>();
+  private readonly merchantOrderIds = new Map<string, OrderId>();
   private readonly providerOrders = new Map<string, { merchantId: MerchantId; orderId: OrderId }>();
   private readonly processedProviderEvents = new Map<string, ProcessedProviderEvent>();
 
@@ -73,9 +73,9 @@ export class InMemoryOrderRepository implements OrderRepository, ProviderWebhook
       return { outcome: 'replayed', order: cloneOrder(replayedOrder) };
     }
 
-    const referenceMapKey = tupleKey(order.merchantId, order.merchantOrderReference);
-    if (this.merchantReferences.has(referenceMapKey)) {
-      throw new MerchantReferenceConflictError();
+    const merchantOrderIdMapKey = tupleKey(order.merchantId, order.merchantOrderId);
+    if (this.merchantOrderIds.has(merchantOrderIdMapKey)) {
+      throw new MerchantOrderIdConflictError();
     }
 
     const orderMapKey = tupleKey(order.merchantId, order.orderId);
@@ -89,7 +89,7 @@ export class InMemoryOrderRepository implements OrderRepository, ProviderWebhook
       requestFingerprint,
       orderId: order.orderId,
     });
-    this.merchantReferences.set(referenceMapKey, order.orderId);
+    this.merchantOrderIds.set(merchantOrderIdMapKey, order.orderId);
 
     return { outcome: 'created', order: cloneOrder(storedOrder) };
   }
@@ -101,13 +101,15 @@ export class InMemoryOrderRepository implements OrderRepository, ProviderWebhook
     return order ? cloneOrder(order) : undefined;
   }
 
-  async getByProviderOrderId(
-    providerCode: Order['provider']['providerCode'],
-    providerOrderId: string,
+  async getByDeliveryProviderOrderId(
+    deliveryProviderCode: Order['provider']['deliveryProviderCode'],
+    deliveryProviderOrderId: string,
   ): Promise<Order | undefined> {
     await Promise.resolve();
 
-    const mapping = this.providerOrders.get(tupleKey(providerCode, providerOrderId));
+    const mapping = this.providerOrders.get(
+      tupleKey(deliveryProviderCode, deliveryProviderOrderId),
+    );
     if (mapping === undefined) {
       return undefined;
     }
@@ -164,14 +166,14 @@ export class InMemoryOrderRepository implements OrderRepository, ProviderWebhook
       throw new OrderVersionConflictError(existingOrder.version);
     }
 
-    const providerOrderId =
+    const deliveryProviderOrderId =
       mutation.previousStatus === 'PENDING_SUBMISSION' && order.status === 'SUBMITTED'
-        ? order.provider.providerOrderId
+        ? order.provider.deliveryProviderOrderId
         : undefined;
     const providerMapKey =
-      providerOrderId === undefined
+      deliveryProviderOrderId === undefined
         ? undefined
-        : tupleKey(order.provider.providerCode, providerOrderId);
+        : tupleKey(order.provider.deliveryProviderCode, deliveryProviderOrderId);
     const existingProviderOrder =
       providerMapKey === undefined ? undefined : this.providerOrders.get(providerMapKey);
     if (
@@ -179,13 +181,13 @@ export class InMemoryOrderRepository implements OrderRepository, ProviderWebhook
       (existingProviderOrder.merchantId !== order.merchantId ||
         existingProviderOrder.orderId !== order.orderId)
     ) {
-      throw new ProviderOrderConflictError();
+      throw new DeliveryProviderOrderIdConflictError();
     }
 
     const updatedOrder: Order = {
       orderId: existingOrder.orderId,
       merchantId: existingOrder.merchantId,
-      merchantOrderReference: existingOrder.merchantOrderReference,
+      merchantOrderId: existingOrder.merchantOrderId,
       status: order.status,
       items: structuredClone(existingOrder.items),
       total: structuredClone(existingOrder.total),

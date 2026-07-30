@@ -18,14 +18,14 @@ describe('domain event JSON Schema', () => {
     const schema = (await readJson(schemaUrl)) as AnySchema;
     validate = new Ajv2020({ allErrors: true, strict: true }).compile(schema);
     const fixtureNames = (await readdir(fixturesUrl))
-      .filter((name) => name.endsWith('.v1.json'))
+      .filter((name) => name.endsWith('.v2.json'))
       .sort();
     validFixtures = await Promise.all(
       fixtureNames.map((name) => readJson(new URL(name, fixturesUrl))),
     );
   });
 
-  it('accepts every representative version 1 fixture', () => {
+  it('accepts every representative version 2 fixture', () => {
     expect(validFixtures).toHaveLength(3);
 
     for (const fixture of validFixtures) {
@@ -63,7 +63,7 @@ describe('domain event JSON Schema', () => {
     const payload = eventWithUnknownField['payload'] as Record<string, unknown>;
     payload['dropoffAddress'] = 'must not travel in the event';
     const futureVersion = structuredClone(validFixtures[0]) as Record<string, unknown>;
-    futureVersion['schemaVersion'] = 2;
+    futureVersion['schemaVersion'] = 3;
 
     expect(validate(eventWithUnknownField)).toBe(false);
     expect(validate(futureVersion)).toBe(false);

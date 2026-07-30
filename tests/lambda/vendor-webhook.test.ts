@@ -60,7 +60,7 @@ function submittedOrder(order: Order): Order {
     order,
     {
       targetStatus: 'SUBMITTED',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
       acceptedAt: '2026-07-21T12:31:00.000Z',
     },
     '2026-07-21T12:31:00.000Z',
@@ -108,7 +108,7 @@ describe('vendor webhook Lambda adapter', () => {
       eventId: 'provider-event-1001',
       eventType: 'DELIVERY_PICKED_UP',
       occurredAt: '2026-07-21T12:32:00.000Z',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
     });
 
     const first = await handler()(eventFixture(rawBody));
@@ -128,7 +128,7 @@ describe('vendor webhook Lambda adapter', () => {
       eventId: 'provider-event-observable',
       eventType: 'DELIVERY_PICKED_UP',
       occurredAt: '2026-07-21T12:32:00.000Z',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
     });
     const logLines: string[] = [];
 
@@ -167,7 +167,7 @@ describe('vendor webhook Lambda adapter', () => {
       eventId: 'provider-event-fallback-correlation',
       eventType: 'DELIVERY_PICKED_UP',
       occurredAt: '2026-07-21T12:32:00.000Z',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
     });
     const event = eventFixture(rawBody);
     delete event.headers['x-correlation-id'];
@@ -190,7 +190,7 @@ describe('vendor webhook Lambda adapter', () => {
       eventId: 'provider-event-1002',
       eventType: 'DELIVERY_DELIVERED',
       occurredAt: '2026-07-21T12:34:00.000Z',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
     });
     const event = eventFixture(rawBody);
     event.headers['x-webhook-signature'] = `sha256=${'0'.repeat(64)}`;
@@ -229,7 +229,7 @@ describe('vendor webhook Lambda adapter', () => {
       eventId: 'provider-event-auth-matrix',
       eventType: 'DELIVERY_DELIVERED',
       occurredAt: '2026-07-21T12:34:00.000Z',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
     });
     const event = eventFixture(rawBody);
     mutate(event);
@@ -245,7 +245,7 @@ describe('vendor webhook Lambda adapter', () => {
       eventId: 'provider-event-1003',
       eventType: 'DELIVERY_DELIVERED',
       occurredAt: '2026-07-21T12:34:00.000Z',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
     });
     const expiredTimestamp = String(Number(NOW_SECONDS) - 301);
 
@@ -260,13 +260,13 @@ describe('vendor webhook Lambda adapter', () => {
       eventId: 'provider-event-1004',
       eventType: 'DELIVERY_DELIVERED',
       occurredAt: '2026-07-21T12:34:00.000Z',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
     });
     const stalePickupBody = JSON.stringify({
       eventId: 'provider-event-1005',
       eventType: 'DELIVERY_PICKED_UP',
       occurredAt: '2026-07-21T12:33:00.000Z',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
     });
 
     expect((await handler()(eventFixture(deliveredBody))).statusCode).toBe(204);
@@ -282,13 +282,13 @@ describe('vendor webhook Lambda adapter', () => {
       eventId: 'provider-event-1006',
       eventType: 'DELIVERY_PICKED_UP',
       occurredAt: '2026-07-21T12:32:00.000Z',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
     });
     const conflictingBody = JSON.stringify({
       eventId: 'provider-event-1006',
       eventType: 'DELIVERY_DELIVERED',
       occurredAt: '2026-07-21T12:34:00.000Z',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
     });
 
     expect((await handler()(eventFixture(firstBody))).statusCode).toBe(204);
@@ -305,7 +305,7 @@ describe('vendor webhook Lambda adapter', () => {
   it('returns a version mismatch after all three concurrent-write attempts conflict', async () => {
     let attempts = 0;
     const conflictingRepository: ProviderWebhookRepository = {
-      getByProviderOrderId: () => Promise.resolve(order),
+      getByDeliveryProviderOrderId: () => Promise.resolve(order),
       recordProviderWebhook: () => {
         attempts += 1;
         return Promise.reject(new OrderVersionConflictError(order.version + attempts));
@@ -322,7 +322,7 @@ describe('vendor webhook Lambda adapter', () => {
       eventId: 'provider-event-contention',
       eventType: 'DELIVERY_PICKED_UP',
       occurredAt: '2026-07-21T12:34:00.000Z',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
     });
 
     const response = await conflictingHandler(eventFixture(rawBody));
@@ -337,7 +337,7 @@ describe('vendor webhook Lambda adapter', () => {
       eventId: 'short',
       eventType: 'UNKNOWN',
       occurredAt: 'invalid',
-      providerOrderId: '',
+      deliveryProviderOrderId: '',
     });
 
     const response = await handler()(eventFixture(rawBody));
@@ -351,7 +351,7 @@ describe('vendor webhook Lambda adapter', () => {
       eventId: 'provider-event-1007',
       eventType: 'DELIVERY_DELIVERED',
       occurredAt: '2026-07-21T12:34:00.000Z',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
     });
     const event = eventFixture(rawBody);
     event.body = Buffer.from(rawBody, 'utf8').toString('base64');
@@ -373,12 +373,12 @@ describe('vendor webhook Lambda adapter', () => {
     expect(problemBody(response)).toMatchObject({ code: 'MALFORMED_REQUEST' });
   });
 
-  it('returns not found for an unknown provider reference', async () => {
+  it('returns not found for an unknown delivery-provider order ID', async () => {
     const rawBody = JSON.stringify({
       eventId: 'provider-event-1008',
       eventType: 'DELIVERY_DELIVERED',
       occurredAt: '2026-07-21T12:34:00.000Z',
-      providerOrderId: 'unknown-delivery',
+      deliveryProviderOrderId: 'unknown-delivery',
     });
 
     const response = await handler()(eventFixture(rawBody));
@@ -391,7 +391,7 @@ describe('vendor webhook Lambda adapter', () => {
     const failure = new Error('This internal detail must not be logged.');
     failure.name = 'AccessDeniedException';
     const failingRepository: ProviderWebhookRepository = {
-      getByProviderOrderId: () => Promise.reject(failure),
+      getByDeliveryProviderOrderId: () => Promise.reject(failure),
       recordProviderWebhook: () => Promise.reject(failure),
     };
     const logLines: string[] = [];
@@ -408,7 +408,7 @@ describe('vendor webhook Lambda adapter', () => {
       eventId: 'provider-event-1010',
       eventType: 'DELIVERY_PICKED_UP',
       occurredAt: '2026-07-21T12:34:00.000Z',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
     });
 
     const response = await failingHandler(eventFixture(rawBody));
@@ -429,7 +429,7 @@ describe('vendor webhook Lambda adapter', () => {
       eventId: 'provider-event-1009',
       eventType: 'DELIVERY_FAILED',
       occurredAt: '2026-07-21T12:34:00.000Z',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
       failure: {
         stage: 'DELIVERY',
         reasonCode: 'CUSTOMER_UNAVAILABLE',

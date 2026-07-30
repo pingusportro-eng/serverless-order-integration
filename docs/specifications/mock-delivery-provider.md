@@ -20,7 +20,7 @@ Required request headers:
 | --- | --- |
 | `Authorization` | `Bearer <token>` using the configured mock token. |
 | `Content-Type` | `application/json`. |
-| `Idempotency-Key` | The order's stable provider `submissionKey`; reuse it on every retry. |
+| `Idempotency-Key` | The order's stable provider `deliveryProviderSubmissionKey`; reuse it on every retry. |
 | `X-Correlation-Id` | The order-flow correlation reference. The mock echoes it on a successful response. |
 
 Request body:
@@ -28,7 +28,7 @@ Request body:
 ```json
 {
   "platformOrderId": "ord_example_123",
-  "merchantOrderReference": "merchant-order-123",
+  "merchantOrderId": "merchant-order-123",
   "items": [{ "itemReference": "item-1", "quantity": 2 }],
   "pickup": {
     "addressLine": "10 Example Street",
@@ -49,7 +49,7 @@ A new accepted submission returns `201 Created`:
 
 ```json
 {
-  "providerOrderId": "delivery_example_123",
+  "deliveryProviderOrderId": "delivery_example_123",
   "status": "ACCEPTED",
   "acceptedAt": "2026-07-22T10:30:00.000Z"
 }
@@ -108,7 +108,7 @@ The exact retry classification and bounded retry policy are defined by the
 The executable server can emit a safe live activity stream through its
 `onActivity` boundary. It records each inbound delivery request and response,
 plus each outbound webhook attempt and response. Records may contain method,
-path, status, scenario, correlation ID, platform/provider order IDs, event
+path, status, scenario, correlation ID, platform and delivery-provider order IDs, event
 identity, event type, and attempt number. They never contain authorization
 values, signing values, raw idempotency keys, request bodies, addresses, or raw
 provider responses.
@@ -116,7 +116,7 @@ provider responses.
 ## Delivery-status webhook
 
 The provider sends status events to `POST /webhooks/vendor`. Each event has a
-stable `eventId`, `providerOrderId`, occurrence time, and one of the event types
+stable `eventId`, `deliveryProviderOrderId`, occurrence time, and one of the event types
 defined by the OpenAPI `ProviderWebhookRequest` schema.
 
 The provider sends:
@@ -154,7 +154,7 @@ accepted delivery schedules:
 1. one signed `DELIVERY_PICKED_UP` callback after a short persistence delay;
 2. one signed `DELIVERY_DELIVERED` callback after pickup succeeds.
 
-Event IDs are deterministic for the accepted provider order and event type, and
+Event IDs are deterministic for the accepted delivery-provider order and event type, and
 the original delivery correlation ID is propagated. Replaying the original
 delivery submission does not schedule another callback journey. A `404`, `429`,
 `5xx`, network error, or timeout receives at most three callback attempts with

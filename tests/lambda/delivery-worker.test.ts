@@ -42,16 +42,16 @@ describe('SQS delivery worker', () => {
       orderId: asOrderId('ord_01JABCDEF0123456789'),
       merchantId,
       provider: {
-        providerCode: 'mock-delivery',
-        submissionKey: 'submission_01JABCDEF0123456789',
+        deliveryProviderCode: 'mock-delivery',
+        deliveryProviderSubmissionKey: 'submission_01JABCDEF0123456789',
       },
     });
     const transientOrder = createOrderFixture({
       orderId: asOrderId('ord_01JABCDEF0123456790'),
       merchantId,
       provider: {
-        providerCode: 'mock-delivery',
-        submissionKey: 'submission_01JABCDEF0123456790',
+        deliveryProviderCode: 'mock-delivery',
+        deliveryProviderSubmissionKey: 'submission_01JABCDEF0123456790',
       },
     });
     await seed(repository, successfulOrder);
@@ -69,7 +69,7 @@ describe('SQS delivery worker', () => {
         );
       }
       return Promise.resolve({
-        providerOrderId: 'delivery-success-123',
+        deliveryProviderOrderId: 'delivery-success-123',
         status: 'ACCEPTED',
         acceptedAt: '2026-07-23T10:00:05.000Z',
       });
@@ -151,7 +151,7 @@ describe('SQS delivery worker', () => {
       status: 'SUBMITTED',
       version: 2,
       provider: {
-        providerOrderId: 'delivery-success-123',
+        deliveryProviderOrderId: 'delivery-success-123',
         acceptedAt: '2026-07-23T10:00:05.000Z',
       },
     });
@@ -169,8 +169,8 @@ describe('SQS delivery worker', () => {
       orderId: asOrderId(event.aggregateId),
       merchantId,
       provider: {
-        providerCode: 'mock-delivery',
-        submissionKey: event.payload.submissionKey,
+        deliveryProviderCode: 'mock-delivery',
+        deliveryProviderSubmissionKey: event.payload.deliveryProviderSubmissionKey,
       },
     });
     await seed(repository, order);

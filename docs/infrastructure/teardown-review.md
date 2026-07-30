@@ -64,8 +64,8 @@ pool both report deletion protection disabled.
 
 The remaining cloud data was synthetic test data:
 
-- five DynamoDB items: one order, one idempotency item, one merchant-reference
-  item, one provider-order mapping, and one processed-event marker;
+- five DynamoDB items: one order, one idempotency item, one merchant order ID
+  item, one delivery-provider-order mapping, and one processed-event marker;
 - one confirmed Cognito user:
   `smoke-operator-20260725t043855z`; and
 - the deployed Lambda code/configuration and API endpoint.

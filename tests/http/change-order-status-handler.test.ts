@@ -37,7 +37,7 @@ describe('PATCH /orders/{orderId}/status handler', () => {
         body: {
           targetStatus: 'SUBMITTED',
           reason: 'Reconciled with the provider.',
-          providerOrderId: 'provider-123',
+          deliveryProviderOrderId: 'provider-123',
         },
       },
     );
@@ -48,10 +48,10 @@ describe('PATCH /orders/{orderId}/status handler', () => {
       body: {
         status: 'SUBMITTED',
         version: 2,
-        provider: { providerOrderId: 'provider-123', acceptedAt: now().toISOString() },
+        provider: { deliveryProviderOrderId: 'provider-123', acceptedAt: now().toISOString() },
       },
     });
-    expect(response.body).not.toHaveProperty('provider.submissionKey');
+    expect(response.body).not.toHaveProperty('provider.deliveryProviderSubmissionKey');
   });
 
   it('requires a valid If-Match header', async () => {
@@ -109,7 +109,7 @@ describe('PATCH /orders/{orderId}/status handler', () => {
       status: 'DELIVERED',
       provider: {
         ...createOrderFixture().provider,
-        providerOrderId: 'provider-delivered',
+        deliveryProviderOrderId: 'provider-delivered',
         acceptedAt: '2026-07-22T09:00:00.000Z',
       },
       version: 4,
@@ -216,7 +216,7 @@ describe('PATCH /orders/{orderId}/status handler', () => {
       statusCode: 422,
       body: {
         code: 'VALIDATION_ERROR',
-        errors: [{ pointer: '#/providerOrderId' }],
+        errors: [{ pointer: '#/deliveryProviderOrderId' }],
       },
     });
   });

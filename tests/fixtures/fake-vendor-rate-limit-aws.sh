@@ -61,12 +61,12 @@ attempt_log() {
 append_attempt() {
   local scenario="$1"
   local status="$2"
-  local submission_key
+  local delivery_provider_submission_key
   local correlation_id
   local digest
-  submission_key="$(order_value '.order.M.provider.M.submissionKey.S')"
+  delivery_provider_submission_key="$(order_value '.order.M.provider.M.deliveryProviderSubmissionKey.S')"
   correlation_id="$(order_value '.mutation.M.correlationId.S')"
-  digest="$(printf %s "$submission_key" | sha256sum | awk '{print $1}')"
+  digest="$(printf %s "$delivery_provider_submission_key" | sha256sum | awk '{print $1}')"
   jq -cn \
     --arg scenario "$scenario" \
     --arg correlationId "$correlation_id" \
@@ -89,11 +89,11 @@ domain_event() {
     --arg occurredAt "$(order_value '.order.M.updatedAt.S')" \
     --arg correlationId "$(order_value '.mutation.M.correlationId.S')" \
     --arg causationId "$(order_value '.mutation.M.causationId.S')" \
-    --arg submissionKey "$(order_value '.order.M.provider.M.submissionKey.S')" '
+    --arg deliveryProviderSubmissionKey "$(order_value '.order.M.provider.M.deliveryProviderSubmissionKey.S')" '
       {
         eventId: $eventId,
         eventType: "order.created",
-        schemaVersion: 1,
+        schemaVersion: 2,
         aggregateType: "ORDER",
         aggregateId: $orderId,
         aggregateVersion: 1,
@@ -103,8 +103,8 @@ domain_event() {
         payload: {
           merchantId: "mrc_demo",
           status: "PENDING_SUBMISSION",
-          providerCode: "mock-delivery",
-          submissionKey: $submissionKey
+          deliveryProviderCode: "mock-delivery",
+          deliveryProviderSubmissionKey: $deliveryProviderSubmissionKey
         }
       }
     '
@@ -408,14 +408,14 @@ case "$service:$operation" in
     [[ ! -f "$FAKE_VENDOR_DRILL_STATE_DIRECTORY/dlq-invisible" ]] || exit 100
     [[ "$(<"$FAKE_VENDOR_DRILL_STATE_DIRECTORY/vendor-scenario")" == 'success' ]] || exit 101
     date +%s%3N | cut -c1-13 >"$FAKE_VENDOR_DRILL_STATE_DIRECTORY/redrive-started-at"
-    provider_order_id="delivery_fakevendor429drill"
+    delivery_provider_order_id="delivery_fakevendor429drill"
     jq \
-      --arg providerOrderId "$provider_order_id" '
+      --arg deliveryProviderOrderId "$delivery_provider_order_id" '
         .status.S = "SUBMITTED" |
         .version.N = "2" |
         .order.M.status.S = "SUBMITTED" |
         .order.M.version.N = "2" |
-        .order.M.provider.M.providerOrderId = {S: $providerOrderId} |
+        .order.M.provider.M.deliveryProviderOrderId = {S: $deliveryProviderOrderId} |
         .order.M.provider.M.acceptedAt = {S: "2026-07-27T07:05:00.000Z"}
       ' "$FAKE_VENDOR_DRILL_STATE_DIRECTORY/order.json" \
       >"$FAKE_VENDOR_DRILL_STATE_DIRECTORY/order.json.tmp"
@@ -424,13 +424,13 @@ case "$service:$operation" in
       "$FAKE_VENDOR_DRILL_STATE_DIRECTORY/order.json"
     jq -cn \
       --arg orderId "$(order_value '.order.M.orderId.S')" \
-      --arg providerOrderId "$provider_order_id" '
+      --arg deliveryProviderOrderId "$delivery_provider_order_id" '
         {
-          entityType: {S: "PROVIDER_ORDER"},
-          schemaVersion: {N: "1"},
+          entityType: {S: "DELIVERY_PROVIDER_ORDER"},
+          schemaVersion: {N: "2"},
           merchantId: {S: "mrc_demo"},
           orderId: {S: $orderId},
-          providerOrderId: {S: $providerOrderId}
+          deliveryProviderOrderId: {S: $deliveryProviderOrderId}
         }
       ' >"$FAKE_VENDOR_DRILL_STATE_DIRECTORY/provider-item.json"
     append_attempt success 201

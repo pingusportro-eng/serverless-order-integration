@@ -2,7 +2,7 @@ export {
   assertNextOrderVersion,
   assertOrderPageLimit,
   IdempotencyConflictError,
-  MerchantReferenceConflictError,
+  MerchantOrderIdConflictError,
   OrderAlreadyExistsError,
   OrderNotFoundError,
   OrderVersionConflictError,
@@ -24,7 +24,7 @@ export type {
   Order,
   OrderId,
   OrderLine,
-  ProviderAssignment,
+  DeliveryProviderAssignment,
 } from './domain/order.js';
 export { isTerminalOrderStatus } from './domain/order-status.js';
 export type { OrderStatus } from './domain/order-status.js';
@@ -188,7 +188,7 @@ export type {
 export {
   PROVIDER_WEBHOOK_CONSUMER,
   ProviderEventIdConflictError,
-  ProviderOrderConflictError,
+  DeliveryProviderOrderIdConflictError,
 } from './application/provider-webhook-repository.js';
 export type {
   ProviderWebhookRepository,

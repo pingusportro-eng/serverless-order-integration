@@ -25,7 +25,7 @@ function record(
   const newImage = marshall(
     {
       entityType: 'ORDER',
-      schemaVersion: 1,
+      schemaVersion: 2,
       order,
       mutation,
       ...itemOverrides,
@@ -58,9 +58,9 @@ function statusMutation(previousStatus: Order['status'], reason?: string): Order
 function acceptedOrder(overrides: Partial<Order>): Order {
   return createOrderFixture({
     provider: {
-      providerCode: 'mock-delivery',
-      submissionKey: 'submission_mapper_test_123',
-      providerOrderId: 'delivery-mapper-123',
+      deliveryProviderCode: 'mock-delivery',
+      deliveryProviderSubmissionKey: 'submission_mapper_test_123',
+      deliveryProviderOrderId: 'delivery-mapper-123',
       acceptedAt: '2026-07-23T08:00:00.000Z',
     },
     updatedAt: '2026-07-23T08:00:00.000Z',
@@ -94,8 +94,8 @@ describe('order stream event mapper', () => {
       eventType: 'order.created',
       order: createOrderFixture({
         provider: {
-          providerCode: 'mock-delivery',
-          submissionKey: 'submission_mapper_test_123',
+          deliveryProviderCode: 'mock-delivery',
+          deliveryProviderSubmissionKey: 'submission_mapper_test_123',
         },
       }),
       mutation: {
@@ -176,7 +176,7 @@ describe('order stream event mapper', () => {
 
       expect(event?.eventType).toBe(testCase.eventType);
       expect(event).toMatchObject({
-        schemaVersion: 1,
+        schemaVersion: 2,
         aggregateVersion: testCase.order.version,
         correlationId: CORRELATION_ID,
         causationId: CAUSATION_ID,
@@ -198,7 +198,7 @@ describe('order stream event mapper', () => {
   it('rejects unsupported item and mutation versions', () => {
     const order = createOrderFixture();
     const unsupportedItem = record(order, statusMutation('PENDING_SUBMISSION'), 'MODIFY', {
-      schemaVersion: 2,
+      schemaVersion: 3,
     });
     const invalidMutation = record(order, {
       kind: 'ORDER_STATUS_CHANGED',
@@ -229,7 +229,7 @@ describe('order stream event mapper', () => {
       'previous status is invalid',
     );
     expect(() => domainEventFromOrderStreamRecord(pickedUpWithoutProviderId)).toThrow(
-      'provider.providerOrderId',
+      'provider.deliveryProviderOrderId',
     );
   });
 

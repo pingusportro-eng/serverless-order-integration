@@ -56,7 +56,7 @@ exhaustion follows the worker-DLQ and managed-redrive path proved by the live
 **Prevention**
 
 The provider request has a three-second bound, calls use a stable provider
-submission key, SQS retry ownership is explicit, and the DLQ retains exhausted
+delivery-provider submission key, SQS retry ownership is explicit, and the DLQ retains exhausted
 messages. A separate timeout cloud drill would repeat the same AWS
 orchestration while making each Lambda attempt slower.
 
@@ -100,7 +100,7 @@ returned `201`, and the worker logged `outcome=submitted`.
 **Prevention**
 
 The vendor client classifies and bounds `Retry-After`, the worker does not
-acknowledge retryable failures, the provider submission key remains stable, and
+acknowledge retryable failures, the delivery-provider submission key remains stable, and
 the DLQ prevents infinite hot retries. Operators redrive only after the
 dependency is healthy.
 

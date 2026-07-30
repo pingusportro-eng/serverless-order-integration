@@ -239,7 +239,7 @@ case "$service:$operation" in
     if [[ "$schema_version" == '999' ]]; then
       printf '%s\n' "$item" >"$FAKE_AWS_STATE_DIRECTORY/poison-item.json"
       touch "$FAKE_AWS_STATE_DIRECTORY/poison-written"
-    elif [[ "$schema_version" == '1' ]]; then
+    elif [[ "$schema_version" == '2' ]]; then
       touch "$FAKE_AWS_STATE_DIRECTORY/repair-written"
       jq -cn \
         --arg aggregateId "$(jq -r '.order.M.orderId.S' <<<"$item")" \
@@ -248,7 +248,7 @@ case "$service:$operation" in
           {
             eventId: "evt_fake_recovery",
             eventType: "order.cancelled",
-            schemaVersion: 1,
+            schemaVersion: 2,
             aggregateType: "ORDER",
             aggregateId: $aggregateId,
             aggregateVersion: 2,

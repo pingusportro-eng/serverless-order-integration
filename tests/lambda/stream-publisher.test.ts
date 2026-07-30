@@ -58,8 +58,8 @@ describe('DynamoDB stream publisher', () => {
       payload: {
         merchantId: 'mrc_demo',
         status: 'PENDING_SUBMISSION',
-        providerCode: 'mock-delivery',
-        submissionKey: 'submission_01JABCDEF0123456789',
+        deliveryProviderCode: 'mock-delivery',
+        deliveryProviderSubmissionKey: 'submission_01JABCDEF0123456789',
       },
     });
     expect(published[0]?.eventId).toMatch(/^evt_[A-Za-z0-9_-]{43}$/);
@@ -111,7 +111,7 @@ describe('DynamoDB stream publisher', () => {
       occurredAt: '2026-07-23T07:00:30.000Z',
       payload: {
         status: 'SUBMITTED',
-        providerOrderId: 'delivery-789',
+        deliveryProviderOrderId: 'delivery-789',
         acceptedAt: '2026-07-23T07:00:30.000Z',
         reason: 'Provider acceptance was reconciled by an operator.',
       },

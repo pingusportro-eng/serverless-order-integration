@@ -41,7 +41,7 @@ function eventFor(order: Order): OrderCreatedEvent {
   return {
     eventId: 'evt_01JPROCESSDELIVERY12345',
     eventType: 'order.created',
-    schemaVersion: 1,
+    schemaVersion: 2,
     aggregateType: 'ORDER',
     aggregateId: order.orderId,
     aggregateVersion: order.version,
@@ -51,8 +51,8 @@ function eventFor(order: Order): OrderCreatedEvent {
     payload: {
       merchantId: order.merchantId,
       status: 'PENDING_SUBMISSION',
-      providerCode: 'mock-delivery',
-      submissionKey: order.provider.submissionKey,
+      deliveryProviderCode: 'mock-delivery',
+      deliveryProviderSubmissionKey: order.provider.deliveryProviderSubmissionKey,
     },
   };
 }
@@ -61,7 +61,7 @@ function acceptingClient(): DeliveryVendorClient {
   return {
     submitDelivery: () =>
       Promise.resolve({
-        providerOrderId: 'delivery-process-123',
+        deliveryProviderOrderId: 'delivery-process-123',
         status: 'ACCEPTED',
         acceptedAt: '2026-07-23T11:00:00.000Z',
       }),
@@ -189,7 +189,7 @@ describe('processDeliveryEvent', () => {
     ).rejects.toThrow('does not exist');
   });
 
-  it('rejects merchant, submission-key, and future-version mismatches', async () => {
+  it('rejects merchant, delivery-provider-submission-key, and future-version mismatches', async () => {
     const order = createOrderFixture();
     const event = eventFor(order);
     const wrongMerchant = {
@@ -198,7 +198,7 @@ describe('processDeliveryEvent', () => {
     };
     const wrongKey = {
       ...event,
-      payload: { ...event.payload, submissionKey: 'submission_different' },
+      payload: { ...event.payload, deliveryProviderSubmissionKey: 'submission_different' },
     };
     const futureVersion = { ...event, aggregateVersion: order.version + 1 };
     const dependencies = { repository: repositoryWithGet(order), vendorClient: acceptingClient() };
@@ -207,7 +207,7 @@ describe('processDeliveryEvent', () => {
       'merchant does not match',
     );
     await expect(processDeliveryEvent(dependencies, wrongKey)).rejects.toThrow(
-      'submission key does not match',
+      'delivery-provider submission key in the event does not match',
     );
     await expect(processDeliveryEvent(dependencies, futureVersion)).rejects.toThrow(
       'version that is not available',
@@ -232,7 +232,7 @@ describe('processDeliveryEvent', () => {
       status: 'SUBMITTED',
       provider: {
         ...order.provider,
-        providerOrderId: 'delivery-process-123',
+        deliveryProviderOrderId: 'delivery-process-123',
         acceptedAt: '2026-07-23T11:00:00.000Z',
       },
       updatedAt: '2026-07-23T11:00:01.000Z',
@@ -317,12 +317,12 @@ describe('processDeliveryEvent', () => {
         return innerRepository.saveStatusChange(changedOrder, expectedVersion, mutation);
       },
     };
-    const submissionKeys: string[] = [];
+    const deliveryProviderSubmissionKeys: string[] = [];
     const vendorClient: DeliveryVendorClient = {
       submitDelivery: (submittedOrder) => {
-        submissionKeys.push(submittedOrder.provider.submissionKey);
+        deliveryProviderSubmissionKeys.push(submittedOrder.provider.deliveryProviderSubmissionKey);
         return Promise.resolve({
-          providerOrderId: 'delivery-recovered-123',
+          deliveryProviderOrderId: 'delivery-recovered-123',
           status: 'ACCEPTED',
           acceptedAt: '2026-07-23T11:00:00.000Z',
         });
@@ -348,10 +348,13 @@ describe('processDeliveryEvent', () => {
       order: {
         status: 'SUBMITTED',
         version: 2,
-        provider: { providerOrderId: 'delivery-recovered-123' },
+        provider: { deliveryProviderOrderId: 'delivery-recovered-123' },
       },
     });
-    expect(submissionKeys).toEqual([order.provider.submissionKey, order.provider.submissionKey]);
+    expect(deliveryProviderSubmissionKeys).toEqual([
+      order.provider.deliveryProviderSubmissionKey,
+      order.provider.deliveryProviderSubmissionKey,
+    ]);
   });
 
   it('requires reconciliation for an incompatible stale event', async () => {

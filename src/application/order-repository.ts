@@ -49,11 +49,11 @@ export class IdempotencyConflictError extends Error {
   }
 }
 
-export class MerchantReferenceConflictError extends Error {
-  override readonly name = 'MerchantReferenceConflictError';
+export class MerchantOrderIdConflictError extends Error {
+  override readonly name = 'MerchantOrderIdConflictError';
 
   constructor() {
-    super('The merchant order reference is already assigned to another order.');
+    super('The merchant order ID is already assigned to another order.');
   }
 }
 

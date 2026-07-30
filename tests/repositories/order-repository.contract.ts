@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import {
   IdempotencyConflictError,
-  MerchantReferenceConflictError,
+  MerchantOrderIdConflictError,
   OrderAlreadyExistsError,
   OrderNotFoundError,
   type OrderRepository,
 } from '../../src/application/order-repository.js';
 import {
   ProviderEventIdConflictError,
-  ProviderOrderConflictError,
+  DeliveryProviderOrderIdConflictError,
   type ProviderWebhookRepository,
 } from '../../src/application/provider-webhook-repository.js';
 import { applyOrderStatusChange } from '../../src/domain/order-status-transition.js';
@@ -25,7 +25,7 @@ function submittedOrder(order: Order): Order {
     status: 'SUBMITTED',
     provider: {
       ...order.provider,
-      providerOrderId: `provider-${order.merchantId}-${order.orderId}`,
+      deliveryProviderOrderId: `provider-${order.merchantId}-${order.orderId}`,
       acceptedAt: '2026-07-21T12:31:00.000Z',
     },
     updatedAt: '2026-07-21T12:31:00.000Z',
@@ -115,7 +115,7 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       ).rejects.toBeInstanceOf(IdempotencyConflictError);
     });
 
-    it('rejects a different idempotency key for an existing merchant reference', async () => {
+    it('rejects a different idempotency key for an existing merchant order ID', async () => {
       const order = createOrderFixture();
       await repository.create({
         order,
@@ -132,7 +132,7 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
         repository.create({
           order: createOrderFixture({
             merchantId: order.merchantId,
-            merchantOrderReference: order.merchantOrderReference,
+            merchantOrderId: order.merchantOrderId,
           }),
           idempotencyKey: 'different-idempotency-key',
           mutation: {
@@ -142,7 +142,7 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
           },
           requestFingerprint: 'different-request',
         }),
-      ).rejects.toBeInstanceOf(MerchantReferenceConflictError);
+      ).rejects.toBeInstanceOf(MerchantOrderIdConflictError);
     });
 
     it('rejects an order ID collision without partial claims', async () => {
@@ -194,42 +194,42 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       await expect(repository.get(order.merchantId, order.orderId)).resolves.toEqual(changedOrder);
     });
 
-    it('resolves a submitted order by its provider reference', async () => {
+    it('resolves a submitted order by its delivery-provider order ID', async () => {
       const order = createOrderFixture();
       const changedOrder = submittedOrder(order);
       await repository.create({
         order,
-        idempotencyKey: 'provider-reference-idempotency',
+        idempotencyKey: 'delivery-provider-order-id-idempotency',
         mutation: {
           kind: 'ORDER_CREATED',
           correlationId: 'corr_test_123',
           causationId: 'request_test_123',
         },
-        requestFingerprint: 'provider-reference-fingerprint',
+        requestFingerprint: 'delivery-provider-order-id-fingerprint',
       });
       await repository.saveStatusChange(changedOrder, order.version, STATUS_MUTATION);
 
       await expect(
-        repository.getByProviderOrderId(
-          changedOrder.provider.providerCode,
-          changedOrder.provider.providerOrderId ?? '',
+        repository.getByDeliveryProviderOrderId(
+          changedOrder.provider.deliveryProviderCode,
+          changedOrder.provider.deliveryProviderOrderId ?? '',
         ),
       ).resolves.toEqual(changedOrder);
     });
 
-    it('rejects a provider reference already assigned to another order atomically', async () => {
+    it('rejects a delivery-provider order ID already assigned to another order atomically', async () => {
       const firstOrder = createOrderFixture();
       const secondOrder = createOrderFixture();
       const firstAccepted = submittedOrder(firstOrder);
-      const sharedProviderOrderId = firstAccepted.provider.providerOrderId;
-      if (sharedProviderOrderId === undefined) {
-        throw new Error('Expected a submitted provider reference.');
+      const sharedDeliveryProviderOrderId = firstAccepted.provider.deliveryProviderOrderId;
+      if (sharedDeliveryProviderOrderId === undefined) {
+        throw new Error('Expected a submitted delivery-provider order ID.');
       }
       const secondAccepted: Order = {
         ...submittedOrder(secondOrder),
         provider: {
           ...secondOrder.provider,
-          providerOrderId: sharedProviderOrderId,
+          deliveryProviderOrderId: sharedDeliveryProviderOrderId,
           acceptedAt: '2026-07-21T12:31:00.000Z',
         },
       };
@@ -249,7 +249,7 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       await repository.saveStatusChange(firstAccepted, firstOrder.version, STATUS_MUTATION);
       await expect(
         repository.saveStatusChange(secondAccepted, secondOrder.version, STATUS_MUTATION),
-      ).rejects.toBeInstanceOf(ProviderOrderConflictError);
+      ).rejects.toBeInstanceOf(DeliveryProviderOrderIdConflictError);
       await expect(repository.get(secondOrder.merchantId, secondOrder.orderId)).resolves.toEqual(
         secondOrder,
       );
@@ -278,7 +278,7 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       const input = {
         eventId: providerEventId,
         eventFingerprint: 'event-fingerprint-1',
-        providerOrderId: accepted.provider.providerOrderId ?? '',
+        deliveryProviderOrderId: accepted.provider.deliveryProviderOrderId ?? '',
         processedAt: '2026-07-21T12:35:00.000Z',
         currentOrder: accepted,
         changedOrder: pickedUp,
@@ -356,7 +356,7 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
         createOrderFixture({
           orderId,
           merchantId,
-          merchantOrderReference: `list-reference-${String(index)}`,
+          merchantOrderId: `list-merchant-order-${String(index)}`,
           createdAt: `2026-07-21T12:3${String(index)}:00.000Z`,
           updatedAt: `2026-07-21T12:3${String(index)}:00.000Z`,
         }),
@@ -428,13 +428,13 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       const pendingOrder = createOrderFixture({
         orderId: asOrderId('ord_status001'),
         merchantId,
-        merchantOrderReference: 'status-reference-1',
+        merchantOrderId: 'status-merchant-order-1',
       });
       const changedOrder = submittedOrder(pendingOrder);
       const remainingPendingOrder = createOrderFixture({
         orderId: asOrderId('ord_status002'),
         merchantId,
-        merchantOrderReference: 'status-reference-2',
+        merchantOrderId: 'status-merchant-order-2',
       });
 
       await repository.create({

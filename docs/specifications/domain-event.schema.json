@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://example.invalid/schemas/domain-event-v1.json",
-  "title": "Order domain event version 1",
+  "$id": "https://example.invalid/schemas/domain-event-v2.json",
+  "title": "Order domain event version 2",
   "oneOf": [
     { "$ref": "#/$defs/orderCreatedEvent" },
     { "$ref": "#/$defs/orderSubmittedEvent" },
@@ -23,12 +23,12 @@
       "maxLength": 64,
       "pattern": "^mrc_[A-Za-z0-9]+$"
     },
-    "providerOrderId": {
+    "deliveryProviderOrderId": {
       "type": "string",
       "minLength": 1,
       "maxLength": 128
     },
-    "submissionKey": {
+    "deliveryProviderSubmissionKey": {
       "type": "string",
       "minLength": 8,
       "maxLength": 128,
@@ -89,7 +89,7 @@
             "order.delivery_failed"
           ]
         },
-        "schemaVersion": { "const": 1 },
+        "schemaVersion": { "const": 2 },
         "aggregateType": { "const": "ORDER" },
         "aggregateId": {
           "type": "string",
@@ -117,23 +117,23 @@
     "orderCreatedPayload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["merchantId", "status", "providerCode", "submissionKey"],
+      "required": ["merchantId", "status", "deliveryProviderCode", "deliveryProviderSubmissionKey"],
       "properties": {
         "merchantId": { "$ref": "#/$defs/merchantId" },
         "status": { "const": "PENDING_SUBMISSION" },
-        "providerCode": { "const": "mock-delivery" },
-        "submissionKey": { "$ref": "#/$defs/submissionKey" }
+        "deliveryProviderCode": { "const": "mock-delivery" },
+        "deliveryProviderSubmissionKey": { "$ref": "#/$defs/deliveryProviderSubmissionKey" }
       }
     },
     "orderSubmittedPayload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["merchantId", "status", "providerCode", "providerOrderId", "acceptedAt"],
+      "required": ["merchantId", "status", "deliveryProviderCode", "deliveryProviderOrderId", "acceptedAt"],
       "properties": {
         "merchantId": { "$ref": "#/$defs/merchantId" },
         "status": { "const": "SUBMITTED" },
-        "providerCode": { "const": "mock-delivery" },
-        "providerOrderId": { "$ref": "#/$defs/providerOrderId" },
+        "deliveryProviderCode": { "const": "mock-delivery" },
+        "deliveryProviderOrderId": { "$ref": "#/$defs/deliveryProviderOrderId" },
         "acceptedAt": { "$ref": "#/$defs/timestamp" },
         "reason": { "$ref": "#/$defs/operatorReason" }
       }
@@ -160,16 +160,16 @@
         "merchantId",
         "previousStatus",
         "status",
-        "providerCode",
-        "submissionKey",
+        "deliveryProviderCode",
+        "deliveryProviderSubmissionKey",
         "reason"
       ],
       "properties": {
         "merchantId": { "$ref": "#/$defs/merchantId" },
         "previousStatus": { "const": "SUBMISSION_FAILED" },
         "status": { "const": "PENDING_SUBMISSION" },
-        "providerCode": { "const": "mock-delivery" },
-        "submissionKey": { "$ref": "#/$defs/submissionKey" },
+        "deliveryProviderCode": { "const": "mock-delivery" },
+        "deliveryProviderSubmissionKey": { "$ref": "#/$defs/deliveryProviderSubmissionKey" },
         "reason": { "$ref": "#/$defs/operatorReason" }
       }
     },
@@ -189,26 +189,26 @@
     "orderPickedUpPayload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["merchantId", "previousStatus", "status", "providerCode", "providerOrderId"],
+      "required": ["merchantId", "previousStatus", "status", "deliveryProviderCode", "deliveryProviderOrderId"],
       "properties": {
         "merchantId": { "$ref": "#/$defs/merchantId" },
         "previousStatus": { "const": "SUBMITTED" },
         "status": { "const": "PICKED_UP" },
-        "providerCode": { "const": "mock-delivery" },
-        "providerOrderId": { "$ref": "#/$defs/providerOrderId" },
+        "deliveryProviderCode": { "const": "mock-delivery" },
+        "deliveryProviderOrderId": { "$ref": "#/$defs/deliveryProviderOrderId" },
         "reason": { "$ref": "#/$defs/operatorReason" }
       }
     },
     "orderDeliveredPayload": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["merchantId", "previousStatus", "status", "providerCode", "providerOrderId"],
+      "required": ["merchantId", "previousStatus", "status", "deliveryProviderCode", "deliveryProviderOrderId"],
       "properties": {
         "merchantId": { "$ref": "#/$defs/merchantId" },
         "previousStatus": { "enum": ["SUBMITTED", "PICKED_UP"] },
         "status": { "const": "DELIVERED" },
-        "providerCode": { "const": "mock-delivery" },
-        "providerOrderId": { "$ref": "#/$defs/providerOrderId" },
+        "deliveryProviderCode": { "const": "mock-delivery" },
+        "deliveryProviderOrderId": { "$ref": "#/$defs/deliveryProviderOrderId" },
         "reason": { "$ref": "#/$defs/operatorReason" }
       }
     },
@@ -219,16 +219,16 @@
         "merchantId",
         "previousStatus",
         "status",
-        "providerCode",
-        "providerOrderId",
+        "deliveryProviderCode",
+        "deliveryProviderOrderId",
         "failure"
       ],
       "properties": {
         "merchantId": { "$ref": "#/$defs/merchantId" },
         "previousStatus": { "enum": ["SUBMITTED", "PICKED_UP"] },
         "status": { "const": "DELIVERY_FAILED" },
-        "providerCode": { "const": "mock-delivery" },
-        "providerOrderId": { "$ref": "#/$defs/providerOrderId" },
+        "deliveryProviderCode": { "const": "mock-delivery" },
+        "deliveryProviderOrderId": { "$ref": "#/$defs/deliveryProviderOrderId" },
         "reason": { "$ref": "#/$defs/operatorReason" },
         "failure": {
           "allOf": [

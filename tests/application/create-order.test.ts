@@ -16,7 +16,7 @@ describe('create-order fingerprint', () => {
         description: line.description,
         itemReference: line.itemReference,
       })),
-      merchantOrderReference: request.merchantOrderReference,
+      merchantOrderId: request.merchantOrderId,
     };
 
     expect(fingerprintCreateOrderRequest(reordered)).toBe(fingerprintCreateOrderRequest(request));

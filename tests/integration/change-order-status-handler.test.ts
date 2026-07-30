@@ -48,7 +48,7 @@ describe('PATCH /orders/{orderId}/status with DynamoDB Local', () => {
           body: {
             targetStatus: 'SUBMITTED',
             reason: 'Provider acceptance was reconciled.',
-            providerOrderId: `provider-${order.orderId}`,
+            deliveryProviderOrderId: `provider-${order.orderId}`,
           },
         },
       ),
@@ -73,7 +73,7 @@ describe('PATCH /orders/{orderId}/status with DynamoDB Local', () => {
       status: 'DELIVERED',
       provider: {
         ...createOrderFixture().provider,
-        providerOrderId: 'provider-terminal-integration',
+        deliveryProviderOrderId: 'provider-terminal-integration',
         acceptedAt: '2026-07-22T09:00:00.000Z',
       },
       version: 4,

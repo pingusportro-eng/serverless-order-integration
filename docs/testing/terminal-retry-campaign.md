@@ -21,7 +21,7 @@ fixed-cost resource. It proved:
 - `order.submission_failed` is published but excluded from the delivery queue;
 - an operator can explicitly retry the failed order;
 - `order.submission_retry_requested` reaches the worker and the same provider
-  submission key is reused;
+  delivery-provider submission key is reused;
 - signed provider webhooks apply, deduplicate, reject conflicting event IDs,
   and ignore stale state changes;
 - a duplicate actionable SQS event is acknowledged without another vendor
@@ -79,9 +79,9 @@ The deployed routes reproduced:
 - malformed JSON and malformed `If-Match` `400`;
 - missing `If-Match` `428`;
 - stale version `412`;
-- idempotency, merchant-reference, invalid-transition, and provider-event
+- idempotency, merchant order ID, invalid-transition, and provider-event
   conflicts `409`;
-- missing API order and unknown provider order `404`;
+- missing API order and unknown delivery-provider order `404`;
 - invalid create, list, status, and webhook values `422`;
 - applied pickup and delivered webhooks `204`;
 - stale webhook `204` without a version change; and
@@ -114,7 +114,7 @@ turning the test into a Lambda-concurrency drill.
 
 Successful cleanup permanently deleted:
 
-- the synthetic order, its idempotency/reference/provider mappings, and three
+- the synthetic order, its idempotency/merchant order ID/delivery-provider mappings, and three
   processed-webhook markers;
 - the temporary audit subscription and queue; and
 - both temporary Cognito users.

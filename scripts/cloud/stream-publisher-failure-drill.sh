@@ -532,7 +532,7 @@ repair_item_json() {
         pk: {S: $pk},
         sk: {S: $sk},
         entityType: {S: "ORDER"},
-        schemaVersion: {N: "1"},
+        schemaVersion: {N: "2"},
         drillMarker: {S: $marker},
         order: {M: {
           orderId: {S: $orderId},
@@ -541,8 +541,8 @@ repair_item_json() {
           version: {N: "2"},
           updatedAt: {S: $now},
           provider: {M: {
-            providerCode: {S: "mock-delivery"},
-            submissionKey: {S: ("submission_" + $marker)}
+            deliveryProviderCode: {S: "mock-delivery"},
+            deliveryProviderSubmissionKey: {S: ("submission_" + $marker)}
           }}
         }},
         mutation: {M: {
@@ -886,7 +886,7 @@ reconcile_repair_write() {
     --arg marker "$(state_string marker)" \
     --arg orderId "$(state_string orderId)" '
       .Item.entityType.S == "ORDER" and
-      .Item.schemaVersion.N == "1" and
+      .Item.schemaVersion.N == "2" and
       .Item.drillMarker.S == $marker and
       .Item.order.M.orderId.S == $orderId and
       .Item.order.M.status.S == "CANCELLED"
@@ -928,7 +928,7 @@ receive_and_verify_recovery() {
       --arg marker "$(state_string marker)" \
       --arg merchantId "$expected_merchant_id" '
         .eventType == "order.cancelled" and
-        .schemaVersion == 1 and
+        .schemaVersion == 2 and
         .aggregateType == "ORDER" and
         .aggregateId == $aggregateId and
         .aggregateVersion == 2 and

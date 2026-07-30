@@ -142,7 +142,7 @@ export async function handleProviderWebhook(
           status: 404,
           code: 'ORDER_NOT_FOUND',
           title: 'Order not found',
-          detail: 'The provider order reference does not identify an order.',
+          detail: 'The delivery-provider order ID does not identify an order.',
         },
         request.requestId,
       );

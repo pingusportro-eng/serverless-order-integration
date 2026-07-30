@@ -73,7 +73,7 @@ export type MockVendorActivity =
       readonly statusCode: number;
       readonly correlationId?: string;
       readonly platformOrderId?: string;
-      readonly providerOrderId?: string;
+      readonly deliveryProviderOrderId?: string;
       readonly scenario?: MockVendorScenario;
     }
   | {
@@ -82,7 +82,7 @@ export type MockVendorActivity =
       readonly attempt: number;
       readonly eventId: string;
       readonly eventType: 'DELIVERY_PICKED_UP' | 'DELIVERY_DELIVERED';
-      readonly providerOrderId: string;
+      readonly deliveryProviderOrderId: string;
       readonly correlationId?: string;
     }
   | {
@@ -91,7 +91,7 @@ export type MockVendorActivity =
       readonly attempt: number;
       readonly eventId: string;
       readonly eventType: 'DELIVERY_PICKED_UP' | 'DELIVERY_DELIVERED';
-      readonly providerOrderId: string;
+      readonly deliveryProviderOrderId: string;
       readonly statusCode: number;
       readonly correlationId?: string;
     }
@@ -101,7 +101,7 @@ export type MockVendorActivity =
       readonly attempts: number;
       readonly eventId: string;
       readonly eventType: 'DELIVERY_PICKED_UP' | 'DELIVERY_DELIVERED';
-      readonly providerOrderId: string;
+      readonly deliveryProviderOrderId: string;
       readonly lastStatusCode?: number;
       readonly correlationId?: string;
     };
@@ -126,7 +126,7 @@ export function formatMockVendorActivity(activity: MockVendorActivity): string {
         status: activity.statusCode,
         scenario: activity.scenario,
         platformOrderId: activity.platformOrderId,
-        providerOrderId: activity.providerOrderId,
+        deliveryProviderOrderId: activity.deliveryProviderOrderId,
         correlationId: activity.correlationId,
       })}`;
     case 'webhook.request.sent':
@@ -135,7 +135,7 @@ export function formatMockVendorActivity(activity: MockVendorActivity): string {
         path: '/webhooks/vendor',
         eventType: activity.eventType,
         eventId: activity.eventId,
-        providerOrderId: activity.providerOrderId,
+        deliveryProviderOrderId: activity.deliveryProviderOrderId,
         correlationId: activity.correlationId,
         attempt: activity.attempt,
       })}`;
@@ -144,7 +144,7 @@ export function formatMockVendorActivity(activity: MockVendorActivity): string {
         status: activity.statusCode,
         eventType: activity.eventType,
         eventId: activity.eventId,
-        providerOrderId: activity.providerOrderId,
+        deliveryProviderOrderId: activity.deliveryProviderOrderId,
         correlationId: activity.correlationId,
         attempt: activity.attempt,
       })}`;
@@ -153,7 +153,7 @@ export function formatMockVendorActivity(activity: MockVendorActivity): string {
         outcome: 'exhausted',
         eventType: activity.eventType,
         eventId: activity.eventId,
-        providerOrderId: activity.providerOrderId,
+        deliveryProviderOrderId: activity.deliveryProviderOrderId,
         correlationId: activity.correlationId,
         attempts: activity.attempts,
         lastStatus: activity.lastStatusCode,
@@ -266,7 +266,7 @@ function isSubmission(value: unknown): value is MockDeliverySubmission {
   const candidate = value as Record<string, unknown>;
   return (
     typeof candidate['platformOrderId'] === 'string' &&
-    typeof candidate['merchantOrderReference'] === 'string' &&
+    typeof candidate['merchantOrderId'] === 'string' &&
     Array.isArray(candidate['items']) &&
     candidate['items'].length > 0 &&
     typeof candidate['pickup'] === 'object' &&
@@ -280,7 +280,7 @@ function fingerprint(value: MockDeliverySubmission): string {
   return createHash('sha256').update(JSON.stringify(value)).digest('base64url');
 }
 
-function providerOrderId(idempotencyKey: string): string {
+function deliveryProviderOrderId(idempotencyKey: string): string {
   const digest = createHash('sha256').update(idempotencyKey).digest('base64url').slice(0, 24);
   return `delivery_${digest}`;
 }
@@ -325,11 +325,11 @@ function nonNegativeInteger(value: number | undefined, fallback: number, name: s
 }
 
 function stableWebhookEventId(
-  providerOrderIdValue: string,
+  deliveryProviderOrderIdValue: string,
   eventType: 'DELIVERY_PICKED_UP' | 'DELIVERY_DELIVERED',
 ): string {
   const digest = createHash('sha256')
-    .update(`${providerOrderIdValue}:${eventType}`)
+    .update(`${deliveryProviderOrderIdValue}:${eventType}`)
     .digest('hex')
     .slice(0, 32);
   return `provider_${digest}`;
@@ -409,13 +409,13 @@ export async function startMockDeliveryVendor(
       return false;
     }
 
-    const eventId = stableWebhookEventId(accepted.providerOrderId, eventType);
+    const eventId = stableWebhookEventId(accepted.deliveryProviderOrderId, eventType);
     const occurredAt = now();
     const body = JSON.stringify({
       eventId,
       eventType,
       occurredAt,
-      providerOrderId: accepted.providerOrderId,
+      deliveryProviderOrderId: accepted.deliveryProviderOrderId,
     });
     let lastStatusCode: number | undefined;
     let attempts = 0;
@@ -432,7 +432,7 @@ export async function startMockDeliveryVendor(
         attempt,
         eventId,
         eventType,
-        providerOrderId: accepted.providerOrderId,
+        deliveryProviderOrderId: accepted.deliveryProviderOrderId,
         ...(correlationId === undefined ? {} : { correlationId }),
       });
 
@@ -455,7 +455,7 @@ export async function startMockDeliveryVendor(
           attempt,
           eventId,
           eventType,
-          providerOrderId: accepted.providerOrderId,
+          deliveryProviderOrderId: accepted.deliveryProviderOrderId,
           statusCode: response.status,
           ...(correlationId === undefined ? {} : { correlationId }),
         });
@@ -482,7 +482,7 @@ export async function startMockDeliveryVendor(
       attempts,
       eventId,
       eventType,
-      providerOrderId: accepted.providerOrderId,
+      deliveryProviderOrderId: accepted.deliveryProviderOrderId,
       ...(lastStatusCode === undefined ? {} : { lastStatusCode }),
       ...(correlationId === undefined ? {} : { correlationId }),
     });
@@ -525,7 +525,7 @@ export async function startMockDeliveryVendor(
       let selectedScenario: MockVendorScenario | undefined;
       let attemptRecorded = false;
       let platformOrderIdValue: string | undefined;
-      let providerOrderIdValue: string | undefined;
+      let deliveryProviderOrderIdValue: string | undefined;
       const correlationId = header(request, 'x-correlation-id');
       emit({
         kind: 'delivery.request.received',
@@ -560,7 +560,9 @@ export async function startMockDeliveryVendor(
           statusCode,
           ...(correlationId === undefined ? {} : { correlationId }),
           ...(platformOrderIdValue === undefined ? {} : { platformOrderId: platformOrderIdValue }),
-          ...(providerOrderIdValue === undefined ? {} : { providerOrderId: providerOrderIdValue }),
+          ...(deliveryProviderOrderIdValue === undefined
+            ? {}
+            : { deliveryProviderOrderId: deliveryProviderOrderIdValue }),
           ...(selectedScenario === undefined ? {} : { scenario: selectedScenario }),
         });
       };
@@ -623,13 +625,13 @@ export async function startMockDeliveryVendor(
           ({
             fingerprint: requestFingerprint,
             response: {
-              providerOrderId: providerOrderId(idempotencyKey),
+              deliveryProviderOrderId: deliveryProviderOrderId(idempotencyKey),
               status: 'ACCEPTED',
               acceptedAt: now(),
             },
           } satisfies AcceptedSubmission);
         acceptedSubmissions.set(idempotencyKey, accepted);
-        providerOrderIdValue = accepted.response.providerOrderId;
+        deliveryProviderOrderIdValue = accepted.response.deliveryProviderOrderId;
 
         const responseHeaders =
           correlationId === undefined ? {} : { 'X-Correlation-Id': correlationId };
@@ -644,7 +646,7 @@ export async function startMockDeliveryVendor(
             ...responseHeaders,
             'Content-Type': 'application/json',
           });
-          response.end('{"providerOrderId":');
+          response.end('{"deliveryProviderOrderId":');
           scheduleWebhookJourneyOnce(idempotencyKey, accepted.response, correlationId);
           return;
         }

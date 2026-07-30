@@ -71,7 +71,7 @@ describe('delivery vendor client', () => {
       status: 'ACCEPTED',
       acceptedAt: '2026-07-22T12:00:00.000Z',
     });
-    expect(acceptance.providerOrderId).toMatch(/^delivery_/);
+    expect(acceptance.deliveryProviderOrderId).toMatch(/^delivery_/);
   });
 
   it('maps a timeout to a retryable safe error', async () => {
@@ -171,7 +171,7 @@ describe('delivery vendor client', () => {
     stubFetchResponse(
       Response.json(
         {
-          providerOrderId: '',
+          deliveryProviderOrderId: '',
           status: 'ACCEPTED',
           acceptedAt: 'not-a-date',
         },

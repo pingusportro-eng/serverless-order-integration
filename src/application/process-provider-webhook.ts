@@ -89,9 +89,9 @@ export async function processProviderWebhook(
   command: ProcessProviderWebhookCommand,
 ): Promise<ProcessProviderWebhookResult> {
   for (let attempt = 1; attempt <= MAX_CONCURRENT_WRITE_ATTEMPTS; attempt += 1) {
-    const currentOrder = await dependencies.repository.getByProviderOrderId(
+    const currentOrder = await dependencies.repository.getByDeliveryProviderOrderId(
       'mock-delivery',
-      command.event.providerOrderId,
+      command.event.deliveryProviderOrderId,
     );
     if (currentOrder === undefined) {
       throw new OrderNotFoundError();
@@ -102,7 +102,7 @@ export async function processProviderWebhook(
       const recordResult = await dependencies.repository.recordProviderWebhook({
         eventId: command.event.eventId,
         eventFingerprint: fingerprint(command.event),
-        providerOrderId: command.event.providerOrderId,
+        deliveryProviderOrderId: command.event.deliveryProviderOrderId,
         processedAt: (dependencies.now ?? (() => new Date()))().toISOString(),
         currentOrder,
         ...(changedOrder === undefined

@@ -2,7 +2,7 @@ import type { DeliveryLocation, Money, OrderLine } from '../domain/order.js';
 import type { ValidationIssue } from '../http/problem-details.js';
 
 export interface CreateOrderRequest {
-  readonly merchantOrderReference: string;
+  readonly merchantOrderId: string;
   readonly items: readonly OrderLine[];
   readonly pickup: DeliveryLocation;
   readonly dropoff: DeliveryLocation;
@@ -12,7 +12,7 @@ export type ValidationResult<T> =
   | { readonly valid: true; readonly value: T }
   | { readonly valid: false; readonly issues: readonly ValidationIssue[] };
 
-const TOP_LEVEL_FIELDS = new Set(['merchantOrderReference', 'items', 'pickup', 'dropoff']);
+const TOP_LEVEL_FIELDS = new Set(['merchantOrderId', 'items', 'pickup', 'dropoff']);
 const ORDER_LINE_FIELDS = new Set(['itemReference', 'description', 'quantity', 'unitPrice']);
 const MONEY_FIELDS = new Set(['amountMinor', 'currency']);
 const LOCATION_FIELDS = new Set(['addressLine', 'city', 'postalCode', 'countryCode']);
@@ -224,13 +224,7 @@ export function validateCreateOrderRequest(value: unknown): ValidationResult<Cre
   }
 
   addUnknownFieldIssues(value, TOP_LEVEL_FIELDS, '#', issues);
-  const merchantOrderReference = readString(
-    value['merchantOrderReference'],
-    '#/merchantOrderReference',
-    1,
-    100,
-    issues,
-  );
+  const merchantOrderId = readString(value['merchantOrderId'], '#/merchantOrderId', 1, 100, issues);
   const items = readOrderLines(value['items'], issues);
   const pickup = readLocation(value['pickup'], '#/pickup', issues);
   const dropoff = readLocation(value['dropoff'], '#/dropoff', issues);
@@ -245,7 +239,7 @@ export function validateCreateOrderRequest(value: unknown): ValidationResult<Cre
 
   if (
     issues.length > 0 ||
-    merchantOrderReference === undefined ||
+    merchantOrderId === undefined ||
     items === undefined ||
     pickup === undefined ||
     dropoff === undefined
@@ -255,7 +249,7 @@ export function validateCreateOrderRequest(value: unknown): ValidationResult<Cre
 
   return {
     valid: true,
-    value: { merchantOrderReference, items, pickup, dropoff },
+    value: { merchantOrderId, items, pickup, dropoff },
   };
 }
 

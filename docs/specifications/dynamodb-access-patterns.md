@@ -1,7 +1,7 @@
 # DynamoDB access patterns
 
 Status: MVP baseline  
-Last reviewed: 2026-07-23
+Last reviewed: 2026-07-30
 
 ## Purpose
 
@@ -37,8 +37,8 @@ deduplication items are absent from the indexes.
 | --- | --- | --- | --- |
 | Order | `MERCHANT#<merchantId>` | `ORDER#<orderId>` | Both GSIs below |
 | Idempotency record | `MERCHANT#<merchantId>` | `IDEMPOTENCY#<idempotencyKey>` | None |
-| Merchant reference claim | `MERCHANT#<merchantId>` | `ORDER_REFERENCE#<merchantOrderReference>` | None |
-| Provider order mapping | `PROVIDER#<providerCode>` | `ORDER#<providerOrderId>` | None |
+| Merchant order ID claim | `MERCHANT#<merchantId>` | `MERCHANT_ORDER_ID#<merchantOrderId>` | None |
+| Delivery-provider order mapping | `DELIVERY_PROVIDER#<deliveryProviderCode>` | `ORDER#<deliveryProviderOrderId>` | None |
 | Processed event | `CONSUMER#<consumerName>` | `EVENT#<eventId>` | None |
 
 Each item also carries an `entityType` and a numeric `schemaVersion` so the
@@ -67,13 +67,13 @@ provides deterministic ordering when two orders have the same creation time.
 
 | ID | Operation | DynamoDB operation and key condition |
 | --- | --- | --- |
-| AP-01 | Create one order | One transaction conditionally puts the order, idempotency record, and merchant-reference claim. |
+| AP-01 | Create one order | One transaction conditionally puts the order, idempotency record, and merchant order ID claim. |
 | AP-02 | Resolve an idempotent retry | `GetItem` using the merchant partition and `IDEMPOTENCY#<key>`. |
 | AP-03 | Get an order for its merchant | Strongly consistent `GetItem` using `MERCHANT#<merchantId>` and `ORDER#<orderId>`. |
 | AP-04 | List a merchant's orders | Query `byMerchantCreatedAt` by merchant, descending, with a bounded limit. |
 | AP-05 | List a merchant's orders by status | Query `byMerchantStatusCreatedAt` by merchant and status, descending, with a bounded limit. |
 | AP-06 | Change order status | Conditional `UpdateItem` checks the aggregate version and updates the status index key atomically. |
-| AP-07 | Resolve a provider webhook | `GetItem` using `PROVIDER#<providerCode>` and `ORDER#<providerOrderId>`. |
+| AP-07 | Resolve a delivery-provider webhook | `GetItem` using `DELIVERY_PROVIDER#<deliveryProviderCode>` and `ORDER#<deliveryProviderOrderId>`. |
 | AP-08 | Deduplicate an event for a consumer | Conditional `PutItem` using consumer identity and event ID, normally in the same transaction as its state change. |
 
 List cursors are versioned and HMAC-signed. They carry only the logical last
@@ -107,3 +107,10 @@ infrastructure definition and are not configured by this local script.
 
 Changing the local key schema requires `npm run dynamodb:reset` followed by
 `npm run dynamodb:bootstrap`. The reset deletes all local table data.
+
+The 2026-07-30 identifier-contract revision also changed stored property names
+and sentinel key prefixes. Data written by an earlier revision is intentionally
+not read through a compatibility layer in this learning project. Reset the
+local table, or destroy and recreate the disposable development stack, before
+testing the revised contract. A production migration would require an explicit
+backfill or a versioned dual-read strategy.

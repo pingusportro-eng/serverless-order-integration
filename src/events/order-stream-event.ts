@@ -11,7 +11,7 @@ import type { OrderMutation } from './order-mutation.js';
 
 interface StreamOrderItem {
   readonly entityType: 'ORDER';
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly order: Order;
   readonly mutation: OrderMutation;
 }
@@ -33,7 +33,7 @@ function readOrder(value: unknown): Order {
   }
 
   const provider = value['provider'];
-  if (!isRecord(provider) || provider['providerCode'] !== 'mock-delivery') {
+  if (!isRecord(provider) || provider['deliveryProviderCode'] !== 'mock-delivery') {
     throw new Error('Stream order provider is invalid.');
   }
   const version = value['version'];
@@ -44,7 +44,7 @@ function readOrder(value: unknown): Order {
   requiredString(value['orderId'], 'orderId');
   requiredString(value['merchantId'], 'merchantId');
   requiredString(value['updatedAt'], 'updatedAt');
-  requiredString(provider['submissionKey'], 'submissionKey');
+  requiredString(provider['deliveryProviderSubmissionKey'], 'deliveryProviderSubmissionKey');
   requiredString(value['status'], 'status');
 
   return value as unknown as Order;
@@ -97,13 +97,13 @@ function readStreamItem(record: DynamoDBRecord): StreamOrderItem | undefined {
   if (item['entityType'] !== 'ORDER') {
     return undefined;
   }
-  if (item['schemaVersion'] !== 1) {
+  if (item['schemaVersion'] !== 2) {
     throw new Error('Stream order item schema version is unsupported.');
   }
 
   return {
     entityType: 'ORDER',
-    schemaVersion: 1,
+    schemaVersion: 2,
     order: readOrder(item['order']),
     mutation: readMutation(item['mutation']),
   };
@@ -120,7 +120,7 @@ function baseEnvelope(record: DynamoDBRecord, item: StreamOrderItem, eventType: 
   return {
     eventId: eventId(record, eventType),
     eventType,
-    schemaVersion: 1 as const,
+    schemaVersion: 2 as const,
     aggregateType: 'ORDER' as const,
     aggregateId: item.order.orderId,
     aggregateVersion: item.order.version,
@@ -130,8 +130,8 @@ function baseEnvelope(record: DynamoDBRecord, item: StreamOrderItem, eventType: 
   };
 }
 
-function providerOrderId(order: Order): string {
-  return requiredString(order.provider.providerOrderId, 'provider.providerOrderId');
+function deliveryProviderOrderId(order: Order): string {
+  return requiredString(order.provider.deliveryProviderOrderId, 'provider.deliveryProviderOrderId');
 }
 
 function acceptedAt(order: Order): string {
@@ -171,8 +171,8 @@ function statusChangedEvent(record: DynamoDBRecord, item: StreamOrderItem): Doma
           merchantId: order.merchantId,
           previousStatus,
           status: 'PENDING_SUBMISSION',
-          providerCode: 'mock-delivery',
-          submissionKey: order.provider.submissionKey,
+          deliveryProviderCode: 'mock-delivery',
+          deliveryProviderSubmissionKey: order.provider.deliveryProviderSubmissionKey,
           reason: item.mutation.reason,
         },
       };
@@ -186,8 +186,8 @@ function statusChangedEvent(record: DynamoDBRecord, item: StreamOrderItem): Doma
         payload: {
           merchantId: order.merchantId,
           status: 'SUBMITTED',
-          providerCode: 'mock-delivery',
-          providerOrderId: providerOrderId(order),
+          deliveryProviderCode: 'mock-delivery',
+          deliveryProviderOrderId: deliveryProviderOrderId(order),
           acceptedAt: acceptedAt(order),
           ...reason,
         },
@@ -236,8 +236,8 @@ function statusChangedEvent(record: DynamoDBRecord, item: StreamOrderItem): Doma
           merchantId: order.merchantId,
           previousStatus,
           status: 'PICKED_UP',
-          providerCode: 'mock-delivery',
-          providerOrderId: providerOrderId(order),
+          deliveryProviderCode: 'mock-delivery',
+          deliveryProviderOrderId: deliveryProviderOrderId(order),
           ...reason,
         },
       };
@@ -252,8 +252,8 @@ function statusChangedEvent(record: DynamoDBRecord, item: StreamOrderItem): Doma
           merchantId: order.merchantId,
           previousStatus,
           status: 'DELIVERED',
-          providerCode: 'mock-delivery',
-          providerOrderId: providerOrderId(order),
+          deliveryProviderCode: 'mock-delivery',
+          deliveryProviderOrderId: deliveryProviderOrderId(order),
           ...reason,
         },
       };
@@ -268,8 +268,8 @@ function statusChangedEvent(record: DynamoDBRecord, item: StreamOrderItem): Doma
           merchantId: order.merchantId,
           previousStatus,
           status: 'DELIVERY_FAILED',
-          providerCode: 'mock-delivery',
-          providerOrderId: providerOrderId(order),
+          deliveryProviderCode: 'mock-delivery',
+          deliveryProviderOrderId: deliveryProviderOrderId(order),
           failure: failure(order, 'DELIVERY') as FailureDetails & { readonly stage: 'DELIVERY' },
           ...reason,
         },
@@ -293,8 +293,8 @@ export function domainEventFromOrderStreamRecord(record: DynamoDBRecord): Domain
       payload: {
         merchantId: item.order.merchantId,
         status: 'PENDING_SUBMISSION',
-        providerCode: 'mock-delivery',
-        submissionKey: item.order.provider.submissionKey,
+        deliveryProviderCode: 'mock-delivery',
+        deliveryProviderSubmissionKey: item.order.provider.deliveryProviderSubmissionKey,
       },
     };
   }

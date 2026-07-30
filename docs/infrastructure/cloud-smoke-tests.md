@@ -38,7 +38,7 @@ arrived.
 | Webhook | Valid `DELIVERY_PICKED_UP` returned `204` and changed the order to version 3 | Passed |
 | Webhook deduplication | Repeating the same provider event returned `204` without another version change | Passed |
 | Replay protection | A correctly signed webhook with a timestamp ten minutes old returned `401` | Passed |
-| Final state | Strongly consistent DynamoDB read returned `PICKED_UP`, version 3, with the original provider order ID | Passed |
+| Final state | Strongly consistent DynamoDB read returned `PICKED_UP`, version 3, with the original delivery-provider order ID | Passed |
 
 The 30 API access records had this final status distribution:
 

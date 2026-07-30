@@ -13,7 +13,7 @@ export interface SafeLogFields {
   readonly statusCode?: number;
   readonly orderId?: string;
   readonly merchantId?: string;
-  readonly providerCode?: string;
+  readonly deliveryProviderCode?: string;
   readonly eventId?: string;
   readonly eventType?: string;
   readonly aggregateVersion?: number;
@@ -50,7 +50,7 @@ const SAFE_FIELD_NAMES: ReadonlySet<keyof SafeLogFields> = new Set([
   'statusCode',
   'orderId',
   'merchantId',
-  'providerCode',
+  'deliveryProviderCode',
   'eventId',
   'eventType',
   'aggregateVersion',

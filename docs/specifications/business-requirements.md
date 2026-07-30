@@ -52,7 +52,7 @@ but their responsibilities must remain distinct in the design.
 | BR-005 | A client shall be able to list orders in bounded pages rather than loading the complete history at once. |
 | BR-006 | An authorized internal operator shall be able to request a valid order status change. Invalid changes shall not alter the order. |
 | BR-007 | After an order is accepted, the system shall submit it to the delivery provider asynchronously. The client shall not wait for the provider call to finish. |
-| BR-008 | A successful provider submission shall associate the provider's reference with the platform order. |
+| BR-008 | A successful provider submission shall associate the delivery-provider order ID with the platform order. |
 | BR-009 | Temporary provider failures shall be retried. Repeated processing shall not submit the same logical order more than intended. |
 | BR-010 | A permanently unprocessable delivery request shall remain visible for investigation and controlled recovery. |
 | BR-011 | The system shall accept authenticated provider webhooks and apply valid status changes to the corresponding order. |

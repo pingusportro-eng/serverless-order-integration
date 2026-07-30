@@ -22,7 +22,7 @@ describe('handleListOrders', () => {
       createOrderFixture({
         orderId: asOrderId(`ord_handler${String(index).padStart(2, '0')}`),
         merchantId: targetMerchantId,
-        merchantOrderReference: `handler-reference-${String(index)}`,
+        merchantOrderId: `handler-merchant-order-${String(index)}`,
         createdAt: `2026-07-21T12:3${String(index)}:00.000Z`,
         updatedAt: `2026-07-21T12:3${String(index)}:00.000Z`,
       }),
@@ -109,7 +109,7 @@ describe('handleListOrders', () => {
         status: 'SUBMITTED',
         provider: {
           ...changedOrder.provider,
-          providerOrderId: 'provider-handler',
+          deliveryProviderOrderId: 'provider-handler',
           acceptedAt: '2026-07-21T12:40:00.000Z',
         },
         updatedAt: '2026-07-21T12:40:00.000Z',

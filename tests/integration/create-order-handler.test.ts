@@ -35,7 +35,7 @@ function testContext() {
       merchantId: asMerchantId(`mrc_${suffix}`),
       requestId: `request-${suffix}`,
       headers: { 'Idempotency-Key': `create-${suffix}` },
-      body: createOrderRequestFixture({ merchantOrderReference: `reference-${suffix}` }),
+      body: createOrderRequestFixture({ merchantOrderId: `merchant-order-${suffix}` }),
     },
   };
 }
@@ -52,21 +52,21 @@ describe('POST /orders with DynamoDB Local', () => {
     expect(replayed.body).toEqual(created.body);
   });
 
-  it('persists idempotency and merchant-reference conflict protection', async () => {
+  it('persists idempotency and merchant order ID conflict protection', async () => {
     const context = testContext();
     await handleCreateOrder(context.dependencies, context.request);
 
     const idempotencyConflict = await handleCreateOrder(context.dependencies, {
       ...context.request,
-      body: { ...context.request.body, merchantOrderReference: 'changed-reference' },
+      body: { ...context.request.body, merchantOrderId: 'changed-merchant-order' },
     });
-    const referenceConflict = await handleCreateOrder(context.dependencies, {
+    const merchantOrderIdConflict = await handleCreateOrder(context.dependencies, {
       ...context.request,
       headers: { 'Idempotency-Key': `different-${randomUUID().replaceAll('-', '')}` },
     });
 
     expect(idempotencyConflict.body).toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
-    expect(referenceConflict.body).toMatchObject({ code: 'MERCHANT_REFERENCE_CONFLICT' });
+    expect(merchantOrderIdConflict.body).toMatchObject({ code: 'MERCHANT_ORDER_ID_CONFLICT' });
   });
 });
 

@@ -9,7 +9,7 @@ readonly expected_merchant_id='mrc_demo'
 readonly budget_name='My Zero-Spend Budget'
 readonly stack_name='serverless-order-integration-dev'
 readonly drill_order_prefix='ord_vendor429drill'
-readonly drill_reference_prefix='vendor-429-drill-'
+readonly drill_merchant_order_id_prefix='vendor-429-drill-'
 readonly call_cap=200
 readonly max_failed_vendor_attempts=4
 
@@ -202,8 +202,8 @@ state_create() {
   local suffix="$1"
   local started_at_ms="$2"
   local order_id="$drill_order_prefix$suffix"
-  local merchant_reference="$drill_reference_prefix$suffix"
-  local submission_key="submission_vendor429drill$suffix"
+  local merchant_order_id="$drill_merchant_order_id_prefix$suffix"
+  local delivery_provider_submission_key="submission_vendor429drill$suffix"
   local correlation_id="corr.vendor429drill.$suffix"
   local causation_id="request.vendor429drill.$suffix"
 
@@ -214,8 +214,8 @@ state_create() {
     --arg suffix "$suffix" \
     --arg startedAtMs "$started_at_ms" \
     --arg orderId "$order_id" \
-    --arg merchantReference "$merchant_reference" \
-    --arg submissionKey "$submission_key" \
+    --arg merchantOrderId "$merchant_order_id" \
+    --arg deliveryProviderSubmissionKey "$delivery_provider_submission_key" \
     --arg correlationId "$correlation_id" \
     --arg causationId "$causation_id" \
     --arg tableName "$table_name" \
@@ -238,8 +238,8 @@ state_create() {
         suffix: $suffix,
         startedAtMs: $startedAtMs,
         orderId: $orderId,
-        merchantReference: $merchantReference,
-        submissionKey: $submissionKey,
+        merchantOrderId: $merchantOrderId,
+        deliveryProviderSubmissionKey: $deliveryProviderSubmissionKey,
         correlationId: $correlationId,
         causationId: $causationId,
         tableName: $tableName,
@@ -827,21 +827,21 @@ cleanup_unexecuted_change_set() {
 write_order_item_file() {
   local now
   local order_id
-  local reference
-  local submission_key
+  local merchant_order_id
+  local delivery_provider_submission_key
   local correlation_id
   local causation_id
   now="$(date -u +'%Y-%m-%dT%H:%M:%S.000Z')"
   order_id="$(state_string orderId)"
-  reference="$(state_string merchantReference)"
-  submission_key="$(state_string submissionKey)"
+  merchant_order_id="$(state_string merchantOrderId)"
+  delivery_provider_submission_key="$(state_string deliveryProviderSubmissionKey)"
   correlation_id="$(state_string correlationId)"
   causation_id="$(state_string causationId)"
   jq -n \
     --arg merchantId "$expected_merchant_id" \
     --arg orderId "$order_id" \
-    --arg reference "$reference" \
-    --arg submissionKey "$submission_key" \
+    --arg merchantOrderId "$merchant_order_id" \
+    --arg deliveryProviderSubmissionKey "$delivery_provider_submission_key" \
     --arg correlationId "$correlation_id" \
     --arg causationId "$causation_id" \
     --arg now "$now" '
@@ -853,13 +853,13 @@ write_order_item_file() {
         gsi2pk: {S: ("MERCHANT#" + $merchantId + "#STATUS#PENDING_SUBMISSION")},
         gsi2sk: {S: ("ORDER#" + $now + "#" + $orderId)},
         entityType: {S: "ORDER"},
-        schemaVersion: {N: "1"},
+        schemaVersion: {N: "2"},
         status: {S: "PENDING_SUBMISSION"},
         version: {N: "1"},
         order: {M: {
           orderId: {S: $orderId},
           merchantId: {S: $merchantId},
-          merchantOrderReference: {S: $reference},
+          merchantOrderId: {S: $merchantOrderId},
           status: {S: "PENDING_SUBMISSION"},
           items: {L: [{M: {
             itemReference: {S: "synthetic-item-1"},
@@ -881,8 +881,8 @@ write_order_item_file() {
             countryCode: {S: "RO"}
           }},
           provider: {M: {
-            providerCode: {S: "mock-delivery"},
-            submissionKey: {S: $submissionKey}
+            deliveryProviderCode: {S: "mock-delivery"},
+            deliveryProviderSubmissionKey: {S: $deliveryProviderSubmissionKey}
           }},
           createdAt: {S: $now},
           updatedAt: {S: $now},
@@ -925,11 +925,11 @@ reconcile_order_write() {
   fi
   jq -e \
     --arg orderId "$(state_string orderId)" \
-    --arg submissionKey "$(state_string submissionKey)" '
+    --arg deliveryProviderSubmissionKey "$(state_string deliveryProviderSubmissionKey)" '
       .Item.entityType.S == "ORDER" and
-      .Item.schemaVersion.N == "1" and
+      .Item.schemaVersion.N == "2" and
       .Item.order.M.orderId.S == $orderId and
-      .Item.order.M.provider.M.submissionKey.S == $submissionKey
+      .Item.order.M.provider.M.deliveryProviderSubmissionKey.S == $deliveryProviderSubmissionKey
     ' <<<"$item" >/dev/null ||
     fail 'stored order does not match the retained drill identity'
   state_set_boolean orderWritten true
@@ -1002,19 +1002,19 @@ receive_and_verify_dlq() {
       fail "expected one worker-DLQ message, received $count"
     jq -e \
       --arg orderId "$(state_string orderId)" \
-      --arg submissionKey "$(state_string submissionKey)" \
+      --arg deliveryProviderSubmissionKey "$(state_string deliveryProviderSubmissionKey)" \
       --arg correlationId "$(state_string correlationId)" '
         .Messages[0] as $message |
         ($message.Body | fromjson) as $event |
         $event.eventType == "order.created" and
-        $event.schemaVersion == 1 and
+        $event.schemaVersion == 2 and
         $event.aggregateId == $orderId and
         $event.aggregateVersion == 1 and
         $event.correlationId == $correlationId and
         $event.payload.merchantId == "mrc_demo" and
         $event.payload.status == "PENDING_SUBMISSION" and
-        $event.payload.providerCode == "mock-delivery" and
-        $event.payload.submissionKey == $submissionKey and
+        $event.payload.deliveryProviderCode == "mock-delivery" and
+        $event.payload.deliveryProviderSubmissionKey == $deliveryProviderSubmissionKey and
         ($message.Attributes.ApproximateReceiveCount | tonumber) > 3
       ' <<<"$response" >/dev/null ||
       fail 'worker DLQ contains an unexpected message; it was preserved'
@@ -1034,7 +1034,7 @@ receive_and_verify_dlq() {
 verify_failure_evidence() {
   local expected_digest
   local attempts
-  expected_digest="$(printf %s "$(state_string submissionKey)" | sha256sum | awk '{print $1}')"
+  expected_digest="$(printf %s "$(state_string deliveryProviderSubmissionKey)" | sha256sum | awk '{print $1}')"
   [[ -f "$attempt_log" ]] || fail 'mock-vendor attempt journal is absent'
   attempts="$(jq -s \
     --arg digest "$expected_digest" \
@@ -1183,15 +1183,15 @@ wait_for_submitted_order() {
     item="$(read_order_item)"
     if jq -e \
       --arg orderId "$(state_string orderId)" \
-      --arg submissionKey "$(state_string submissionKey)" '
+      --arg deliveryProviderSubmissionKey "$(state_string deliveryProviderSubmissionKey)" '
         .Item.entityType.S == "ORDER" and
         .Item.version.N == "2" and
         .Item.status.S == "SUBMITTED" and
         .Item.order.M.orderId.S == $orderId and
         .Item.order.M.status.S == "SUBMITTED" and
         .Item.order.M.version.N == "2" and
-        .Item.order.M.provider.M.submissionKey.S == $submissionKey and
-        (.Item.order.M.provider.M.providerOrderId.S | length) > 0 and
+        .Item.order.M.provider.M.deliveryProviderSubmissionKey.S == $deliveryProviderSubmissionKey and
+        (.Item.order.M.provider.M.deliveryProviderOrderId.S | length) > 0 and
         (.Item.order.M.provider.M.acceptedAt.S |
           test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{3})?Z$"))
       ' <<<"$item" >/dev/null; then
@@ -1205,7 +1205,7 @@ wait_for_submitted_order() {
 
 verify_recovery_attempt() {
   local expected_digest
-  expected_digest="$(printf %s "$(state_string submissionKey)" | sha256sum | awk '{print $1}')"
+  expected_digest="$(printf %s "$(state_string deliveryProviderSubmissionKey)" | sha256sum | awk '{print $1}')"
   jq -se \
     --arg digest "$expected_digest" \
     --arg correlationId "$(state_string correlationId)" '
@@ -1224,15 +1224,15 @@ verify_recovery_attempt() {
 
 write_cleanup_items() {
   local item
-  local provider_order_id
+  local delivery_provider_order_id
   item="$(read_order_item)"
-  provider_order_id="$(jq -er '.Item.order.M.provider.M.providerOrderId.S' <<<"$item")"
+  delivery_provider_order_id="$(jq -er '.Item.order.M.provider.M.deliveryProviderOrderId.S' <<<"$item")"
   jq -n \
     --arg tableName "$table_name" \
     --arg merchantId "$expected_merchant_id" \
     --arg orderId "$(state_string orderId)" \
-    --arg submissionKey "$(state_string submissionKey)" \
-    --arg providerOrderId "$provider_order_id" '
+    --arg deliveryProviderSubmissionKey "$(state_string deliveryProviderSubmissionKey)" \
+    --arg deliveryProviderOrderId "$delivery_provider_order_id" '
       [
         {
           Delete: {
@@ -1241,22 +1241,22 @@ write_cleanup_items() {
               pk: {S: ("MERCHANT#" + $merchantId)},
               sk: {S: ("ORDER#" + $orderId)}
             },
-            ConditionExpression: "#entityType = :orderType AND #version = :version AND #order.#orderId = :orderId AND #order.#provider.#submissionKey = :submissionKey AND #order.#provider.#providerOrderId = :providerOrderId",
+            ConditionExpression: "#entityType = :orderType AND #version = :version AND #order.#orderId = :orderId AND #order.#provider.#deliveryProviderSubmissionKey = :deliveryProviderSubmissionKey AND #order.#provider.#deliveryProviderOrderId = :deliveryProviderOrderId",
             ExpressionAttributeNames: {
               "#entityType": "entityType",
               "#version": "version",
               "#order": "order",
               "#orderId": "orderId",
               "#provider": "provider",
-              "#submissionKey": "submissionKey",
-              "#providerOrderId": "providerOrderId"
+              "#deliveryProviderSubmissionKey": "deliveryProviderSubmissionKey",
+              "#deliveryProviderOrderId": "deliveryProviderOrderId"
             },
             ExpressionAttributeValues: {
               ":orderType": {S: "ORDER"},
               ":version": {N: "2"},
               ":orderId": {S: $orderId},
-              ":submissionKey": {S: $submissionKey},
-              ":providerOrderId": {S: $providerOrderId}
+              ":deliveryProviderSubmissionKey": {S: $deliveryProviderSubmissionKey},
+              ":deliveryProviderOrderId": {S: $deliveryProviderOrderId}
             }
           }
         },
@@ -1264,8 +1264,8 @@ write_cleanup_items() {
           Delete: {
             TableName: $tableName,
             Key: {
-              pk: {S: "PROVIDER#mock-delivery"},
-              sk: {S: ("ORDER#" + $providerOrderId)}
+              pk: {S: "DELIVERY_PROVIDER#mock-delivery"},
+              sk: {S: ("ORDER#" + $deliveryProviderOrderId)}
             },
             ConditionExpression: "#entityType = :providerType AND #schemaVersion = :schemaVersion AND merchantId = :merchantId AND orderId = :orderId",
             ExpressionAttributeNames: {
@@ -1273,8 +1273,8 @@ write_cleanup_items() {
               "#schemaVersion": "schemaVersion"
             },
             ExpressionAttributeValues: {
-              ":providerType": {S: "PROVIDER_ORDER"},
-              ":schemaVersion": {N: "1"},
+              ":providerType": {S: "DELIVERY_PROVIDER_ORDER"},
+              ":schemaVersion": {N: "2"},
               ":merchantId": {S: $merchantId},
               ":orderId": {S: $orderId}
             }
@@ -1355,7 +1355,7 @@ validate_recovery_state() {
       .stackName == $stackName and
       (.orderId | startswith($orderPrefix)) and
       (.suffix | type) == "string" and
-      (.submissionKey | type) == "string" and
+      (.deliveryProviderSubmissionKey | type) == "string" and
       (.correlationId | type) == "string" and
       (.orderWriteAttempted | type) == "boolean" and
       (.orderWritten | type) == "boolean" and

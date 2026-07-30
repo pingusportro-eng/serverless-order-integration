@@ -35,7 +35,9 @@ export type ChangeOrderStatusResult =
 function toDomainChange(request: ChangeOrderStatusRequest): OrderStatusChange {
   return {
     targetStatus: request.targetStatus,
-    ...(request.providerOrderId === undefined ? {} : { providerOrderId: request.providerOrderId }),
+    ...(request.deliveryProviderOrderId === undefined
+      ? {}
+      : { deliveryProviderOrderId: request.deliveryProviderOrderId }),
     ...(request.failure === undefined ? {} : { failure: request.failure }),
   };
 }

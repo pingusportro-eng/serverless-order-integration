@@ -48,7 +48,7 @@ if ! curl --silent --fail --output /dev/null "$api_base_url/orders?limit=1"; the
 fi
 
 suffix="$(date +%s%N)"
-create_body="{\"merchantOrderReference\":\"sam-$suffix\",\"items\":[{\"itemReference\":\"item-1\",\"description\":\"SAM smoke test\",\"quantity\":1,\"unitPrice\":{\"amountMinor\":1000,\"currency\":\"RON\"}}],\"pickup\":{\"addressLine\":\"10 Example Street\",\"city\":\"Bucharest\",\"postalCode\":\"010101\",\"countryCode\":\"RO\"},\"dropoff\":{\"addressLine\":\"20 Example Avenue\",\"city\":\"Bucharest\",\"postalCode\":\"020202\",\"countryCode\":\"RO\"}}"
+create_body="{\"merchantOrderId\":\"sam-$suffix\",\"items\":[{\"itemReference\":\"item-1\",\"description\":\"SAM smoke test\",\"quantity\":1,\"unitPrice\":{\"amountMinor\":1000,\"currency\":\"RON\"}}],\"pickup\":{\"addressLine\":\"10 Example Street\",\"city\":\"Bucharest\",\"postalCode\":\"010101\",\"countryCode\":\"RO\"},\"dropoff\":{\"addressLine\":\"20 Example Avenue\",\"city\":\"Bucharest\",\"postalCode\":\"020202\",\"countryCode\":\"RO\"}}"
 
 create_status="$(curl --silent --output "$temporary_directory/create.json" --write-out '%{http_code}' \
   --request POST \
@@ -74,7 +74,7 @@ change_status="$(curl --silent --output "$temporary_directory/change.json" --wri
   --request PATCH \
   --header 'Content-Type: application/json' \
   --header 'If-Match: "1"' \
-  --data "{\"targetStatus\":\"SUBMITTED\",\"reason\":\"SAM local reconciliation.\",\"providerOrderId\":\"provider-$suffix\"}" \
+  --data "{\"targetStatus\":\"SUBMITTED\",\"reason\":\"SAM local reconciliation.\",\"deliveryProviderOrderId\":\"provider-$suffix\"}" \
   "$api_base_url/orders/$order_id/status")"
 [[ "$change_status" == '200' ]]
 
@@ -82,7 +82,7 @@ node -e "const fs=require('node:fs');const value=JSON.parse(fs.readFileSync(proc
 
 webhook_timestamp="$(date +%s)"
 webhook_occurred_at="$(node -e "process.stdout.write(new Date().toISOString());")"
-webhook_body="{\"eventId\":\"provider-event-$suffix\",\"eventType\":\"DELIVERY_DELIVERED\",\"occurredAt\":\"$webhook_occurred_at\",\"providerOrderId\":\"provider-$suffix\"}"
+webhook_body="{\"eventId\":\"provider-event-$suffix\",\"eventType\":\"DELIVERY_DELIVERED\",\"occurredAt\":\"$webhook_occurred_at\",\"deliveryProviderOrderId\":\"provider-$suffix\"}"
 webhook_signature="$(node -e "const crypto=require('node:crypto');const [secret,timestamp,body]=process.argv.slice(1);process.stdout.write('sha256='+crypto.createHmac('sha256',secret).update(timestamp+'.'+body,'utf8').digest('hex'));" \
   'LOCAL_ONLY_WEBHOOK_SECRET_0123456789' "$webhook_timestamp" "$webhook_body")"
 

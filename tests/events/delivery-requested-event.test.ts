@@ -4,7 +4,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { parseDeliveryRequestedEvent } from '../../src/events/delivery-requested-event.js';
 
-const fixtureUrl = new URL('../fixtures/domain-events/order-created.v1.json', import.meta.url);
+const fixtureUrl = new URL('../fixtures/domain-events/order-created.v2.json', import.meta.url);
 
 describe('delivery-requested event parser', () => {
   let createdEvent: Record<string, unknown>;
@@ -39,8 +39,8 @@ describe('delivery-requested event parser', () => {
       merchantId: 'mrc_demo',
       previousStatus: 'SUBMISSION_FAILED',
       status: 'PENDING_SUBMISSION',
-      providerCode: 'mock-delivery',
-      submissionKey: 'submission_01JABCDEF0123456789',
+      deliveryProviderCode: 'mock-delivery',
+      deliveryProviderSubmissionKey: 'submission_01JABCDEF0123456789',
       reason: 'Operator approved a controlled retry.',
     };
 
@@ -92,8 +92,8 @@ describe('delivery-requested event parser', () => {
       merchantId: 'mrc_demo',
       previousStatus: 'SUBMISSION_FAILED',
       status: 'PENDING_SUBMISSION',
-      providerCode: 'mock-delivery',
-      submissionKey: 'submission_01JABCDEF0123456789',
+      deliveryProviderCode: 'mock-delivery',
+      deliveryProviderSubmissionKey: 'submission_01JABCDEF0123456789',
       reason: 'x',
     };
 

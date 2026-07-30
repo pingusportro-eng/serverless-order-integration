@@ -10,7 +10,7 @@ import {
   assertNextOrderVersion,
   assertOrderPageLimit,
   IdempotencyConflictError,
-  MerchantReferenceConflictError,
+  MerchantOrderIdConflictError,
   OrderAlreadyExistsError,
   OrderNotFoundError,
   OrderVersionConflictError,
@@ -24,7 +24,7 @@ import {
 import {
   PROVIDER_WEBHOOK_CONSUMER,
   ProviderEventIdConflictError,
-  ProviderOrderConflictError,
+  DeliveryProviderOrderIdConflictError,
   type ProviderWebhookRepository,
   type RecordProviderWebhookInput,
   type RecordProviderWebhookResult,
@@ -32,7 +32,7 @@ import {
 import type { MerchantId, Order, OrderId } from '../../domain/order.js';
 import type { OrderMutation, OrderStatusChangedMutation } from '../../events/order-mutation.js';
 
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 interface StoredOrderItem {
   readonly pk: string;
@@ -59,19 +59,19 @@ interface StoredIdempotencyItem {
   readonly createdAt: string;
 }
 
-interface StoredMerchantReferenceItem {
+interface StoredMerchantOrderIdItem {
   readonly pk: string;
   readonly sk: string;
-  readonly entityType: 'ORDER_REFERENCE';
+  readonly entityType: 'MERCHANT_ORDER_ID';
   readonly schemaVersion: typeof SCHEMA_VERSION;
   readonly orderId: OrderId;
   readonly createdAt: string;
 }
 
-interface StoredProviderOrderItem {
+interface StoredDeliveryProviderOrderItem {
   readonly pk: string;
   readonly sk: string;
-  readonly entityType: 'PROVIDER_ORDER';
+  readonly entityType: 'DELIVERY_PROVIDER_ORDER';
   readonly schemaVersion: typeof SCHEMA_VERSION;
   readonly merchantId: MerchantId;
   readonly orderId: OrderId;
@@ -84,7 +84,7 @@ interface StoredProcessedEventItem {
   readonly entityType: 'PROCESSED_EVENT';
   readonly schemaVersion: typeof SCHEMA_VERSION;
   readonly eventFingerprint: string;
-  readonly providerOrderId: string;
+  readonly deliveryProviderOrderId: string;
   readonly processedAt: string;
 }
 
@@ -100,12 +100,14 @@ function idempotencyKey(value: string): string {
   return `IDEMPOTENCY#${value}`;
 }
 
-function merchantReferenceKey(value: string): string {
-  return `ORDER_REFERENCE#${value}`;
+function merchantOrderIdKey(value: string): string {
+  return `MERCHANT_ORDER_ID#${value}`;
 }
 
-function providerKey(providerCode: Order['provider']['providerCode']): string {
-  return `PROVIDER#${providerCode}`;
+function deliveryProviderKey(
+  deliveryProviderCode: Order['provider']['deliveryProviderCode'],
+): string {
+  return `DELIVERY_PROVIDER#${deliveryProviderCode}`;
 }
 
 function processedEventConsumerKey(): string {
@@ -175,10 +177,12 @@ function readStoredIdempotency(item: unknown): StoredIdempotencyItem | undefined
   return item as unknown as StoredIdempotencyItem;
 }
 
-function readStoredProviderOrder(item: unknown): StoredProviderOrderItem | undefined {
+function readStoredDeliveryProviderOrder(
+  item: unknown,
+): StoredDeliveryProviderOrderItem | undefined {
   if (
     !isRecord(item) ||
-    item['entityType'] !== 'PROVIDER_ORDER' ||
+    item['entityType'] !== 'DELIVERY_PROVIDER_ORDER' ||
     item['schemaVersion'] !== SCHEMA_VERSION ||
     typeof item['merchantId'] !== 'string' ||
     typeof item['orderId'] !== 'string'
@@ -186,7 +190,7 @@ function readStoredProviderOrder(item: unknown): StoredProviderOrderItem | undef
     return undefined;
   }
 
-  return item as unknown as StoredProviderOrderItem;
+  return item as unknown as StoredDeliveryProviderOrderItem;
 }
 
 function readStoredProcessedEvent(item: unknown): StoredProcessedEventItem | undefined {
@@ -247,10 +251,10 @@ export class DynamoDbOrderRepository implements OrderRepository, ProviderWebhook
       orderId: order.orderId,
       createdAt: order.createdAt,
     };
-    const merchantReferenceItem: StoredMerchantReferenceItem = {
+    const merchantOrderIdItem: StoredMerchantOrderIdItem = {
       pk,
-      sk: merchantReferenceKey(order.merchantOrderReference),
-      entityType: 'ORDER_REFERENCE',
+      sk: merchantOrderIdKey(order.merchantOrderId),
+      entityType: 'MERCHANT_ORDER_ID',
       schemaVersion: SCHEMA_VERSION,
       orderId: order.orderId,
       createdAt: order.createdAt,
@@ -259,7 +263,7 @@ export class DynamoDbOrderRepository implements OrderRepository, ProviderWebhook
     try {
       await this.client.send(
         new TransactWriteCommand({
-          TransactItems: [orderItem, idempotencyItem, merchantReferenceItem].map((Item) => ({
+          TransactItems: [orderItem, idempotencyItem, merchantOrderIdItem].map((Item) => ({
             Put: {
               TableName: this.tableName,
               Item,
@@ -294,18 +298,21 @@ export class DynamoDbOrderRepository implements OrderRepository, ProviderWebhook
     return result.Item === undefined ? undefined : readStoredOrder(result.Item);
   }
 
-  async getByProviderOrderId(
-    providerCode: Order['provider']['providerCode'],
-    providerOrderId: string,
+  async getByDeliveryProviderOrderId(
+    deliveryProviderCode: Order['provider']['deliveryProviderCode'],
+    deliveryProviderOrderId: string,
   ): Promise<Order | undefined> {
     const result = await this.client.send(
       new GetCommand({
         TableName: this.tableName,
-        Key: { pk: providerKey(providerCode), sk: orderKey(providerOrderId as OrderId) },
+        Key: {
+          pk: deliveryProviderKey(deliveryProviderCode),
+          sk: orderKey(deliveryProviderOrderId as OrderId),
+        },
         ConsistentRead: true,
       }),
     );
-    const mapping = readStoredProviderOrder(result.Item);
+    const mapping = readStoredDeliveryProviderOrder(result.Item);
     return mapping === undefined ? undefined : this.get(mapping.merchantId, mapping.orderId);
   }
 
@@ -360,9 +367,9 @@ export class DynamoDbOrderRepository implements OrderRepository, ProviderWebhook
   ): Promise<void> {
     assertNextOrderVersion(order, expectedVersion);
     const storedOrder = toStoredOrder(order, mutation);
-    const providerOrderId =
+    const deliveryProviderOrderId =
       mutation.previousStatus === 'PENDING_SUBMISSION' && order.status === 'SUBMITTED'
-        ? order.provider.providerOrderId
+        ? order.provider.deliveryProviderOrderId
         : undefined;
 
     try {
@@ -374,21 +381,21 @@ export class DynamoDbOrderRepository implements OrderRepository, ProviderWebhook
                 ...statusUpdate(this.tableName, storedOrder, expectedVersion),
               },
             },
-            ...(providerOrderId === undefined
+            ...(deliveryProviderOrderId === undefined
               ? []
               : [
                   {
                     Put: {
                       TableName: this.tableName,
                       Item: {
-                        pk: providerKey(order.provider.providerCode),
-                        sk: orderKey(providerOrderId as OrderId),
-                        entityType: 'PROVIDER_ORDER',
+                        pk: deliveryProviderKey(order.provider.deliveryProviderCode),
+                        sk: orderKey(deliveryProviderOrderId as OrderId),
+                        entityType: 'DELIVERY_PROVIDER_ORDER',
                         schemaVersion: SCHEMA_VERSION,
                         merchantId: order.merchantId,
                         orderId: order.orderId,
                         createdAt: order.updatedAt,
-                      } satisfies StoredProviderOrderItem,
+                      } satisfies StoredDeliveryProviderOrderItem,
                       ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
                     },
                   },
@@ -408,8 +415,8 @@ export class DynamoDbOrderRepository implements OrderRepository, ProviderWebhook
       if (currentOrder.version !== expectedVersion) {
         throw new OrderVersionConflictError(currentOrder.version);
       }
-      if (providerOrderId !== undefined) {
-        throw new ProviderOrderConflictError();
+      if (deliveryProviderOrderId !== undefined) {
+        throw new DeliveryProviderOrderIdConflictError();
       }
       throw new OrderVersionConflictError(currentOrder.version);
     }
@@ -432,7 +439,7 @@ export class DynamoDbOrderRepository implements OrderRepository, ProviderWebhook
       entityType: 'PROCESSED_EVENT',
       schemaVersion: SCHEMA_VERSION,
       eventFingerprint: input.eventFingerprint,
-      providerOrderId: input.providerOrderId,
+      deliveryProviderOrderId: input.deliveryProviderOrderId,
       processedAt: input.processedAt,
     };
     const orderKeyValue = {
@@ -535,13 +542,13 @@ export class DynamoDbOrderRepository implements OrderRepository, ProviderWebhook
     const referenceResult = await this.client.send(
       new GetCommand({
         TableName: this.tableName,
-        Key: { pk, sk: merchantReferenceKey(order.merchantOrderReference) },
+        Key: { pk, sk: merchantOrderIdKey(order.merchantOrderId) },
         ConsistentRead: true,
       }),
     );
 
     if (referenceResult.Item !== undefined) {
-      throw new MerchantReferenceConflictError();
+      throw new MerchantOrderIdConflictError();
     }
 
     const existingOrder = await this.get(order.merchantId, order.orderId);

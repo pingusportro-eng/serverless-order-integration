@@ -230,7 +230,7 @@ control.
 | How is AWS deployment controlled and secured? | [Deployment workflow](docs/infrastructure/deployment-workflows.md), [OIDC review](docs/infrastructure/github-oidc-review.md), and [cost review](docs/infrastructure/pre-deployment-cost-review.md) |
 | What proves the real cloud wiring and failures? | [Cloud smoke-test record](docs/infrastructure/cloud-smoke-tests.md), [error and event-journey matrix](docs/testing/error-and-event-journey-matrix.md), and [failure-drill inventory](docs/testing/phase-7-failure-drill-inventory.md) |
 | How do I investigate and recover an incident? | [Observability inventory](docs/operations/observability-inventory.md), [CloudWatch query cookbook](docs/operations/cloudwatch-query-cookbook.md), [incident runbook](docs/operations/delivery-worker-incident-runbook.md), and [exercise postmortem](docs/operations/postmortem-2026-07-29-vendor-rate-limit.md) |
-| How do I present the system in an interview? | [Short system-design walkthrough](docs/interview/system-design-overview.md) |
+| How do I present the system in an interview? | [Short system-design walkthrough](docs/interview/system-design-overview.md) and [synchronous API and data-integrity deep dive](docs/interview/synchronous-api-and-data-integrity.md) |
 | What remains to be done? | [Project plan](PLAN.md) |
 
 ## Prerequisites
@@ -549,7 +549,7 @@ exchange console. From a second terminal, submit a generated synthetic order:
 npm run cloud:order:create
 ```
 
-Each invocation generates a new merchant reference, idempotency key, and
+Each invocation generates a new merchant order ID, idempotency key, and
 correlation ID; it prints the API response and the two identifiers needed for
 CloudWatch investigation. The supervisor console shows the worker-to-vendor
 request, vendor response, and signed vendor-to-API webhook exchanges without
@@ -665,7 +665,7 @@ platform:
   cross-region replication, or disaster-recovery design.
 - Standard SNS and SQS provide at-least-once delivery without global ordering
   or an exactly-once guarantee. Application idempotency, aggregate versions,
-  conditional writes, and provider submission keys provide the safety model.
+  conditional writes, and delivery-provider submission keys provide the safety model.
 - One-day log and failure-message retention supports short exercises, not
   compliance archives or long-running incident investigations.
 - The stack has structured logs and native service metrics but no custom

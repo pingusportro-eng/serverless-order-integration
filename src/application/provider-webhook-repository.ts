@@ -6,7 +6,7 @@ export const PROVIDER_WEBHOOK_CONSUMER = 'provider-webhook';
 export interface RecordProviderWebhookInput {
   readonly eventId: string;
   readonly eventFingerprint: string;
-  readonly providerOrderId: string;
+  readonly deliveryProviderOrderId: string;
   readonly processedAt: string;
   readonly currentOrder: Order;
   readonly changedOrder?: Order;
@@ -16,18 +16,18 @@ export interface RecordProviderWebhookInput {
 export type RecordProviderWebhookResult = 'recorded' | 'duplicate';
 
 export interface ProviderWebhookRepository {
-  getByProviderOrderId(
-    providerCode: Order['provider']['providerCode'],
-    providerOrderId: string,
+  getByDeliveryProviderOrderId(
+    deliveryProviderCode: Order['provider']['deliveryProviderCode'],
+    deliveryProviderOrderId: string,
   ): Promise<Order | undefined>;
   recordProviderWebhook(input: RecordProviderWebhookInput): Promise<RecordProviderWebhookResult>;
 }
 
-export class ProviderOrderConflictError extends Error {
-  override readonly name = 'ProviderOrderConflictError';
+export class DeliveryProviderOrderIdConflictError extends Error {
+  override readonly name = 'DeliveryProviderOrderIdConflictError';
 
   constructor() {
-    super('The provider order ID is already assigned to another order.');
+    super('The delivery-provider order ID is already assigned to another order.');
   }
 }
 

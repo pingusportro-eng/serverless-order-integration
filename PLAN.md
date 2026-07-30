@@ -420,6 +420,8 @@ For every step, the review should answer:
   - Verification: explain every major choice and one credible alternative.
   - Short walkthrough:
     [System-design interview overview](docs/interview/system-design-overview.md).
+  - Synchronous-path deep dive:
+    [Synchronous API and data integrity](docs/interview/synchronous-api-and-data-integrity.md).
 
 ## Definition of done
 
@@ -437,9 +439,9 @@ For every step, the review should answer:
 
 ## Next step
 
-Continue **7.5 — Prepare the interview walkthrough** with the deeper technical
-version. Walk component by component through data modeling, event semantics,
-failure handling, security, observability, deployment, and cost, and connect
-each choice to evidence from the implemented project.
+Continue **7.5 — Prepare the interview walkthrough** with the asynchronous
+event-journey and failure-handling deep dive: committed mutation, DynamoDB
+Stream, publisher, SNS, SQS, worker, provider, ordering, deduplication, retries,
+and every retained failure path.
 
 Interview preparation creates no AWS resources and costs `$0`.

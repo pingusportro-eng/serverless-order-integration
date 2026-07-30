@@ -34,10 +34,10 @@ export interface DeliveryLocation {
   readonly countryCode: string;
 }
 
-export interface ProviderAssignment {
-  readonly providerCode: 'mock-delivery';
-  readonly submissionKey: string;
-  readonly providerOrderId?: string;
+export interface DeliveryProviderAssignment {
+  readonly deliveryProviderCode: 'mock-delivery';
+  readonly deliveryProviderSubmissionKey: string;
+  readonly deliveryProviderOrderId?: string;
   readonly acceptedAt?: string;
 }
 
@@ -51,13 +51,13 @@ export interface FailureDetails {
 export interface Order {
   readonly orderId: OrderId;
   readonly merchantId: MerchantId;
-  readonly merchantOrderReference: string;
+  readonly merchantOrderId: string;
   readonly status: OrderStatus;
   readonly items: readonly OrderLine[];
   readonly total: Money;
   readonly pickup: DeliveryLocation;
   readonly dropoff: DeliveryLocation;
-  readonly provider: ProviderAssignment;
+  readonly provider: DeliveryProviderAssignment;
   readonly failure?: FailureDetails;
   readonly createdAt: string;
   readonly updatedAt: string;

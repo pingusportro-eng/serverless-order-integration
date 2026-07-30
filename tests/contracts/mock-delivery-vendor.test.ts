@@ -16,7 +16,7 @@ import {
 const AUTH_TOKEN = 'contract-test-token';
 const SUBMISSION: MockDeliverySubmission = {
   platformOrderId: 'ord_contract_123',
-  merchantOrderReference: 'merchant-order-123',
+  merchantOrderId: 'merchant-order-123',
   items: [{ itemReference: 'item-1', quantity: 2 }],
   pickup: {
     addressLine: '10 Example Street',
@@ -101,7 +101,7 @@ describe('mock delivery vendor contract', () => {
       status: 'ACCEPTED',
       acceptedAt: '2026-07-22T10:30:00.000Z',
     });
-    expect((body as Record<string, unknown>)['providerOrderId']).toMatch(
+    expect((body as Record<string, unknown>)['deliveryProviderOrderId']).toMatch(
       /^delivery_[A-Za-z0-9_-]{24}$/,
     );
     expect(activities).toEqual([
@@ -118,7 +118,7 @@ describe('mock delivery vendor contract', () => {
         statusCode: 201,
         correlationId: 'correlation-contract-123',
         platformOrderId: 'ord_contract_123',
-        providerOrderId: (body as Record<string, string>)['providerOrderId'],
+        deliveryProviderOrderId: (body as Record<string, string>)['deliveryProviderOrderId'],
         scenario: 'success',
       },
     ]);

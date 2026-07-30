@@ -16,20 +16,20 @@
           "pk": { "S": "MERCHANT#mrc_demo" },
           "sk": { "S": "ORDER#ord_01JABCDEF0123456789" },
           "entityType": { "S": "ORDER" },
-          "schemaVersion": { "N": "1" },
+          "schemaVersion": { "N": "2" },
           "order": {
             "M": {
               "orderId": { "S": "ord_01JABCDEF0123456789" },
               "merchantId": { "S": "mrc_demo" },
-              "merchantOrderReference": { "S": "merchant-order-123" },
+              "merchantOrderId": { "S": "merchant-order-123" },
               "status": { "S": "PENDING_SUBMISSION" },
               "version": { "N": "1" },
               "createdAt": { "S": "2026-07-23T07:00:00.000Z" },
               "updatedAt": { "S": "2026-07-23T07:00:00.000Z" },
               "provider": {
                 "M": {
-                  "providerCode": { "S": "mock-delivery" },
-                  "submissionKey": { "S": "submission_01JABCDEF0123456789" }
+                  "deliveryProviderCode": { "S": "mock-delivery" },
+                  "deliveryProviderSubmissionKey": { "S": "submission_01JABCDEF0123456789" }
                 }
               }
             }
@@ -59,7 +59,7 @@
           "pk": { "S": "MERCHANT#mrc_demo" },
           "sk": { "S": "IDEMPOTENCY#order-create-123" },
           "entityType": { "S": "IDEMPOTENCY" },
-          "schemaVersion": { "N": "1" }
+          "schemaVersion": { "N": "2" }
         }
       }
     }

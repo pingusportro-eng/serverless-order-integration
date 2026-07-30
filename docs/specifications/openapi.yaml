@@ -2,7 +2,7 @@ openapi: 3.0.3
 
 info:
   title: Serverless Order Integration API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     Contract for creating and inspecting synthetic delivery orders, performing
     controlled operator status changes, and receiving mock-provider webhooks.
@@ -500,12 +500,12 @@ components:
       type: object
       additionalProperties: false
       required:
-        - merchantOrderReference
+        - merchantOrderId
         - items
         - pickup
         - dropoff
       properties:
-        merchantOrderReference:
+        merchantOrderId:
           type: string
           minLength: 1
           maxLength: 100
@@ -521,17 +521,17 @@ components:
         dropoff:
           $ref: '#/components/schemas/DeliveryLocation'
 
-    ProviderSummary:
+    DeliveryProviderSummary:
       type: object
       additionalProperties: false
       required:
-        - providerCode
+        - deliveryProviderCode
       properties:
-        providerCode:
+        deliveryProviderCode:
           type: string
           enum:
             - mock-delivery
-        providerOrderId:
+        deliveryProviderOrderId:
           type: string
           minLength: 1
           maxLength: 128
@@ -577,7 +577,7 @@ components:
       required:
         - orderId
         - merchantId
-        - merchantOrderReference
+        - merchantOrderId
         - status
         - items
         - total
@@ -592,7 +592,7 @@ components:
           $ref: '#/components/schemas/OrderId'
         merchantId:
           $ref: '#/components/schemas/MerchantId'
-        merchantOrderReference:
+        merchantOrderId:
           type: string
           minLength: 1
           maxLength: 100
@@ -612,7 +612,7 @@ components:
         dropoff:
           $ref: '#/components/schemas/DeliveryLocation'
         provider:
-          $ref: '#/components/schemas/ProviderSummary'
+          $ref: '#/components/schemas/DeliveryProviderSummary'
         failure:
           $ref: '#/components/schemas/FailureDetails'
         createdAt:
@@ -670,7 +670,7 @@ components:
           maxLength: 500
           description: Audit-safe reason for the operator action.
           example: Reconciled against the mock provider response.
-        providerOrderId:
+        deliveryProviderOrderId:
           type: string
           minLength: 1
           maxLength: 128
@@ -688,7 +688,7 @@ components:
         - eventId
         - eventType
         - occurredAt
-        - providerOrderId
+        - deliveryProviderOrderId
       properties:
         eventId:
           type: string
@@ -707,7 +707,7 @@ components:
           type: string
           format: date-time
           example: '2026-07-21T13:00:00.000Z'
-        providerOrderId:
+        deliveryProviderOrderId:
           type: string
           minLength: 1
           maxLength: 128
@@ -773,7 +773,7 @@ components:
             Stable application code. Defined values include
             `MALFORMED_REQUEST`, `UNAUTHORIZED`, `FORBIDDEN`,
             `INVALID_WEBHOOK_SIGNATURE`, `ORDER_NOT_FOUND`,
-            `IDEMPOTENCY_CONFLICT`, `MERCHANT_REFERENCE_CONFLICT`,
+            `IDEMPOTENCY_CONFLICT`, `MERCHANT_ORDER_ID_CONFLICT`,
             `INVALID_STATUS_TRANSITION`, `EVENT_ID_CONFLICT`,
             `VERSION_MISMATCH`, `PRECONDITION_REQUIRED`, `VALIDATION_ERROR`,
             and `INTERNAL_ERROR`.

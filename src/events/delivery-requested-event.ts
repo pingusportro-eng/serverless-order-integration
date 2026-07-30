@@ -14,13 +14,18 @@ const ENVELOPE_FIELDS = new Set([
   'causationId',
   'payload',
 ]);
-const CREATED_PAYLOAD_FIELDS = new Set(['merchantId', 'status', 'providerCode', 'submissionKey']);
+const CREATED_PAYLOAD_FIELDS = new Set([
+  'merchantId',
+  'status',
+  'deliveryProviderCode',
+  'deliveryProviderSubmissionKey',
+]);
 const RETRY_PAYLOAD_FIELDS = new Set([
   'merchantId',
   'previousStatus',
   'status',
-  'providerCode',
-  'submissionKey',
+  'deliveryProviderCode',
+  'deliveryProviderSubmissionKey',
   'reason',
 ]);
 const SAFE_ID_PATTERN = /^[A-Za-z0-9._:-]+={0,2}$/;
@@ -50,7 +55,7 @@ function hasValidEnvelope(value: Record<string, unknown>): boolean {
     hasOnlyFields(value, ENVELOPE_FIELDS) &&
     isSafeId(value['eventId'], 20, 132) &&
     EVENT_ID_PATTERN.test(value['eventId']) &&
-    value['schemaVersion'] === 1 &&
+    value['schemaVersion'] === 2 &&
     value['aggregateType'] === 'ORDER' &&
     isSafeId(value['aggregateId'], 12, 64) &&
     ORDER_ID_PATTERN.test(value['aggregateId']) &&
@@ -68,8 +73,8 @@ function hasCommonPayload(payload: Record<string, unknown>): boolean {
     isSafeId(payload['merchantId'], 3, 64) &&
     MERCHANT_ID_PATTERN.test(payload['merchantId']) &&
     payload['status'] === 'PENDING_SUBMISSION' &&
-    payload['providerCode'] === 'mock-delivery' &&
-    isSafeId(payload['submissionKey'], 8, 128)
+    payload['deliveryProviderCode'] === 'mock-delivery' &&
+    isSafeId(payload['deliveryProviderSubmissionKey'], 8, 128)
   );
 }
 

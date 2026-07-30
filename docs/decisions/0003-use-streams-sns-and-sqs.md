@@ -41,11 +41,11 @@ Responsibilities are separated as follows:
 | Publisher Lambda | Interpret relevant changes, construct the versioned domain event envelope, and publish it. |
 | SNS topic | Fan out domain events and apply subscription filters without coupling publishers to consumers. |
 | SQS delivery queue | Persist delivery work, buffer bursts, apply backpressure, and drive worker retries. |
-| Worker Lambda | Deduplicate the event and call the provider with the order's stable submission key. |
+| Worker Lambda | Deduplicate the event and call the provider with the order's stable delivery-provider submission key. |
 | Dead-letter handling | Retain unprocessable records for investigation and controlled recovery. |
 
 Use standard SNS and SQS rather than FIFO. Domain event IDs, aggregate versions,
-conditional writes, and provider submission keys provide correctness without a
+conditional writes, and delivery-provider submission keys provide correctness without a
 global ordering guarantee.
 
 The DynamoDB Stream mapping and SQS mapping will enable partial batch responses.

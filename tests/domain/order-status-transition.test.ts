@@ -15,16 +15,16 @@ describe('order status transition', () => {
 
     const changed = applyOrderStatusChange(
       order,
-      { targetStatus: 'SUBMITTED', providerOrderId: 'provider-123' },
+      { targetStatus: 'SUBMITTED', deliveryProviderOrderId: 'provider-123' },
       changedAt,
     );
 
     expect(changed).toMatchObject({
       status: 'SUBMITTED',
       provider: {
-        providerOrderId: 'provider-123',
+        deliveryProviderOrderId: 'provider-123',
         acceptedAt: changedAt,
-        submissionKey: order.provider.submissionKey,
+        deliveryProviderSubmissionKey: order.provider.deliveryProviderSubmissionKey,
       },
       updatedAt: changedAt,
       version: 2,
@@ -63,7 +63,9 @@ describe('order status transition', () => {
 
     expect(changed.status).toBe('PENDING_SUBMISSION');
     expect(changed).not.toHaveProperty('failure');
-    expect(changed.provider.submissionKey).toBe(failedOrder.provider.submissionKey);
+    expect(changed.provider.deliveryProviderSubmissionKey).toBe(
+      failedOrder.provider.deliveryProviderSubmissionKey,
+    );
   });
 
   it('rejects transitions out of a terminal state without mutation', () => {
@@ -71,7 +73,7 @@ describe('order status transition', () => {
       status: 'DELIVERED',
       provider: {
         ...createOrderFixture().provider,
-        providerOrderId: 'provider-terminal',
+        deliveryProviderOrderId: 'provider-terminal',
         acceptedAt: '2026-07-22T09:00:00.000Z',
       },
       version: 4,
@@ -92,13 +94,13 @@ describe('order status transition', () => {
 
     const submittedOrder = applyOrderStatusChange(
       order,
-      { targetStatus: 'SUBMITTED', providerOrderId: 'provider-original' },
+      { targetStatus: 'SUBMITTED', deliveryProviderOrderId: 'provider-original' },
       changedAt,
     );
     expect(() =>
       applyOrderStatusChange(
         submittedOrder,
-        { targetStatus: 'PICKED_UP', providerOrderId: 'provider-replacement' },
+        { targetStatus: 'PICKED_UP', deliveryProviderOrderId: 'provider-replacement' },
         changedAt,
       ),
     ).toThrow(InvalidOrderStatusDetailsError);
@@ -109,7 +111,7 @@ describe('order status transition', () => {
       status: 'SUBMITTED',
       provider: {
         ...createOrderFixture().provider,
-        providerOrderId: 'provider-failure',
+        deliveryProviderOrderId: 'provider-failure',
         acceptedAt: '2026-07-22T09:00:00.000Z',
       },
       version: 2,

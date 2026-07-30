@@ -4,7 +4,7 @@ export function createOrderRequestFixture(
   overrides: Partial<CreateOrderRequest> = {},
 ): CreateOrderRequest {
   return {
-    merchantOrderReference: 'pos-order-10042',
+    merchantOrderId: 'pos-order-10042',
     items: [
       {
         itemReference: 'pizza-margherita',

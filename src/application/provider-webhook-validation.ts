@@ -12,7 +12,7 @@ const TOP_LEVEL_FIELDS = new Set([
   'eventId',
   'eventType',
   'occurredAt',
-  'providerOrderId',
+  'deliveryProviderOrderId',
   'failure',
 ]);
 const FAILURE_FIELDS = new Set(['stage', 'reasonCode', 'summary', 'occurredAt']);
@@ -25,7 +25,7 @@ export interface ProviderWebhookEvent {
   readonly eventId: string;
   readonly eventType: ProviderWebhookEventType;
   readonly occurredAt: string;
-  readonly providerOrderId: string;
+  readonly deliveryProviderOrderId: string;
   readonly failure?: FailureDetails & { readonly stage: 'DELIVERY' };
 }
 
@@ -133,9 +133,9 @@ export function validateProviderWebhookEvent(
     issues.push({ pointer: '#/eventType', detail: 'must be a supported delivery event type' });
   }
   const occurredAt = timestampValue(value['occurredAt'], '#/occurredAt', issues);
-  const providerOrderId = stringValue(
-    value['providerOrderId'],
-    '#/providerOrderId',
+  const deliveryProviderOrderId = stringValue(
+    value['deliveryProviderOrderId'],
+    '#/deliveryProviderOrderId',
     1,
     128,
     issues,
@@ -158,7 +158,7 @@ export function validateProviderWebhookEvent(
     eventId === undefined ||
     eventType === undefined ||
     occurredAt === undefined ||
-    providerOrderId === undefined
+    deliveryProviderOrderId === undefined
   ) {
     return { valid: false, issues };
   }
@@ -169,7 +169,7 @@ export function validateProviderWebhookEvent(
       eventId,
       eventType,
       occurredAt,
-      providerOrderId,
+      deliveryProviderOrderId,
       ...(failure === undefined ? {} : { failure }),
     },
   };

@@ -1,7 +1,7 @@
 {
   "eventId": "evt_01JABCDEF0123456789A",
   "eventType": "order.created",
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "aggregateType": "ORDER",
   "aggregateId": "ord_01JABCDEF0123456789",
   "aggregateVersion": 1,
@@ -11,7 +11,7 @@
   "payload": {
     "merchantId": "mrc_demo",
     "status": "PENDING_SUBMISSION",
-    "providerCode": "mock-delivery",
-    "submissionKey": "submission_01JABCDEF0123456789"
+    "deliveryProviderCode": "mock-delivery",
+    "deliveryProviderSubmissionKey": "submission_01JABCDEF0123456789"
   }
 }

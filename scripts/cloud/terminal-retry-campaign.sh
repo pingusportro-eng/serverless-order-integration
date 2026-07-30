@@ -350,11 +350,11 @@ assert_no_previous_campaign_data() {
   local response
   response="$(aws_call dynamodb dynamodb scan \
     --table-name "$table_name" \
-    --filter-expression 'begins_with(sk, :eventPrefix) OR begins_with(sk, :idempotencyPrefix) OR begins_with(sk, :referencePrefix)' \
+    --filter-expression 'begins_with(sk, :eventPrefix) OR begins_with(sk, :idempotencyPrefix) OR begins_with(sk, :merchantOrderIdPrefix)' \
     --expression-attribute-values '{
       ":eventPrefix":{"S":"EVENT#provider-terminal-campaign-"},
       ":idempotencyPrefix":{"S":"IDEMPOTENCY#terminal-campaign-"},
-      ":referencePrefix":{"S":"ORDER_REFERENCE#terminal-campaign-"}
+      ":merchantOrderIdPrefix":{"S":"MERCHANT_ORDER_ID#terminal-campaign-"}
     }' \
     --projection-expression 'pk,sk' \
     --output json)"
@@ -387,7 +387,7 @@ state_create() {
     --arg memberUsername "$drill_prefix-member-$suffix" \
     --arg idempotencyKey "$drill_prefix-idempotency-$suffix" \
     --arg conflictIdempotencyKey "$drill_prefix-conflict-$suffix" \
-    --arg merchantReference "$drill_prefix-reference-$suffix" \
+    --arg merchantOrderId "$drill_prefix-merchant-order-$suffix" \
     --arg createCorrelationId "corr.$drill_prefix.create.$suffix" \
     --arg retryCorrelationId "corr.$drill_prefix.retry.$suffix" \
     --arg pickupEventId "provider-$drill_prefix-pickup-$suffix" \
@@ -416,7 +416,7 @@ state_create() {
         memberUsername: $memberUsername,
         idempotencyKey: $idempotencyKey,
         conflictIdempotencyKey: $conflictIdempotencyKey,
-        merchantReference: $merchantReference,
+        merchantOrderId: $merchantOrderId,
         createCorrelationId: $createCorrelationId,
         retryCorrelationId: $retryCorrelationId,
         pickupEventId: $pickupEventId,
@@ -970,9 +970,9 @@ assert_problem() {
 
 write_order_bodies() {
   jq -n \
-    --arg reference "$(state_string merchantReference)" '
+    --arg merchantOrderId "$(state_string merchantOrderId)" '
       {
-        merchantOrderReference: $reference,
+        merchantOrderId: $merchantOrderId,
         items: [{
           itemReference: "terminal-campaign-item",
           description: "Synthetic terminal campaign item",
@@ -1027,7 +1027,7 @@ create_order_and_http_errors() {
   status="$(api_request "$operator_token_file" POST /orders "$order_body_file" "$response_file" \
     'Content-Type: application/json' \
     "Idempotency-Key: $(state_string conflictIdempotencyKey)")"
-  assert_problem "$status" 409 MERCHANT_REFERENCE_CONFLICT "$response_file"
+  assert_problem "$status" 409 MERCHANT_ORDER_ID_CONFLICT "$response_file"
 
   printf '%s' '{malformed' >"$input_file"
   status="$(api_request "$operator_token_file" POST /orders "$input_file" "$response_file" \
@@ -1075,7 +1075,7 @@ wait_for_terminal_failure() {
       .Item.order.M.version.N == "2" and
       .Item.order.M.failure.M.stage.S == "SUBMISSION" and
       .Item.order.M.failure.M.reasonCode.S == "REQUEST_REJECTED" and
-      (.Item.order.M.provider.M.providerOrderId? == null)
+      (.Item.order.M.provider.M.deliveryProviderOrderId? == null)
     ' <<<"$item" >/dev/null; then
       state_set_boolean terminalFailureVerified true
       return
@@ -1116,7 +1116,7 @@ collect_audit_events() {
       body="$(jq -er --argjson index "$index" '.Messages[$index].Body' <<<"$response")"
       jq -e \
         --arg orderId "$(state_string orderId)" '
-          .aggregateId == $orderId and .schemaVersion == 1
+          .aggregateId == $orderId and .schemaVersion == 2
         ' <<<"$body" >/dev/null || fail 'audit subscription received an unrelated event'
       jq -c . <<<"$body" >>"$audit_events_file"
       local receipt
@@ -1235,7 +1235,7 @@ wait_for_submitted_order() {
       .Item.version.N == "4" and
       .Item.order.M.status.S == "SUBMITTED" and
       .Item.order.M.version.N == "4" and
-      (.Item.order.M.provider.M.providerOrderId.S | length) > 0
+      (.Item.order.M.provider.M.deliveryProviderOrderId.S | length) > 0
     ' <<<"$item" >/dev/null; then
       state_set_boolean orderSubmitted true
       return
@@ -1298,13 +1298,13 @@ webhook_request() {
   printf '%s\n' "$status"
 }
 
-provider_order_id() {
-  jq -er '.Item.order.M.provider.M.providerOrderId.S' <<<"$(read_order_item)"
+delivery_provider_order_id() {
+  jq -er '.Item.order.M.provider.M.deliveryProviderOrderId.S' <<<"$(read_order_item)"
 }
 
 exercise_webhook_cases() {
-  local provider_id
-  provider_id="$(provider_order_id)"
+  local delivery_provider_order_id_value
+  delivery_provider_order_id_value="$(delivery_provider_order_id)"
   local status
 
   jq -n \
@@ -1314,7 +1314,7 @@ exercise_webhook_cases() {
         eventId:$eventId,
         eventType:"DELIVERY_PICKED_UP",
         occurredAt:$occurredAt,
-        providerOrderId:"delivery-unknown-terminal-campaign"
+        deliveryProviderOrderId:"delivery-unknown-terminal-campaign"
       }
     ' >"$webhook_body_file"
   status="$(webhook_request "$webhook_body_file" "$response_file")"
@@ -1322,7 +1322,7 @@ exercise_webhook_cases() {
 
   jq -n \
     --arg eventId "provider-$drill_prefix-invalid-$(state_string suffix)" '
-      {eventId:$eventId,eventType:"UNKNOWN",occurredAt:"invalid",providerOrderId:""}
+      {eventId:$eventId,eventType:"UNKNOWN",occurredAt:"invalid",deliveryProviderOrderId:""}
     ' >"$webhook_body_file"
   status="$(webhook_request "$webhook_body_file" "$response_file")"
   assert_problem "$status" 422 VALIDATION_ERROR "$response_file"
@@ -1337,8 +1337,8 @@ exercise_webhook_cases() {
   jq -n \
     --arg eventId "$(state_string pickupEventId)" \
     --arg occurredAt "$pickup_at" \
-    --arg providerOrderId "$provider_id" '
-      {eventId:$eventId,eventType:"DELIVERY_PICKED_UP",occurredAt:$occurredAt,providerOrderId:$providerOrderId}
+    --arg deliveryProviderOrderId "$delivery_provider_order_id_value" '
+      {eventId:$eventId,eventType:"DELIVERY_PICKED_UP",occurredAt:$occurredAt,deliveryProviderOrderId:$deliveryProviderOrderId}
     ' >"$webhook_body_file"
   status="$(webhook_request "$webhook_body_file" "$response_file")"
   [[ "$status" == '204' ]] || fail "pickup webhook returned HTTP $status"
@@ -1349,8 +1349,8 @@ exercise_webhook_cases() {
   jq -n \
     --arg eventId "$(state_string pickupEventId)" \
     --arg occurredAt "$conflict_at" \
-    --arg providerOrderId "$provider_id" '
-      {eventId:$eventId,eventType:"DELIVERY_DELIVERED",occurredAt:$occurredAt,providerOrderId:$providerOrderId}
+    --arg deliveryProviderOrderId "$delivery_provider_order_id_value" '
+      {eventId:$eventId,eventType:"DELIVERY_DELIVERED",occurredAt:$occurredAt,deliveryProviderOrderId:$deliveryProviderOrderId}
     ' >"$webhook_body_file"
   status="$(webhook_request "$webhook_body_file" "$response_file")"
   assert_problem "$status" 409 EVENT_ID_CONFLICT "$response_file"
@@ -1361,8 +1361,8 @@ exercise_webhook_cases() {
   jq -n \
     --arg eventId "$(state_string deliveredEventId)" \
     --arg occurredAt "$delivered_at" \
-    --arg providerOrderId "$provider_id" '
-      {eventId:$eventId,eventType:"DELIVERY_DELIVERED",occurredAt:$occurredAt,providerOrderId:$providerOrderId}
+    --arg deliveryProviderOrderId "$delivery_provider_order_id_value" '
+      {eventId:$eventId,eventType:"DELIVERY_DELIVERED",occurredAt:$occurredAt,deliveryProviderOrderId:$deliveryProviderOrderId}
     ' >"$webhook_body_file"
   status="$(webhook_request "$webhook_body_file" "$response_file")"
   [[ "$status" == '204' ]] || fail "delivered webhook returned HTTP $status"
@@ -1370,8 +1370,8 @@ exercise_webhook_cases() {
   jq -n \
     --arg eventId "$(state_string staleEventId)" \
     --arg occurredAt "$pickup_at" \
-    --arg providerOrderId "$provider_id" '
-      {eventId:$eventId,eventType:"DELIVERY_PICKED_UP",occurredAt:$occurredAt,providerOrderId:$providerOrderId}
+    --arg deliveryProviderOrderId "$delivery_provider_order_id_value" '
+      {eventId:$eventId,eventType:"DELIVERY_PICKED_UP",occurredAt:$occurredAt,deliveryProviderOrderId:$deliveryProviderOrderId}
     ' >"$webhook_body_file"
   status="$(webhook_request "$webhook_body_file" "$response_file")"
   [[ "$status" == '204' ]] || fail "stale webhook returned HTTP $status"
@@ -1402,20 +1402,20 @@ exercise_duplicate_delivery() {
   local item
   item="$(read_order_item)"
   local occurred_at
-  local submission_key
+  local delivery_provider_submission_key
   occurred_at="$(jq -er '.Item.order.M.updatedAt.S' <<<"$item")"
-  submission_key="$(jq -er '.Item.order.M.provider.M.submissionKey.S' <<<"$item")"
+  delivery_provider_submission_key="$(jq -er '.Item.order.M.provider.M.deliveryProviderSubmissionKey.S' <<<"$item")"
   jq -n \
     --arg eventId "evt_terminalcampaign_duplicate_$(state_string suffix)" \
     --arg orderId "$(state_string orderId)" \
     --arg occurredAt "$occurred_at" \
     --arg correlationId "$(state_string retryCorrelationId)" \
     --arg causationId "request.$drill_prefix.duplicate.$(state_string suffix)" \
-    --arg submissionKey "$submission_key" '
+    --arg deliveryProviderSubmissionKey "$delivery_provider_submission_key" '
       {
         eventId:$eventId,
         eventType:"order.submission_retry_requested",
-        schemaVersion:1,
+        schemaVersion:2,
         aggregateType:"ORDER",
         aggregateId:$orderId,
         aggregateVersion:3,
@@ -1426,8 +1426,8 @@ exercise_duplicate_delivery() {
           merchantId:"mrc_demo",
           previousStatus:"SUBMISSION_FAILED",
           status:"PENDING_SUBMISSION",
-          providerCode:"mock-delivery",
-          submissionKey:$submissionKey,
+          deliveryProviderCode:"mock-delivery",
+          deliveryProviderSubmissionKey:$deliveryProviderSubmissionKey,
           reason:"Approved synthetic submission retry."
         }
       }
@@ -1531,19 +1531,19 @@ delete_campaign_data() {
     ".Item.entityType.S == \"IDEMPOTENCY\" and .Item.orderId.S == \"$order_id\"" "$deletes")"
 
   key="$(jq -cn --arg pk "MERCHANT#$expected_merchant_id" \
-    --arg sk "ORDER_REFERENCE#$(state_string merchantReference)" '{pk:{S:$pk},sk:{S:$sk}}')"
+    --arg sk "MERCHANT_ORDER_ID#$(state_string merchantOrderId)" '{pk:{S:$pk},sk:{S:$sk}}')"
   deletes="$(append_delete_if_valid "$key" \
-    ".Item.entityType.S == \"ORDER_REFERENCE\" and .Item.orderId.S == \"$order_id\"" "$deletes")"
+    ".Item.entityType.S == \"MERCHANT_ORDER_ID\" and .Item.orderId.S == \"$order_id\"" "$deletes")"
 
-  local provider_id=''
+  local delivery_provider_order_id_value=''
   local order_item
   order_item="$(read_order_item)"
-  provider_id="$(jq -r '.Item.order.M.provider.M.providerOrderId.S // ""' <<<"$order_item")"
-  if [[ -n "$provider_id" ]]; then
-    key="$(jq -cn --arg pk 'PROVIDER#mock-delivery' --arg sk "ORDER#$provider_id" \
+  delivery_provider_order_id_value="$(jq -r '.Item.order.M.provider.M.deliveryProviderOrderId.S // ""' <<<"$order_item")"
+  if [[ -n "$delivery_provider_order_id_value" ]]; then
+    key="$(jq -cn --arg pk 'DELIVERY_PROVIDER#mock-delivery' --arg sk "ORDER#$delivery_provider_order_id_value" \
       '{pk:{S:$pk},sk:{S:$sk}}')"
     deletes="$(append_delete_if_valid "$key" \
-      ".Item.entityType.S == \"PROVIDER_ORDER\" and .Item.orderId.S == \"$order_id\"" "$deletes")"
+      ".Item.entityType.S == \"DELIVERY_PROVIDER_ORDER\" and .Item.orderId.S == \"$order_id\"" "$deletes")"
   fi
 
   local event_field
@@ -1576,16 +1576,16 @@ assert_campaign_data_absent() {
   local response
   response="$(aws_call dynamodb dynamodb scan \
     --table-name "$table_name" \
-    --filter-expression 'begins_with(sk, :eventPrefix) OR begins_with(sk, :idempotencyPrefix) OR begins_with(sk, :referencePrefix) OR orderId = :orderId OR #order.#orderId = :orderId' \
+    --filter-expression 'begins_with(sk, :eventPrefix) OR begins_with(sk, :idempotencyPrefix) OR begins_with(sk, :merchantOrderIdPrefix) OR orderId = :orderId OR #order.#orderId = :orderId' \
     --expression-attribute-names '{"#order":"order","#orderId":"orderId"}' \
     --expression-attribute-values "$(jq -cn \
       --arg eventPrefix "EVENT#provider-$drill_prefix-" \
       --arg idempotencyPrefix "IDEMPOTENCY#$drill_prefix-" \
-      --arg referencePrefix "ORDER_REFERENCE#$drill_prefix-" \
+      --arg merchantOrderIdPrefix "MERCHANT_ORDER_ID#$drill_prefix-" \
       --arg orderId "$(state_string orderId)" '{
         ":eventPrefix":{S:$eventPrefix},
         ":idempotencyPrefix":{S:$idempotencyPrefix},
-        ":referencePrefix":{S:$referencePrefix},
+        ":merchantOrderIdPrefix":{S:$merchantOrderIdPrefix},
         ":orderId":{S:$orderId}
       }')" \
     --projection-expression 'pk,sk' \

@@ -962,7 +962,7 @@ async function createOperator(stack, state) {
     orderPath,
     `${JSON.stringify(
       {
-        merchantOrderReference: 'cookbook-order-001',
+        merchantOrderId: 'cookbook-order-001',
         items: [
           {
             itemReference: 'cookbook-item-1',
@@ -1276,7 +1276,7 @@ async function createOrder() {
   const idempotencyKey = `cookbook-order-${suffix}`;
   const requestPath = join(stateDirectory, 'order-request.json');
   const order = parseJson(await readFile(orderPath, 'utf8'), 'synthetic order');
-  order.merchantOrderReference = `cookbook-order-${suffix}`;
+  order.merchantOrderId = `cookbook-order-${suffix}`;
   await writeFile(requestPath, `${JSON.stringify(order, undefined, 2)}\n`, { mode: 0o600 });
   const result = await command('curl', [
     '--silent',

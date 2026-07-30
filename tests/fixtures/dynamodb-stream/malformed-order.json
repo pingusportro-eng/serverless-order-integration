@@ -15,7 +15,7 @@
           "pk": { "S": "MERCHANT#mrc_demo" },
           "sk": { "S": "ORDER#ord_01JABCDEF0123456789" },
           "entityType": { "S": "ORDER" },
-          "schemaVersion": { "N": "1" },
+          "schemaVersion": { "N": "2" },
           "order": {
             "M": {
               "orderId": { "S": "ord_01JABCDEF0123456789" },
@@ -25,8 +25,8 @@
               "updatedAt": { "S": "2026-07-23T07:00:30.000Z" },
               "provider": {
                 "M": {
-                  "providerCode": { "S": "mock-delivery" },
-                  "submissionKey": { "S": "submission_01JABCDEF0123456789" }
+                  "deliveryProviderCode": { "S": "mock-delivery" },
+                  "deliveryProviderSubmissionKey": { "S": "submission_01JABCDEF0123456789" }
                 }
               }
             }

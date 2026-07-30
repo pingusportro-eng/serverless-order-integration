@@ -36,9 +36,9 @@ describe('GET /orders/{orderId} handler', () => {
     expect(response.body).toMatchObject({
       orderId: order.orderId,
       merchantId: order.merchantId,
-      provider: { providerCode: 'mock-delivery' },
+      provider: { deliveryProviderCode: 'mock-delivery' },
     });
-    expect(response.body).not.toHaveProperty('provider.submissionKey');
+    expect(response.body).not.toHaveProperty('provider.deliveryProviderSubmissionKey');
   });
 
   it('returns the same safe 404 for unknown and other-merchant orders', async () => {

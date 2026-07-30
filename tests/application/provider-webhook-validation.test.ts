@@ -8,7 +8,7 @@ describe('provider webhook validation', () => {
       eventId: 'provider-event-1001',
       eventType: 'DELIVERY_FAILED',
       occurredAt: '2026-07-21T12:35:00Z',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
       failure: {
         stage: 'DELIVERY',
         reasonCode: 'CUSTOMER_UNAVAILABLE',
@@ -23,7 +23,7 @@ describe('provider webhook validation', () => {
         eventId: 'provider-event-1001',
         eventType: 'DELIVERY_FAILED',
         occurredAt: '2026-07-21T12:35:00.000Z',
-        providerOrderId: 'delivery-789',
+        deliveryProviderOrderId: 'delivery-789',
         failure: {
           stage: 'DELIVERY',
           reasonCode: 'CUSTOMER_UNAVAILABLE',
@@ -39,7 +39,7 @@ describe('provider webhook validation', () => {
       eventId: 'provider-event-1002',
       eventType: 'DELIVERY_DELIVERED',
       occurredAt: 'not-a-date',
-      providerOrderId: 'delivery-789',
+      deliveryProviderOrderId: 'delivery-789',
       failure: {
         stage: 'SUBMISSION',
         reasonCode: 'bad-code',

@@ -7,11 +7,11 @@ Last reviewed: 2026-07-22
 
 The delivery vendor client translates an internal `Order` into the mock
 provider's `POST /deliveries` contract, sends the stable provider
-`submissionKey` as `Idempotency-Key`, propagates the correlation ID, enforces an
+`deliveryProviderSubmissionKey` as `Idempotency-Key`, propagates the correlation ID, enforces an
 HTTP timeout, and converts untrusted provider responses into safe typed results
 or errors.
 
-The client returns only `providerOrderId`, `status`, and `acceptedAt`. It does
+The client returns only `deliveryProviderOrderId`, `status`, and `acceptedAt`. It does
 not expose raw provider error bodies, authorization values, or submitted
 addresses through its errors.
 
@@ -44,7 +44,7 @@ The processing path owns retries as follows:
 3. SQS `maxReceiveCount` bounds total deliveries and moves exhausted work to the
    DLQ. Its exact value will be configured and reviewed with the asynchronous
    infrastructure.
-4. The unchanged provider `submissionKey` protects the external side effect
+4. The unchanged provider `deliveryProviderSubmissionKey` protects the external side effect
    across every attempt, including uncertain timeout and malformed-response
    outcomes.
 
@@ -60,7 +60,7 @@ multiplying calls, Lambda duration, and cost.
 Provider acceptance and the DynamoDB order update cannot share one atomic
 transaction. If the provider accepts but the database write fails, the worker
 fails the SQS record. A later delivery calls the provider with the unchanged
-submission key, recovers the original acceptance, and retries the conditional
+delivery-provider submission key, recovers the original acceptance, and retries the conditional
 database update.
 
 A conditional-write conflict is acknowledged only when the reloaded order

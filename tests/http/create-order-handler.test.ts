@@ -36,7 +36,7 @@ function deterministicDependencies(repository: OrderRepository) {
 }
 
 describe('POST /orders handler', () => {
-  it('creates an order, calculates its total, and hides the submission key', async () => {
+  it('creates an order, calculates its total, and hides the delivery-provider submission key', async () => {
     const repository = new InMemoryOrderRepository();
 
     const response = await handleCreateOrder(deterministicDependencies(repository), request());
@@ -55,9 +55,9 @@ describe('POST /orders handler', () => {
       total: { amountMinor: 2598, currency: 'RON' },
       createdAt: '2026-07-22T08:00:00.000Z',
       version: 1,
-      provider: { providerCode: 'mock-delivery' },
+      provider: { deliveryProviderCode: 'mock-delivery' },
     });
-    expect(response.body).not.toHaveProperty('provider.submissionKey');
+    expect(response.body).not.toHaveProperty('provider.deliveryProviderSubmissionKey');
   });
 
   it('returns the original order for a case-insensitive idempotent replay', async () => {
@@ -109,7 +109,7 @@ describe('POST /orders handler', () => {
     expect(create).not.toHaveBeenCalled();
   });
 
-  it('maps idempotency and merchant-reference conflicts', async () => {
+  it('maps idempotency and merchant order ID conflicts', async () => {
     const repository = new InMemoryOrderRepository();
     const dependencies = deterministicDependencies(repository);
     const body = createOrderRequestFixture();
@@ -117,17 +117,17 @@ describe('POST /orders handler', () => {
 
     const idempotencyConflict = await handleCreateOrder(
       dependencies,
-      request({ ...body, merchantOrderReference: 'different-reference' }),
+      request({ ...body, merchantOrderId: 'different-merchant-order' }),
     );
-    const referenceConflict = await handleCreateOrder(
+    const merchantOrderIdConflict = await handleCreateOrder(
       dependencies,
       request(body, { 'Idempotency-Key': 'different-key-10042' }),
     );
 
     expect(idempotencyConflict.statusCode).toBe(409);
     expect(idempotencyConflict.body).toMatchObject({ code: 'IDEMPOTENCY_CONFLICT' });
-    expect(referenceConflict.statusCode).toBe(409);
-    expect(referenceConflict.body).toMatchObject({ code: 'MERCHANT_REFERENCE_CONFLICT' });
+    expect(merchantOrderIdConflict.statusCode).toBe(409);
+    expect(merchantOrderIdConflict.body).toMatchObject({ code: 'MERCHANT_ORDER_ID_CONFLICT' });
   });
 
   it('does not expose a generated ID collision', async () => {

@@ -13,7 +13,7 @@ const ALLOWED_TRANSITIONS: Readonly<Record<OrderStatus, ReadonlySet<OrderStatus>
 
 export interface OrderStatusChange {
   readonly targetStatus: OrderStatus;
-  readonly providerOrderId?: string;
+  readonly deliveryProviderOrderId?: string;
   readonly acceptedAt?: string;
   readonly failure?: FailureDetails;
 }
@@ -33,7 +33,7 @@ export class InvalidOrderStatusDetailsError extends Error {
   override readonly name = 'InvalidOrderStatusDetailsError';
 
   constructor(
-    readonly field: 'providerOrderId' | 'failure' | 'failure.stage',
+    readonly field: 'deliveryProviderOrderId' | 'failure' | 'failure.stage',
     message: string,
   ) {
     super(message);
@@ -83,42 +83,43 @@ function providerForChange(
   change: OrderStatusChange,
   changedAt: string,
 ): Order['provider'] {
-  const existingProviderOrderId = order.provider.providerOrderId;
+  const existingDeliveryProviderOrderId = order.provider.deliveryProviderOrderId;
 
   if (
-    change.providerOrderId !== undefined &&
-    existingProviderOrderId !== undefined &&
-    change.providerOrderId !== existingProviderOrderId
+    change.deliveryProviderOrderId !== undefined &&
+    existingDeliveryProviderOrderId !== undefined &&
+    change.deliveryProviderOrderId !== existingDeliveryProviderOrderId
   ) {
     throw new InvalidOrderStatusDetailsError(
-      'providerOrderId',
-      'The provider order ID cannot be changed.',
+      'deliveryProviderOrderId',
+      'The delivery-provider order ID cannot be changed.',
     );
   }
 
   if (
-    change.providerOrderId !== undefined &&
-    existingProviderOrderId === undefined &&
+    change.deliveryProviderOrderId !== undefined &&
+    existingDeliveryProviderOrderId === undefined &&
     change.targetStatus !== 'SUBMITTED'
   ) {
     throw new InvalidOrderStatusDetailsError(
-      'providerOrderId',
-      'A provider order ID can first be recorded only when confirming submission.',
+      'deliveryProviderOrderId',
+      'A delivery-provider order ID can first be recorded only when confirming submission.',
     );
   }
 
   if (change.targetStatus === 'SUBMITTED') {
-    const providerOrderId = existingProviderOrderId ?? change.providerOrderId;
-    if (providerOrderId === undefined) {
+    const deliveryProviderOrderId =
+      existingDeliveryProviderOrderId ?? change.deliveryProviderOrderId;
+    if (deliveryProviderOrderId === undefined) {
       throw new InvalidOrderStatusDetailsError(
-        'providerOrderId',
-        'A provider order ID is required when confirming submission.',
+        'deliveryProviderOrderId',
+        'A delivery-provider order ID is required when confirming submission.',
       );
     }
 
     return {
       ...order.provider,
-      providerOrderId,
+      deliveryProviderOrderId,
       acceptedAt: order.provider.acceptedAt ?? change.acceptedAt ?? changedAt,
     };
   }
@@ -128,9 +129,9 @@ function providerForChange(
     change.targetStatus === 'DELIVERED' ||
     change.targetStatus === 'DELIVERY_FAILED'
   ) {
-    if (existingProviderOrderId === undefined || order.provider.acceptedAt === undefined) {
+    if (existingDeliveryProviderOrderId === undefined || order.provider.acceptedAt === undefined) {
       throw new InvalidOrderStatusDetailsError(
-        'providerOrderId',
+        'deliveryProviderOrderId',
         'Provider acceptance must be recorded before a delivery status.',
       );
     }
@@ -162,7 +163,7 @@ export function applyOrderStatusChange(
   return {
     orderId: order.orderId,
     merchantId: order.merchantId,
-    merchantOrderReference: order.merchantOrderReference,
+    merchantOrderId: order.merchantOrderId,
     status: change.targetStatus,
     items: order.items,
     total: order.total,

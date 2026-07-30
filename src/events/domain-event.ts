@@ -16,7 +16,7 @@ export type DomainEventType = (typeof DOMAIN_EVENT_TYPES)[number];
 export interface DomainEventEnvelope<TType extends DomainEventType, TPayload extends object> {
   readonly eventId: string;
   readonly eventType: TType;
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 2;
   readonly aggregateType: 'ORDER';
   readonly aggregateId: OrderId;
   readonly aggregateVersion: number;
@@ -32,14 +32,14 @@ interface MerchantEventPayload {
 
 export interface OrderCreatedPayload extends MerchantEventPayload {
   readonly status: 'PENDING_SUBMISSION';
-  readonly providerCode: 'mock-delivery';
-  readonly submissionKey: string;
+  readonly deliveryProviderCode: 'mock-delivery';
+  readonly deliveryProviderSubmissionKey: string;
 }
 
 export interface OrderSubmittedPayload extends MerchantEventPayload {
   readonly status: 'SUBMITTED';
-  readonly providerCode: 'mock-delivery';
-  readonly providerOrderId: string;
+  readonly deliveryProviderCode: 'mock-delivery';
+  readonly deliveryProviderOrderId: string;
   readonly acceptedAt: string;
   readonly reason?: string;
 }
@@ -52,8 +52,8 @@ export interface OrderSubmissionFailedPayload extends MerchantEventPayload {
 export interface OrderSubmissionRetryRequestedPayload extends MerchantEventPayload {
   readonly previousStatus: 'SUBMISSION_FAILED';
   readonly status: 'PENDING_SUBMISSION';
-  readonly providerCode: 'mock-delivery';
-  readonly submissionKey: string;
+  readonly deliveryProviderCode: 'mock-delivery';
+  readonly deliveryProviderSubmissionKey: string;
   readonly reason: string;
 }
 
@@ -66,24 +66,24 @@ export interface OrderCancelledPayload extends MerchantEventPayload {
 export interface OrderPickedUpPayload extends MerchantEventPayload {
   readonly previousStatus: 'SUBMITTED';
   readonly status: 'PICKED_UP';
-  readonly providerCode: 'mock-delivery';
-  readonly providerOrderId: string;
+  readonly deliveryProviderCode: 'mock-delivery';
+  readonly deliveryProviderOrderId: string;
   readonly reason?: string;
 }
 
 export interface OrderDeliveredPayload extends MerchantEventPayload {
   readonly previousStatus: 'SUBMITTED' | 'PICKED_UP';
   readonly status: 'DELIVERED';
-  readonly providerCode: 'mock-delivery';
-  readonly providerOrderId: string;
+  readonly deliveryProviderCode: 'mock-delivery';
+  readonly deliveryProviderOrderId: string;
   readonly reason?: string;
 }
 
 export interface OrderDeliveryFailedPayload extends MerchantEventPayload {
   readonly previousStatus: 'SUBMITTED' | 'PICKED_UP';
   readonly status: 'DELIVERY_FAILED';
-  readonly providerCode: 'mock-delivery';
-  readonly providerOrderId: string;
+  readonly deliveryProviderCode: 'mock-delivery';
+  readonly deliveryProviderOrderId: string;
   readonly failure: FailureDetails & { readonly stage: 'DELIVERY' };
   readonly reason?: string;
 }

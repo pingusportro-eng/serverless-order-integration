@@ -9,7 +9,7 @@ export function createOrderFixture(overrides: Partial<Order> = {}): Order {
   return {
     orderId: asOrderId(`ord_${suffix}`),
     merchantId: asMerchantId(`mrc_${suffix}`),
-    merchantOrderReference: `reference_${suffix}`,
+    merchantOrderId: `merchant_order_${suffix}`,
     status: 'PENDING_SUBMISSION',
     items: [
       {
@@ -33,8 +33,8 @@ export function createOrderFixture(overrides: Partial<Order> = {}): Order {
       countryCode: 'RO',
     },
     provider: {
-      providerCode: 'mock-delivery',
-      submissionKey: `submission_${suffix}`,
+      deliveryProviderCode: 'mock-delivery',
+      deliveryProviderSubmissionKey: `submission_${suffix}`,
     },
     createdAt,
     updatedAt: createdAt,

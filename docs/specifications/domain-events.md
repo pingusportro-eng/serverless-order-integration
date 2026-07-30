@@ -1,7 +1,7 @@
 # Domain event contract
 
-Status: MVP version 1  
-Last reviewed: 2026-07-22
+Status: MVP version 2
+Last reviewed: 2026-07-30
 
 ## Purpose
 
@@ -10,7 +10,7 @@ The DynamoDB Stream publisher creates these events, SNS distributes them, and
 SQS consumers process them at least once. The normative machine-readable
 contract is [domain-event.schema.json](domain-event.schema.json).
 
-The event contains only routing, trace, state-transition, and provider-reference
+The event contains only routing, trace, state-transition, and delivery-provider
 data. Consumers that require the current complete order load it by merchant and
 aggregate ID. Delivery addresses and order lines are deliberately not copied
 through SNS and SQS.
@@ -21,7 +21,7 @@ through SNS and SQS.
 | --- | --- |
 | `eventId` | Globally unique, stable ID beginning with `evt_`. A retry of the same publication uses the same ID. |
 | `eventType` | Stable fact name from the taxonomy below. |
-| `schemaVersion` | Positive integer version of this event type and payload; version 1 is the current contract. |
+| `schemaVersion` | Positive integer version of this event type and payload; version 2 is the current contract. |
 | `aggregateType` | `ORDER` for every event in this contract. |
 | `aggregateId` | Order ID whose state change produced the fact. |
 | `aggregateVersion` | Order version after the committed change. |
@@ -50,14 +50,14 @@ attempt.
 
 | Event type | Meaning | Important payload fields |
 | --- | --- | --- |
-| `order.created` | The platform accepted a new order. | Merchant, pending status, provider code, stable submission key. |
-| `order.submitted` | The provider confirmed acceptance. | Merchant, submitted status, provider order ID, acceptance time, and optional operator reason. |
+| `order.created` | The platform accepted a new order. | Merchant, pending status, delivery-provider code, stable delivery-provider submission key. |
+| `order.submitted` | The provider confirmed acceptance. | Merchant, submitted status, delivery-provider order ID, acceptance time, and optional operator reason. |
 | `order.submission_failed` | Provider acceptance permanently failed or retries were exhausted. | Merchant, submission-stage failure. |
-| `order.submission_retry_requested` | An operator approved another submission attempt. | Merchant, prior status, pending status, unchanged submission key, and required operator reason. |
+| `order.submission_retry_requested` | An operator approved another submission attempt. | Merchant, prior status, pending status, unchanged delivery-provider submission key, and required operator reason. |
 | `order.cancelled` | The order was cancelled from an allowed state. | Merchant, prior status, cancelled status, and optional operator reason. |
-| `order.picked_up` | The provider reported pickup. | Merchant, prior status, provider order ID, and optional operator reason. |
-| `order.delivered` | The provider reported successful delivery. | Merchant, prior status, provider order ID, and optional operator reason. |
-| `order.delivery_failed` | A provider-accepted delivery failed. | Merchant, prior status, provider order ID, delivery-stage failure, and optional operator reason. |
+| `order.picked_up` | The provider reported pickup. | Merchant, prior status, delivery-provider order ID, and optional operator reason. |
+| `order.delivered` | The provider reported successful delivery. | Merchant, prior status, delivery-provider order ID, and optional operator reason. |
+| `order.delivery_failed` | A provider-accepted delivery failed. | Merchant, prior status, delivery-provider order ID, delivery-stage failure, and optional operator reason. |
 
 The TypeScript discriminated union in
 [`src/events/domain-event.ts`](../../src/events/domain-event.ts) mirrors the JSON
@@ -69,7 +69,7 @@ message data before it is treated as a typed event.
 1. The meaning and shape of an existing `(eventType, schemaVersion)` pair are
    immutable.
 2. Removing a field, changing a type or meaning, or adding a field requires a
-   new schema version because version 1 rejects unknown fields.
+   new schema version because existing versions reject unknown fields.
 3. A new event type may be introduced without changing existing event types.
    Consumers ignore event types outside their declared subscription or route
    them to an explicit unsupported-event path.
@@ -104,7 +104,7 @@ For every consumer:
 7. Use the aggregate version and domain state machine to recognize stale or
    invalid out-of-order events. Such an event must not move the order backward.
 
-The delivery worker additionally uses the order's stable `submissionKey` when
+The delivery worker additionally uses the order's stable `deliveryProviderSubmissionKey` when
 calling the provider. Event deduplication prevents repeated consumer work;
 provider idempotency protects the external side effect when the worker loses a
 response after the provider accepted the request.

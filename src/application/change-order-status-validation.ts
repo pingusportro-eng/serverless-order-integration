@@ -11,14 +11,14 @@ const OPERATOR_TARGET_STATUSES = [
   'DELIVERY_FAILED',
   'CANCELLED',
 ] as const satisfies readonly OrderStatus[];
-const TOP_LEVEL_FIELDS = new Set(['targetStatus', 'reason', 'providerOrderId', 'failure']);
+const TOP_LEVEL_FIELDS = new Set(['targetStatus', 'reason', 'deliveryProviderOrderId', 'failure']);
 const FAILURE_FIELDS = new Set(['stage', 'reasonCode', 'summary', 'occurredAt']);
 const REASON_CODE_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 
 export interface ChangeOrderStatusRequest {
   readonly targetStatus: (typeof OPERATOR_TARGET_STATUSES)[number];
   readonly reason: string;
-  readonly providerOrderId?: string;
+  readonly deliveryProviderOrderId?: string;
   readonly failure?: FailureDetails;
 }
 
@@ -128,10 +128,10 @@ export function validateChangeOrderStatusRequest(
     issues.push({ pointer: '#/targetStatus', detail: 'must be an operator-controlled status' });
   }
   const reason = readString(value['reason'], '#/reason', 3, 500, issues);
-  const providerOrderId =
-    value['providerOrderId'] === undefined
+  const deliveryProviderOrderId =
+    value['deliveryProviderOrderId'] === undefined
       ? undefined
-      : readString(value['providerOrderId'], '#/providerOrderId', 1, 128, issues);
+      : readString(value['deliveryProviderOrderId'], '#/deliveryProviderOrderId', 1, 128, issues);
   const failure =
     value['failure'] === undefined ? undefined : readFailure(value['failure'], issues);
 
@@ -154,7 +154,7 @@ export function validateChangeOrderStatusRequest(
     value: {
       targetStatus,
       reason,
-      ...(providerOrderId === undefined ? {} : { providerOrderId }),
+      ...(deliveryProviderOrderId === undefined ? {} : { deliveryProviderOrderId }),
       ...(failure === undefined ? {} : { failure }),
     },
   };

@@ -34,7 +34,7 @@ describe('changeOrderStatus', () => {
         body: {
           targetStatus: 'SUBMITTED',
           reason: 'Provider acceptance was reconciled.',
-          providerOrderId: 'provider-concurrent',
+          deliveryProviderOrderId: 'provider-concurrent',
         },
       }),
       changeOrderStatus(dependencies, {

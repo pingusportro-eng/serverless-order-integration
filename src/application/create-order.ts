@@ -29,7 +29,7 @@ export type CreateOrderApplicationResult =
 
 function canonicalRequest(request: CreateOrderRequest): object {
   return {
-    merchantOrderReference: request.merchantOrderReference,
+    merchantOrderId: request.merchantOrderId,
     items: request.items.map((line) => ({
       itemReference: line.itemReference,
       description: line.description,
@@ -79,15 +79,15 @@ export async function createOrder(
   const order: Order = {
     orderId: asOrderId(identifier('ord_', generateId)),
     merchantId: command.merchantId,
-    merchantOrderReference: validation.value.merchantOrderReference,
+    merchantOrderId: validation.value.merchantOrderId,
     status: 'PENDING_SUBMISSION',
     items: validation.value.items,
     total: calculateOrderTotal(validation.value),
     pickup: validation.value.pickup,
     dropoff: validation.value.dropoff,
     provider: {
-      providerCode: 'mock-delivery',
-      submissionKey: identifier('submission_', generateId),
+      deliveryProviderCode: 'mock-delivery',
+      deliveryProviderSubmissionKey: identifier('submission_', generateId),
     },
     createdAt: timestamp,
     updatedAt: timestamp,
