@@ -418,6 +418,8 @@ For every step, the review should answer:
   - Practise questions about scaling, idempotency, retries, consistency, IAM,
     observability, incident response, CI/CD, and cost.
   - Verification: explain every major choice and one credible alternative.
+  - Short walkthrough:
+    [System-design interview overview](docs/interview/system-design-overview.md).
 
 ## Definition of done
 
@@ -435,10 +437,9 @@ For every step, the review should answer:
 
 ## Next step
 
-Begin **7.5 — Prepare the interview walkthrough** with a concise system-design
-explanation for the complete synchronous API, asynchronous delivery path,
-failure handling, security boundaries, CI/CD controls, and cost model. Then
-expand it into a deeper technical walkthrough and practise likely follow-up
-questions.
+Continue **7.5 — Prepare the interview walkthrough** with the deeper technical
+version. Walk component by component through data modeling, event semantics,
+failure handling, security, observability, deployment, and cost, and connect
+each choice to evidence from the implemented project.
 
 Interview preparation creates no AWS resources and costs `$0`.

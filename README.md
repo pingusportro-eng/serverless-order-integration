@@ -230,6 +230,7 @@ control.
 | How is AWS deployment controlled and secured? | [Deployment workflow](docs/infrastructure/deployment-workflows.md), [OIDC review](docs/infrastructure/github-oidc-review.md), and [cost review](docs/infrastructure/pre-deployment-cost-review.md) |
 | What proves the real cloud wiring and failures? | [Cloud smoke-test record](docs/infrastructure/cloud-smoke-tests.md), [error and event-journey matrix](docs/testing/error-and-event-journey-matrix.md), and [failure-drill inventory](docs/testing/phase-7-failure-drill-inventory.md) |
 | How do I investigate and recover an incident? | [Observability inventory](docs/operations/observability-inventory.md), [CloudWatch query cookbook](docs/operations/cloudwatch-query-cookbook.md), [incident runbook](docs/operations/delivery-worker-incident-runbook.md), and [exercise postmortem](docs/operations/postmortem-2026-07-29-vendor-rate-limit.md) |
+| How do I present the system in an interview? | [Short system-design walkthrough](docs/interview/system-design-overview.md) |
 | What remains to be done? | [Project plan](PLAN.md) |
 
 ## Prerequisites
