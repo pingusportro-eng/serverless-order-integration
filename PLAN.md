@@ -422,6 +422,8 @@ For every step, the review should answer:
     [System-design interview overview](docs/interview/system-design-overview.md).
   - Synchronous-path deep dive:
     [Synchronous API and data integrity](docs/interview/synchronous-api-and-data-integrity.md).
+  - Asynchronous-path deep dive:
+    [Asynchronous event journey and failure handling](docs/interview/asynchronous-event-journey-and-failures.md).
 
 ## Definition of done
 
@@ -439,9 +441,10 @@ For every step, the review should answer:
 
 ## Next step
 
-Continue **7.5 — Prepare the interview walkthrough** with the asynchronous
-event-journey and failure-handling deep dive: committed mutation, DynamoDB
-Stream, publisher, SNS, SQS, worker, provider, ordering, deduplication, retries,
-and every retained failure path.
+Continue **7.5 — Prepare the interview walkthrough** by rehearsing the
+[asynchronous practice checklist](docs/interview/asynchronous-event-journey-and-failures.md#practice-checklist).
+Use the same explain-without-reading review used for the synchronous path, then
+close the walkthrough with CI/CD, cost, scaling, and production-limit
+questions.
 
 Interview preparation creates no AWS resources and costs `$0`.

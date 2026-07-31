@@ -151,6 +151,8 @@ A successful short explanation should answer:
 Source material:
 
 - [Final architecture and project guide](../../README.md)
+- [Synchronous API and data-integrity walkthrough](synchronous-api-and-data-integrity.md)
+- [Asynchronous event journey and failure handling](asynchronous-event-journey-and-failures.md)
 - [Architecture decision records](../decisions/README.md)
 - [Failure-drill inventory](../testing/phase-7-failure-drill-inventory.md)
 - [Incident runbook](../operations/delivery-worker-incident-runbook.md)
