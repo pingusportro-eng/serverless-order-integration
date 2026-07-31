@@ -429,7 +429,7 @@ Application safeguards make those transport properties acceptable:
 
 | Risk | Safeguard |
 | --- | --- |
-| Publisher retries a record | Stable domain `eventId` |
+| Publisher republishes one stream record | Delivery worker checks aggregate version/current state, and provider submission uses a stable idempotency key |
 | Delivery work is duplicated | Aggregate version/state checks plus stable provider idempotency key |
 | Newer event arrives first | Missing aggregate version remains retryable; stale work cannot move state backward |
 | Provider accepts but response is lost | Same provider submission key recovers the original acceptance |
@@ -438,10 +438,18 @@ Application safeguards make those transport properties acceptable:
 | Two writers change the order | Conditional expected-version write |
 
 The delivery worker does not persist a generic processed-event marker for its
-SNS event. It uses durable order progression and provider idempotency because
-the important external side effect is the provider submission. The webhook
-consumer does persist a processed-event marker because provider event IDs are
-its durable duplicate boundary.
+SNS event. It validates and logs `eventId` and preserves it as causation
+metadata, while durable order progression and provider idempotency protect the
+actual business side effect. This means it does not independently detect the
+same domain event ID reused with a different payload. That accepted limitation
+avoids an in-progress claim, expiry, recovery, and additional DynamoDB state for
+a queue that accepts messages only from the trusted SNS topic.
+
+The webhook consumer does persist a processed-event marker because its order
+update and provider event-ID claim can be committed in one DynamoDB transaction.
+There is no external side effect between that claim and the order update. A
+future consumer with different side effects must select and document its own
+idempotency strategy instead of assuming that a stable event ID is sufficient.
 
 ## 10. Walk through three interview scenarios
 

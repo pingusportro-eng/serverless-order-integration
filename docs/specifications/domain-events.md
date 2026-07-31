@@ -87,27 +87,55 @@ message data before it is treated as a typed event.
 Delivery through DynamoDB Streams, Lambda, SNS, and standard SQS is at least
 once. Duplicates and out-of-order messages are normal operating conditions.
 
-For every consumer:
+Every consumer must define a durable idempotency strategy appropriate to its
+side effects. A stable `eventId` preserves the identity of publisher retries,
+but it does not prevent duplicate processing by itself.
+
+Rules shared by every consumer:
+
+1. Do not assume exactly-once or globally ordered delivery.
+2. Validate the complete event before using it as trusted application data.
+3. Do not report successful completion before all required side effects are
+   safely complete. A failed or interrupted attempt must remain retryable.
+4. Use the aggregate version and domain state machine to recognize stale or
+   invalid out-of-order events. Such an event must not move the order backward.
+5. Document which durable state or idempotency contract makes repeated and
+   concurrent processing safe.
+
+The delivery worker uses a domain-specific strategy:
+
+- aggregate version and current order state recognize completed or stale work;
+- conditional writes prevent concurrent order updates from overwriting each
+  other; and
+- the stable `deliveryProviderSubmissionKey` protects concurrent calls and an
+  uncertain provider acceptance from creating duplicate deliveries.
+
+The delivery worker validates, logs, and propagates the domain `eventId` as a
+causation reference, but it does not persist a `(consumerName, eventId)` claim.
+Consequently, it does not independently detect the same event ID reused with a
+different payload. This is an accepted limitation because actionable messages
+originate from the trusted publisher and the delivery queue accepts messages
+only from the stack's SNS topic.
+
+Consumers that need event-ID-based deduplication should use the generic
+processed-event pattern:
 
 1. Calculate a SHA-256 fingerprint of the complete event using RFC 8785 JSON
    canonicalization. Transport wrappers are excluded.
 2. Claim `(consumerName, eventId)` with a conditional write before or atomically
-   with the consumer's state change.
-3. If the same ID and fingerprint previously completed successfully, acknowledge
-   it without repeating the state change or external side effect.
+   with the consumer's database state change.
+3. If the same ID and fingerprint previously completed successfully,
+   acknowledge it without repeating the state change.
 4. If the ID exists with another fingerprint, do not process it. Record an
    operational conflict and allow the configured failure or DLQ path to retain
    the message.
-5. Do not record successful completion before all required side effects are
-   safely complete. A failed or interrupted attempt remains retryable.
-6. Do not use payload similarity or `aggregateVersion` as the duplicate key.
-7. Use the aggregate version and domain state machine to recognize stale or
-   invalid out-of-order events. Such an event must not move the order backward.
+5. If processing includes an external side effect, a completed-event marker
+   alone does not prevent concurrent calls. Use an atomic in-progress claim
+   with expiry or an idempotent external API, and retain a recovery path for a
+   crash between the external call and the completion write.
 
-The delivery worker additionally uses the order's stable `deliveryProviderSubmissionKey` when
-calling the provider. Event deduplication prevents repeated consumer work;
-provider idempotency protects the external side effect when the worker loses a
-response after the provider accepted the request.
+The provider-webhook consumer uses a processed-event claim because the order
+update and event marker can be committed in the same DynamoDB transaction.
 
 ## Data and size rules
 
