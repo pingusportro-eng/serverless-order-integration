@@ -413,7 +413,7 @@ For every step, the review should answer:
     model, security decisions, limitations, and trade-offs to the README.
   - Verification: a new developer can follow the documented workflow.
 
-- [ ] **7.5 — Prepare the interview walkthrough**
+- [x] **7.5 — Prepare the interview walkthrough**
   - Prepare a short system-design explanation and a deeper technical walkthrough.
   - Practise questions about scaling, idempotency, retries, consistency, IAM,
     observability, incident response, CI/CD, and cost.
@@ -424,6 +424,9 @@ For every step, the review should answer:
     [Synchronous API and data integrity](docs/interview/synchronous-api-and-data-integrity.md).
   - Asynchronous-path deep dive:
     [Asynchronous event journey and failure handling](docs/interview/asynchronous-event-journey-and-failures.md).
+  - Verification completed through explain-without-reading reviews of the
+    synchronous path, asynchronous path, CI/CD controls, scaling decisions,
+    cost safeguards, production limitations, and a final mock interview.
 
 ## Definition of done
 
@@ -439,12 +442,13 @@ For every step, the review should answer:
 - No unexplained AWS resource or recurring charge remains.
 - Total AWS spending stays within the agreed $5 monthly budget.
 
-## Next step
+## Project plan complete
 
-Continue **7.5 — Prepare the interview walkthrough** by rehearsing the
-[asynchronous practice checklist](docs/interview/asynchronous-event-journey-and-failures.md#practice-checklist).
-Use the same explain-without-reading review used for the synchronous path, then
-close the walkthrough with CI/CD, cost, scaling, and production-limit
-questions.
+All planned implementation, cloud verification, operational exercises,
+documentation, and interview preparation steps are complete. Further work is
+optional practice or an explicitly reviewed extension rather than an unfinished
+project milestone.
 
-Interview preparation creates no AWS resources and costs `$0`.
+Interview rehearsal creates no AWS resources and costs `$0`. Any future cloud
+exercise or architecture extension must retain the existing cost-review and
+verified-teardown controls.
