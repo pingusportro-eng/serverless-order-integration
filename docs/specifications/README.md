@@ -13,3 +13,7 @@ Current specifications:
 - [Delivery vendor client policy](vendor-client.md)
 - [DynamoDB access patterns](dynamodb-access-patterns.md)
 - [OpenAPI contract](openapi.yaml)
+
+Reviewed post-MVP extension plans:
+
+- [Stripe payment extension](stripe-payment-extension.md)
