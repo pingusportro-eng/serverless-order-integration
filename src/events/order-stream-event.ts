@@ -160,7 +160,25 @@ function statusChangedEvent(record: DynamoDBRecord, item: StreamOrderItem): Doma
   const previousStatus = item.mutation.previousStatus;
   const reason = optionalReason(item.mutation);
   switch (order.status) {
+    case 'AWAITING_PAYMENT':
+      throw new Error('An order cannot transition back to awaiting payment.');
     case 'PENDING_SUBMISSION':
+      if (previousStatus === 'AWAITING_PAYMENT') {
+        if (order.payment?.status !== 'SUCCEEDED') {
+          throw new Error('A ready-for-submission order requires successful payment.');
+        }
+        return {
+          ...baseEnvelope(record, item, 'order.ready_for_submission'),
+          eventType: 'order.ready_for_submission',
+          payload: {
+            merchantId: order.merchantId,
+            previousStatus,
+            status: 'PENDING_SUBMISSION',
+            deliveryProviderCode: 'mock-delivery',
+            deliveryProviderSubmissionKey: order.provider.deliveryProviderSubmissionKey,
+          },
+        };
+      }
       if (previousStatus !== 'SUBMISSION_FAILED' || item.mutation.reason === undefined) {
         throw new Error('Submission retry metadata is invalid.');
       }
@@ -284,15 +302,21 @@ export function domainEventFromOrderStreamRecord(record: DynamoDBRecord): Domain
   }
 
   if (item.mutation.kind === 'ORDER_CREATED') {
-    if (record.eventName !== 'INSERT' || item.order.status !== 'PENDING_SUBMISSION') {
+    if (
+      record.eventName !== 'INSERT' ||
+      (item.order.status !== 'AWAITING_PAYMENT' && item.order.status !== 'PENDING_SUBMISSION')
+    ) {
       throw new Error('Created-order stream metadata is inconsistent.');
+    }
+    if (item.order.status === 'AWAITING_PAYMENT' && item.order.payment?.status !== 'NOT_STARTED') {
+      throw new Error('An awaiting-payment order requires an initial payment value.');
     }
     return {
       ...baseEnvelope(record, item, 'order.created'),
       eventType: 'order.created',
       payload: {
         merchantId: item.order.merchantId,
-        status: 'PENDING_SUBMISSION',
+        status: item.order.status,
         deliveryProviderCode: 'mock-delivery',
         deliveryProviderSubmissionKey: item.order.provider.deliveryProviderSubmissionKey,
       },

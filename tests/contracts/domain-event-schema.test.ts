@@ -26,7 +26,7 @@ describe('domain event JSON Schema', () => {
   });
 
   it('accepts every representative version 2 fixture', () => {
-    expect(validFixtures).toHaveLength(3);
+    expect(validFixtures).toHaveLength(4);
 
     for (const fixture of validFixtures) {
       expect(validate(fixture), JSON.stringify(validate.errors)).toBe(true);

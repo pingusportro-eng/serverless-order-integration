@@ -26,6 +26,18 @@ export type {
   OrderLine,
   DeliveryProviderAssignment,
 } from './domain/order.js';
+export {
+  createInitialOrderPayment,
+  isTerminalPaymentStatus,
+  PAYMENT_STATUSES,
+} from './domain/payment.js';
+export type { OrderPayment, PaymentFailure, PaymentStatus } from './domain/payment.js';
+export {
+  applyPaymentStatusChange,
+  InvalidPaymentStatusDetailsError,
+  InvalidPaymentStatusTransitionError,
+} from './domain/payment-status-transition.js';
+export type { PaymentStatusChange } from './domain/payment-status-transition.js';
 export { isTerminalOrderStatus } from './domain/order-status.js';
 export type { OrderStatus } from './domain/order-status.js';
 export {
@@ -101,6 +113,8 @@ export type {
   OrderCancelledPayload,
   OrderCreatedEvent,
   OrderCreatedPayload,
+  OrderReadyForSubmissionEvent,
+  OrderReadyForSubmissionPayload,
   OrderDeliveredEvent,
   OrderDeliveredPayload,
   OrderDeliveryFailedEvent,
@@ -114,6 +128,18 @@ export type {
   OrderSubmittedEvent,
   OrderSubmittedPayload,
 } from './events/domain-event.js';
+export {
+  beginIdempotentOperationAttempt,
+  createIdempotentOperation,
+  IDEMPOTENT_OPERATION_STATES,
+  InvalidIdempotentOperationError,
+  markIdempotentOperationOutcome,
+} from './client/idempotent-operation.js';
+export type {
+  DeepReadonly,
+  IdempotentOperation,
+  IdempotentOperationState,
+} from './client/idempotent-operation.js';
 export { createOrder, fingerprintCreateOrderRequest } from './application/create-order.js';
 export type {
   CreateOrderApplicationResult,

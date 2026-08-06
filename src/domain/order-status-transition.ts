@@ -2,6 +2,7 @@ import type { FailureDetails, Order } from './order.js';
 import type { OrderStatus } from './order-status.js';
 
 const ALLOWED_TRANSITIONS: Readonly<Record<OrderStatus, ReadonlySet<OrderStatus>>> = {
+  AWAITING_PAYMENT: new Set(['PENDING_SUBMISSION', 'CANCELLED']),
   PENDING_SUBMISSION: new Set(['SUBMITTED', 'SUBMISSION_FAILED', 'CANCELLED']),
   SUBMISSION_FAILED: new Set(['PENDING_SUBMISSION', 'CANCELLED']),
   SUBMITTED: new Set(['PICKED_UP', 'DELIVERED', 'DELIVERY_FAILED', 'CANCELLED']),
@@ -33,10 +34,25 @@ export class InvalidOrderStatusDetailsError extends Error {
   override readonly name = 'InvalidOrderStatusDetailsError';
 
   constructor(
-    readonly field: 'deliveryProviderOrderId' | 'failure' | 'failure.stage',
+    readonly field: 'deliveryProviderOrderId' | 'failure' | 'failure.stage' | 'payment.status',
     message: string,
   ) {
     super(message);
+  }
+}
+
+function validatePaymentGate(order: Order, change: OrderStatusChange): void {
+  if (order.status !== 'AWAITING_PAYMENT') {
+    return;
+  }
+
+  const requiredPaymentStatus =
+    change.targetStatus === 'PENDING_SUBMISSION' ? 'SUCCEEDED' : 'CANCELLED';
+  if (order.payment?.status !== requiredPaymentStatus) {
+    throw new InvalidOrderStatusDetailsError(
+      'payment.status',
+      `Payment must be ${requiredPaymentStatus} before changing an awaiting-payment order to ${change.targetStatus}.`,
+    );
   }
 }
 
@@ -158,6 +174,7 @@ export function applyOrderStatusChange(
   }
 
   validateFailure(change);
+  validatePaymentGate(order, change);
   const provider = providerForChange(order, change, changedAt);
 
   return {
@@ -170,6 +187,7 @@ export function applyOrderStatusChange(
     pickup: order.pickup,
     dropoff: order.dropoff,
     provider,
+    ...(order.payment === undefined ? {} : { payment: order.payment }),
     ...(change.failure === undefined ? {} : { failure: change.failure }),
     createdAt: order.createdAt,
     updatedAt: changedAt,

@@ -4,6 +4,7 @@
   "title": "Order domain event version 2",
   "oneOf": [
     { "$ref": "#/$defs/orderCreatedEvent" },
+    { "$ref": "#/$defs/orderReadyForSubmissionEvent" },
     { "$ref": "#/$defs/orderSubmittedEvent" },
     { "$ref": "#/$defs/orderSubmissionFailedEvent" },
     { "$ref": "#/$defs/orderSubmissionRetryRequestedEvent" },
@@ -80,6 +81,7 @@
         "eventType": {
           "enum": [
             "order.created",
+            "order.ready_for_submission",
             "order.submitted",
             "order.submission_failed",
             "order.submission_retry_requested",
@@ -120,6 +122,24 @@
       "required": ["merchantId", "status", "deliveryProviderCode", "deliveryProviderSubmissionKey"],
       "properties": {
         "merchantId": { "$ref": "#/$defs/merchantId" },
+        "status": { "enum": ["AWAITING_PAYMENT", "PENDING_SUBMISSION"] },
+        "deliveryProviderCode": { "const": "mock-delivery" },
+        "deliveryProviderSubmissionKey": { "$ref": "#/$defs/deliveryProviderSubmissionKey" }
+      }
+    },
+    "orderReadyForSubmissionPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "merchantId",
+        "previousStatus",
+        "status",
+        "deliveryProviderCode",
+        "deliveryProviderSubmissionKey"
+      ],
+      "properties": {
+        "merchantId": { "$ref": "#/$defs/merchantId" },
+        "previousStatus": { "const": "AWAITING_PAYMENT" },
         "status": { "const": "PENDING_SUBMISSION" },
         "deliveryProviderCode": { "const": "mock-delivery" },
         "deliveryProviderSubmissionKey": { "$ref": "#/$defs/deliveryProviderSubmissionKey" }
@@ -258,6 +278,18 @@
           "properties": {
             "eventType": { "const": "order.submitted" },
             "payload": { "$ref": "#/$defs/orderSubmittedPayload" }
+          }
+        }
+      ]
+    },
+    "orderReadyForSubmissionEvent": {
+      "allOf": [
+        { "$ref": "#/$defs/baseEnvelope" },
+        {
+          "type": "object",
+          "properties": {
+            "eventType": { "const": "order.ready_for_submission" },
+            "payload": { "$ref": "#/$defs/orderReadyForSubmissionPayload" }
           }
         }
       ]

@@ -10,10 +10,13 @@ describe('isTerminalOrderStatus', () => {
     },
   );
 
-  it.each<OrderStatus>(['PENDING_SUBMISSION', 'SUBMISSION_FAILED', 'SUBMITTED', 'PICKED_UP'])(
-    'recognizes %s as non-terminal',
-    (status) => {
-      expect(isTerminalOrderStatus(status)).toBe(false);
-    },
-  );
+  it.each<OrderStatus>([
+    'AWAITING_PAYMENT',
+    'PENDING_SUBMISSION',
+    'SUBMISSION_FAILED',
+    'SUBMITTED',
+    'PICKED_UP',
+  ])('recognizes %s as non-terminal', (status) => {
+    expect(isTerminalOrderStatus(status)).toBe(false);
+  });
 });

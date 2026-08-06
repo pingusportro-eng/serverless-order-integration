@@ -50,6 +50,24 @@ describe('delivery-requested event parser', () => {
     });
   });
 
+  it('accepts an order that became ready after verified payment', () => {
+    const readyEvent = structuredClone(createdEvent);
+    readyEvent['eventType'] = 'order.ready_for_submission';
+    readyEvent['aggregateVersion'] = 2;
+    readyEvent['payload'] = {
+      merchantId: 'mrc_demo',
+      previousStatus: 'AWAITING_PAYMENT',
+      status: 'PENDING_SUBMISSION',
+      deliveryProviderCode: 'mock-delivery',
+      deliveryProviderSubmissionKey: 'submission_01JABCDEF0123456789',
+    };
+
+    expect(parseDeliveryRequestedEvent(JSON.stringify(readyEvent))).toMatchObject({
+      eventType: 'order.ready_for_submission',
+      payload: { previousStatus: 'AWAITING_PAYMENT' },
+    });
+  });
+
   it('rejects malformed JSON and a non-object envelope', () => {
     expect(() => parseDeliveryRequestedEvent('{')).toThrow('valid JSON');
     expect(() => parseDeliveryRequestedEvent('[]')).toThrow('valid domain-event envelope');

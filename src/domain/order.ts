@@ -1,4 +1,5 @@
 import type { OrderStatus } from './order-status.js';
+import type { OrderPayment } from './payment.js';
 
 declare const brand: unique symbol;
 
@@ -58,6 +59,7 @@ export interface Order {
   readonly pickup: DeliveryLocation;
   readonly dropoff: DeliveryLocation;
   readonly provider: DeliveryProviderAssignment;
+  readonly payment?: OrderPayment;
   readonly failure?: FailureDetails;
   readonly createdAt: string;
   readonly updatedAt: string;

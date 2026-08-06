@@ -2,6 +2,7 @@ import type { FailureDetails, MerchantId, OrderId } from '../domain/order.js';
 
 export const DOMAIN_EVENT_TYPES = [
   'order.created',
+  'order.ready_for_submission',
   'order.submitted',
   'order.submission_failed',
   'order.submission_retry_requested',
@@ -31,6 +32,13 @@ interface MerchantEventPayload {
 }
 
 export interface OrderCreatedPayload extends MerchantEventPayload {
+  readonly status: 'AWAITING_PAYMENT' | 'PENDING_SUBMISSION';
+  readonly deliveryProviderCode: 'mock-delivery';
+  readonly deliveryProviderSubmissionKey: string;
+}
+
+export interface OrderReadyForSubmissionPayload extends MerchantEventPayload {
+  readonly previousStatus: 'AWAITING_PAYMENT';
   readonly status: 'PENDING_SUBMISSION';
   readonly deliveryProviderCode: 'mock-delivery';
   readonly deliveryProviderSubmissionKey: string;
@@ -89,6 +97,10 @@ export interface OrderDeliveryFailedPayload extends MerchantEventPayload {
 }
 
 export type OrderCreatedEvent = DomainEventEnvelope<'order.created', OrderCreatedPayload>;
+export type OrderReadyForSubmissionEvent = DomainEventEnvelope<
+  'order.ready_for_submission',
+  OrderReadyForSubmissionPayload
+>;
 export type OrderSubmittedEvent = DomainEventEnvelope<'order.submitted', OrderSubmittedPayload>;
 export type OrderSubmissionFailedEvent = DomainEventEnvelope<
   'order.submission_failed',
@@ -108,6 +120,7 @@ export type OrderDeliveryFailedEvent = DomainEventEnvelope<
 
 export type DomainEvent =
   | OrderCreatedEvent
+  | OrderReadyForSubmissionEvent
   | OrderSubmittedEvent
   | OrderSubmissionFailedEvent
   | OrderSubmissionRetryRequestedEvent

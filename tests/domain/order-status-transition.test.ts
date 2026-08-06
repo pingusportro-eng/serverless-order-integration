@@ -5,11 +5,80 @@ import {
   InvalidOrderStatusDetailsError,
   InvalidOrderStatusTransitionError,
 } from '../../src/domain/order-status-transition.js';
+import { createInitialOrderPayment } from '../../src/domain/payment.js';
+import { applyPaymentStatusChange } from '../../src/domain/payment-status-transition.js';
 import { createOrderFixture } from '../fixtures/order.js';
 
 const changedAt = '2026-07-22T10:00:00.000Z';
 
 describe('order status transition', () => {
+  it('opens delivery only after payment is durably successful', () => {
+    const payment = applyPaymentStatusChange(
+      createInitialOrderPayment(
+        { amountMinor: 2500, currency: 'RON' },
+        'stripe-payment-intent:mrc_demo:ord_demo',
+        '2026-07-22T09:00:00.000Z',
+      ),
+      { targetStatus: 'SUCCEEDED', stripePaymentIntentId: 'pi_payment_123' },
+      '2026-07-22T09:30:00.000Z',
+    );
+    const order = createOrderFixture({ status: 'AWAITING_PAYMENT', payment });
+
+    const changed = applyOrderStatusChange(
+      order,
+      { targetStatus: 'PENDING_SUBMISSION' },
+      changedAt,
+    );
+
+    expect(changed).toMatchObject({
+      status: 'PENDING_SUBMISSION',
+      payment: { status: 'SUCCEEDED', stripePaymentIntentId: 'pi_payment_123' },
+      version: 2,
+    });
+  });
+
+  it('rejects delivery eligibility before payment success', () => {
+    const payment = createInitialOrderPayment(
+      { amountMinor: 2500, currency: 'RON' },
+      'stripe-payment-intent:mrc_demo:ord_demo',
+      '2026-07-22T09:00:00.000Z',
+    );
+    const order = createOrderFixture({ status: 'AWAITING_PAYMENT', payment });
+
+    expect(() =>
+      applyOrderStatusChange(order, { targetStatus: 'PENDING_SUBMISSION' }, changedAt),
+    ).toThrow(InvalidOrderStatusDetailsError);
+  });
+
+  it('allows awaiting-payment cancellation only after payment cancellation is recorded', () => {
+    const initialPayment = createInitialOrderPayment(
+      { amountMinor: 2500, currency: 'RON' },
+      'stripe-payment-intent:mrc_demo:ord_demo',
+      '2026-07-22T09:00:00.000Z',
+    );
+    const awaiting = createOrderFixture({
+      status: 'AWAITING_PAYMENT',
+      payment: initialPayment,
+    });
+
+    expect(() =>
+      applyOrderStatusChange(awaiting, { targetStatus: 'CANCELLED' }, changedAt),
+    ).toThrow(InvalidOrderStatusDetailsError);
+
+    const cancelledPayment = applyPaymentStatusChange(
+      initialPayment,
+      { targetStatus: 'CANCELLED', stripePaymentIntentId: 'pi_payment_123' },
+      '2026-07-22T09:30:00.000Z',
+    );
+    const changed = applyOrderStatusChange(
+      { ...awaiting, payment: cancelledPayment },
+      { targetStatus: 'CANCELLED' },
+      changedAt,
+    );
+
+    expect(changed).toMatchObject({ status: 'CANCELLED', payment: { status: 'CANCELLED' } });
+  });
+
   it('confirms provider submission atomically', () => {
     const order = createOrderFixture();
 

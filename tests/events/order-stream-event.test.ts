@@ -6,6 +6,8 @@ import type { DynamoDBRecord } from 'aws-lambda';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import type { Order } from '../../src/domain/order.js';
+import { createInitialOrderPayment } from '../../src/domain/payment.js';
+import { applyPaymentStatusChange } from '../../src/domain/payment-status-transition.js';
 import type { DomainEventType } from '../../src/events/domain-event.js';
 import type { OrderMutation } from '../../src/events/order-mutation.js';
 import { domainEventFromOrderStreamRecord } from '../../src/events/order-stream-event.js';
@@ -69,6 +71,22 @@ function acceptedOrder(overrides: Partial<Order>): Order {
   });
 }
 
+function initialPayment() {
+  return createInitialOrderPayment(
+    { amountMinor: 2500, currency: 'RON' },
+    'stripe-payment-intent:mrc_mapper:ord_mapper',
+    '2026-07-21T12:30:00.000Z',
+  );
+}
+
+function successfulPayment() {
+  return applyPaymentStatusChange(
+    initialPayment(),
+    { targetStatus: 'SUCCEEDED', stripePaymentIntentId: 'pi_mapper_123' },
+    '2026-07-23T08:00:00.000Z',
+  );
+}
+
 describe('order stream event mapper', () => {
   let validateEvent: ValidateFunction;
 
@@ -106,10 +124,34 @@ describe('order stream event mapper', () => {
       eventName: 'INSERT',
     },
     {
+      name: 'created awaiting payment',
+      eventType: 'order.created',
+      order: createOrderFixture({
+        status: 'AWAITING_PAYMENT',
+        payment: initialPayment(),
+      }),
+      mutation: {
+        kind: 'ORDER_CREATED',
+        correlationId: CORRELATION_ID,
+        causationId: CAUSATION_ID,
+      },
+      eventName: 'INSERT',
+    },
+    {
       name: 'submitted',
       eventType: 'order.submitted',
       order: acceptedOrder({ status: 'SUBMITTED' }),
       mutation: statusMutation('PENDING_SUBMISSION'),
+    },
+    {
+      name: 'ready for submission',
+      eventType: 'order.ready_for_submission',
+      order: createOrderFixture({
+        status: 'PENDING_SUBMISSION',
+        payment: successfulPayment(),
+        version: 2,
+      }),
+      mutation: statusMutation('AWAITING_PAYMENT'),
     },
     {
       name: 'submission failed',
@@ -230,6 +272,21 @@ describe('order stream event mapper', () => {
     );
     expect(() => domainEventFromOrderStreamRecord(pickedUpWithoutProviderId)).toThrow(
       'provider.deliveryProviderOrderId',
+    );
+  });
+
+  it('rejects a ready event without successful payment evidence', () => {
+    const unpaidReadyOrder = record(
+      createOrderFixture({
+        status: 'PENDING_SUBMISSION',
+        payment: initialPayment(),
+        version: 2,
+      }),
+      statusMutation('AWAITING_PAYMENT'),
+    );
+
+    expect(() => domainEventFromOrderStreamRecord(unpaidReadyOrder)).toThrow(
+      'requires successful payment',
     );
   });
 

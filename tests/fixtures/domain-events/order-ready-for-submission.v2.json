@@ -1,0 +1,18 @@
+{
+  "eventId": "evt_01JABCDEF0123456789D",
+  "eventType": "order.ready_for_submission",
+  "schemaVersion": 2,
+  "aggregateType": "ORDER",
+  "aggregateId": "ord_01JABCDEF0123456789",
+  "aggregateVersion": 2,
+  "occurredAt": "2026-08-05T12:00:30.000Z",
+  "correlationId": "corr_01JABCDEF0123456789",
+  "causationId": "stripe-event-01JABCDEF0123456789",
+  "payload": {
+    "merchantId": "mrc_demo",
+    "previousStatus": "AWAITING_PAYMENT",
+    "status": "PENDING_SUBMISSION",
+    "deliveryProviderCode": "mock-delivery",
+    "deliveryProviderSubmissionKey": "submission_01JABCDEF0123456789"
+  }
+}

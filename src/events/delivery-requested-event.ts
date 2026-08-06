@@ -1,6 +1,11 @@
-import type { OrderCreatedEvent, OrderSubmissionRetryRequestedEvent } from './domain-event.js';
+import type {
+  OrderCreatedEvent,
+  OrderReadyForSubmissionEvent,
+  OrderSubmissionRetryRequestedEvent,
+} from './domain-event.js';
 
-export type DeliveryRequestedEvent = OrderCreatedEvent | OrderSubmissionRetryRequestedEvent;
+export type DeliveryRequestedEvent =
+  OrderCreatedEvent | OrderReadyForSubmissionEvent | OrderSubmissionRetryRequestedEvent;
 
 const ENVELOPE_FIELDS = new Set([
   'eventId',
@@ -27,6 +32,13 @@ const RETRY_PAYLOAD_FIELDS = new Set([
   'deliveryProviderCode',
   'deliveryProviderSubmissionKey',
   'reason',
+]);
+const READY_PAYLOAD_FIELDS = new Set([
+  'merchantId',
+  'previousStatus',
+  'status',
+  'deliveryProviderCode',
+  'deliveryProviderSubmissionKey',
 ]);
 const SAFE_ID_PATTERN = /^[A-Za-z0-9._:-]+={0,2}$/;
 const EVENT_ID_PATTERN = /^evt_[A-Za-z0-9_-]{16,128}$/;
@@ -97,6 +109,14 @@ export function parseDeliveryRequestedEvent(body: string): DeliveryRequestedEven
 
   if (value['eventType'] === 'order.created' && hasOnlyFields(payload, CREATED_PAYLOAD_FIELDS)) {
     return value as unknown as OrderCreatedEvent;
+  }
+
+  if (
+    value['eventType'] === 'order.ready_for_submission' &&
+    hasOnlyFields(payload, READY_PAYLOAD_FIELDS) &&
+    payload['previousStatus'] === 'AWAITING_PAYMENT'
+  ) {
+    return value as unknown as OrderReadyForSubmissionEvent;
   }
 
   if (
