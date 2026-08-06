@@ -39,6 +39,19 @@ function validateDetails(payment: OrderPayment, change: PaymentStatusChange): vo
   }
 }
 
+function sameFailure(
+  current: PaymentFailure | undefined,
+  proposed: PaymentFailure | undefined,
+): boolean {
+  return (
+    current === proposed ||
+    (current !== undefined &&
+      proposed !== undefined &&
+      current.reasonCode === proposed.reasonCode &&
+      current.occurredAt === proposed.occurredAt)
+  );
+}
+
 export function applyPaymentStatusChange(
   payment: OrderPayment,
   change: PaymentStatusChange,
@@ -60,9 +73,13 @@ export function applyPaymentStatusChange(
   if (
     payment.status === change.targetStatus &&
     payment.stripePaymentIntentId === stripePaymentIntentId &&
-    payment.lastFailure === lastFailure
+    sameFailure(payment.lastFailure, lastFailure)
   ) {
     return payment;
+  }
+
+  if (changedAt < payment.updatedAt) {
+    throw new RangeError('A payment change cannot occur before the previous payment update.');
   }
 
   return {

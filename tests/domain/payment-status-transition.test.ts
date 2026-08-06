@@ -185,16 +185,44 @@ describe('payment status transition', () => {
   it('returns the original value for an idempotent terminal replay', () => {
     const succeeded = applyPaymentStatusChange(
       initialPayment(),
-      { targetStatus: 'SUCCEEDED', stripePaymentIntentId: 'pi_payment_123' },
+      {
+        targetStatus: 'SUCCEEDED',
+        stripePaymentIntentId: 'pi_payment_123',
+        lastFailure: { reasonCode: 'CARD_DECLINED', occurredAt: changedAt },
+      },
       changedAt,
     );
 
     expect(
       applyPaymentStatusChange(
         succeeded,
-        { targetStatus: 'SUCCEEDED', stripePaymentIntentId: 'pi_payment_123' },
-        '2026-08-05T10:02:00.000Z',
+        {
+          targetStatus: 'SUCCEEDED',
+          stripePaymentIntentId: 'pi_payment_123',
+          lastFailure: { reasonCode: 'CARD_DECLINED', occurredAt: changedAt },
+        },
+        '2026-08-05T10:00:30.000Z',
       ),
     ).toBe(succeeded);
+  });
+
+  it('rejects a new payment value that would move its update time backwards', () => {
+    const processing = applyPaymentStatusChange(
+      initialPayment(),
+      { targetStatus: 'PROCESSING', stripePaymentIntentId: 'pi_payment_123' },
+      '2026-08-05T10:03:00.000Z',
+    );
+
+    expect(() =>
+      applyPaymentStatusChange(
+        processing,
+        { targetStatus: 'REQUIRES_ACTION', stripePaymentIntentId: 'pi_payment_123' },
+        '2026-08-05T10:02:00.000Z',
+      ),
+    ).toThrow('before the previous payment update');
+    expect(processing).toMatchObject({
+      status: 'PROCESSING',
+      updatedAt: '2026-08-05T10:03:00.000Z',
+    });
   });
 });
