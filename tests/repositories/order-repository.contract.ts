@@ -92,13 +92,13 @@ function paymentBindingInput(
 async function createStoredOrder(repository: OrderRepository, order: Order): Promise<void> {
   await repository.create({
     order,
-    idempotencyKey: `payment-idempotency-${order.orderId}`,
+    idempotencyKey: `create-order-idempotency-${order.orderId}`,
     mutation: {
       kind: 'ORDER_CREATED',
       correlationId: 'corr_payment_contract_123',
       causationId: 'request_payment_contract_123',
     },
-    requestFingerprint: `payment-fingerprint-${order.orderId}`,
+    requestFingerprint: `create-order-fingerprint-${order.orderId}`,
   });
 }
 

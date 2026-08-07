@@ -22,6 +22,16 @@ export type {
   PaymentRepository,
 } from './application/payment-repository.js';
 export {
+  PaymentPreparationNotAllowedError,
+  prepareStripePaymentIntent,
+  StripePaymentIntentContractError,
+} from './application/prepare-stripe-payment-intent.js';
+export type {
+  PrepareStripePaymentIntentCommand,
+  PrepareStripePaymentIntentDependencies,
+  PrepareStripePaymentIntentResult,
+} from './application/prepare-stripe-payment-intent.js';
+export {
   assertStripePaymentIntentInput,
   STRIPE_CLIENT_FAILURE_CODES,
   StripeClientError,

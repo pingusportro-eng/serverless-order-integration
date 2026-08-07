@@ -205,7 +205,6 @@ It does not contact Stripe and does not enqueue delivery work.
 ```http
 POST /orders/{orderId}/payment-intents
 Authorization: Bearer <Cognito token>
-Idempotency-Key: <client-generated payment-operation key>
 X-Correlation-Id: <optional correlation ID>
 ```
 
@@ -217,26 +216,19 @@ The server:
 4. returns the existing PaymentIntent when one is already mapped;
 5. otherwise calls Stripe with a stable server-derived key such as
    `stripe-payment-intent:<merchantId>:<orderId>`;
-6. transactionally records the order update, PaymentIntent lookup, and HTTP
-   idempotency result pointer; and
+6. transactionally records the order update and PaymentIntent lookup; and
 7. returns the client secret only after the mapping is durable.
 
-The two idempotency layers have different scopes:
-
-- the client `Idempotency-Key` makes this HTTP operation replay-safe and detects
-  conflicting key reuse; and
-- the server-derived Stripe key prevents different HTTP attempts for the same
-  order from creating different logical PaymentIntents.
+The operation is naturally idempotent in this bounded design: `orderId`
+identifies the logical operation, the order can hold only one PaymentIntent ID,
+and the server-derived Stripe key prevents concurrent or repeated HTTP attempts
+from creating different logical PaymentIntents.
 
 The first successful creation returns `201`; a valid replay returns `200`.
 Amount, currency, merchant, and Stripe creation key are never accepted from the
 browser. The client secret is returned only to the authenticated order owner and
-is never logged or stored in DynamoDB.
-
-The HTTP idempotency item stores only a safe result pointer such as the order ID
-and PaymentIntent ID. On replay, the server retrieves the current PaymentIntent
-from Stripe and returns its client secret; the idempotency item never contains
-that secret.
+is never logged or stored in DynamoDB. On replay, the server retrieves the
+current PaymentIntent from Stripe and returns its client secret.
 
 If Stripe creation succeeds but persistence fails, the server does not return
 the client secret. A retry uses the same Stripe creation key and persists the
@@ -503,8 +495,8 @@ still requires a separate bounded cost review and user approval.
 - [ ] Domain tests cover every payment and order transition.
 - [ ] The Stripe port uses deterministic fakes for success, timeout, decline,
       action-required, processing, cancellation, and conflicting data.
-- [ ] Repository tests prove atomic order, mapping, idempotency, and event-marker
-      writes.
+- [ ] Repository tests prove atomic order and PaymentIntent-mapping writes plus
+      atomic webhook event-marker writes.
 - [ ] Webhook tests use exact raw bytes and valid, invalid, duplicate, stale,
       out-of-order, and concurrent events.
 - [ ] A delayed failure cannot overwrite `SUCCEEDED`.
