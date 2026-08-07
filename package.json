@@ -43,6 +43,7 @@
     "test:publisher-failure-drill": "vitest run tests/scripts/stream-publisher-failure-drill.test.ts",
     "test:sam": "bash scripts/sam/smoke-local.sh",
     "test:stream-publisher": "vitest run tests/events/order-stream-event.test.ts tests/lambda/stream-publisher.test.ts",
+    "test:stripe-client": "vitest run tests/integrations/fake-stripe-payment-client.test.ts tests/integrations/stripe-payment-client.test.ts",
     "test:terminal-retry-campaign": "vitest run tests/scripts/sign-webhook.test.ts tests/scripts/terminal-retry-campaign.test.ts",
     "test:vendor-client": "vitest run tests/integrations/delivery-vendor-client.test.ts",
     "test:vendor-rate-limit-drill": "vitest run tests/scripts/vendor-rate-limit-dlq-drill.test.ts",
@@ -54,7 +55,8 @@
     "@aws-sdk/client-dynamodb": "3.1091.0",
     "@aws-sdk/client-sns": "3.1091.0",
     "@aws-sdk/lib-dynamodb": "3.1091.0",
-    "@aws-sdk/util-dynamodb": "3.996.7"
+    "@aws-sdk/util-dynamodb": "3.996.7",
+    "stripe": "22.4.0"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

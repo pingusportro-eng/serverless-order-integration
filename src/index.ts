@@ -21,6 +21,18 @@ export type {
   BindStripePaymentIntentResult,
   PaymentRepository,
 } from './application/payment-repository.js';
+export {
+  assertStripePaymentIntentInput,
+  STRIPE_CLIENT_FAILURE_CODES,
+  StripeClientError,
+} from './application/stripe-payment-client.js';
+export type {
+  CreateStripePaymentIntentInput,
+  StripeClientErrorOptions,
+  StripeClientFailureCode,
+  StripePaymentClient,
+  StripePaymentIntentSnapshot,
+} from './application/stripe-payment-client.js';
 export { asMerchantId, asOrderId } from './domain/order.js';
 export type {
   DeliveryLocation,
@@ -188,6 +200,23 @@ export type {
   VendorSubmissionErrorOptions,
   VendorSubmissionFailureCode,
 } from './integrations/delivery-vendor-client.js';
+export {
+  FAKE_STRIPE_SCENARIOS,
+  FakeStripePaymentClient,
+} from './integrations/fake-stripe-payment-client.js';
+export type {
+  FakeStripePaymentClientOptions,
+  FakeStripeScenario,
+} from './integrations/fake-stripe-payment-client.js';
+export {
+  createStripePaymentClient,
+  mapStripeClientError,
+  stripePaymentIntentSnapshot,
+} from './integrations/stripe-payment-client.js';
+export type {
+  CreateStripePaymentClientOptions,
+  StripeSdkClient,
+} from './integrations/stripe-payment-client.js';
 export { domainEventFromOrderStreamRecord } from './events/order-stream-event.js';
 export type {
   OrderCreatedMutation,
