@@ -12,11 +12,18 @@ import {
   DeliveryProviderOrderIdConflictError,
   type ProviderWebhookRepository,
 } from '../../src/application/provider-webhook-repository.js';
+import {
+  StripePaymentIntentBindingConflictError,
+  type BindStripePaymentIntentInput,
+  type PaymentRepository,
+} from '../../src/application/payment-repository.js';
 import { applyOrderStatusChange } from '../../src/domain/order-status-transition.js';
 import { asMerchantId, asOrderId, type Order } from '../../src/domain/order.js';
+import { createInitialOrderPayment } from '../../src/domain/payment.js';
+import { applyPaymentStatusChange } from '../../src/domain/payment-status-transition.js';
 import { createOrderFixture } from '../fixtures/order.js';
 
-type TestedRepository = OrderRepository & ProviderWebhookRepository;
+type TestedRepository = OrderRepository & ProviderWebhookRepository & PaymentRepository;
 type RepositoryFactory = () => TestedRepository | Promise<TestedRepository>;
 
 function submittedOrder(order: Order): Order {
@@ -39,6 +46,61 @@ const STATUS_MUTATION = {
   correlationId: 'corr_repository_123',
   causationId: 'request_repository_123',
 } as const;
+
+function awaitingPaymentOrder(overrides: Partial<Order> = {}): Order {
+  const order = createOrderFixture({ status: 'AWAITING_PAYMENT', ...overrides });
+  return {
+    ...order,
+    payment: createInitialOrderPayment(
+      order.total,
+      `stripe-payment-intent:${order.merchantId}:${order.orderId}`,
+      order.createdAt,
+    ),
+  };
+}
+
+function paymentBindingInput(
+  order: Order,
+  stripePaymentIntentId: string,
+): BindStripePaymentIntentInput {
+  if (order.payment === undefined) {
+    throw new Error('Expected an initial payment fixture.');
+  }
+  const changedAt = '2026-08-06T10:01:00.000Z';
+  const payment = applyPaymentStatusChange(
+    order.payment,
+    { targetStatus: 'REQUIRES_PAYMENT_METHOD', stripePaymentIntentId },
+    changedAt,
+  );
+  return {
+    currentOrder: order,
+    changedOrder: {
+      ...order,
+      payment,
+      updatedAt: changedAt,
+      version: order.version + 1,
+    },
+    mutation: {
+      kind: 'ORDER_PAYMENT_CHANGED',
+      previousPaymentStatus: order.payment.status,
+      correlationId: 'corr_payment_binding_123',
+      causationId: 'request_payment_binding_123',
+    },
+  };
+}
+
+async function createStoredOrder(repository: OrderRepository, order: Order): Promise<void> {
+  await repository.create({
+    order,
+    idempotencyKey: `payment-idempotency-${order.orderId}`,
+    mutation: {
+      kind: 'ORDER_CREATED',
+      correlationId: 'corr_payment_contract_123',
+      causationId: 'request_payment_contract_123',
+    },
+    requestFingerprint: `payment-fingerprint-${order.orderId}`,
+  });
+}
 
 export function orderRepositoryContract(name: string, createRepository: RepositoryFactory): void {
   describe(name, () => {
@@ -64,6 +126,103 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
 
       expect(result).toEqual({ outcome: 'created', order });
       await expect(repository.get(order.merchantId, order.orderId)).resolves.toEqual(order);
+    });
+
+    it('atomically binds and resolves one Stripe PaymentIntent', async () => {
+      const order = awaitingPaymentOrder();
+      const input = paymentBindingInput(order, `pi_contract_${order.orderId}`);
+      await createStoredOrder(repository, order);
+
+      await expect(repository.bindStripePaymentIntent(input)).resolves.toEqual({
+        outcome: 'bound',
+        order: input.changedOrder,
+      });
+      await expect(repository.get(order.merchantId, order.orderId)).resolves.toEqual(
+        input.changedOrder,
+      );
+      await expect(
+        repository.getByStripePaymentIntentId(
+          input.changedOrder.payment?.stripePaymentIntentId ?? '',
+        ),
+      ).resolves.toEqual(input.changedOrder);
+    });
+
+    it('replays an already committed PaymentIntent binding', async () => {
+      const order = awaitingPaymentOrder();
+      const input = paymentBindingInput(order, `pi_replay_${order.orderId}`);
+      await createStoredOrder(repository, order);
+
+      await expect(repository.bindStripePaymentIntent(input)).resolves.toMatchObject({
+        outcome: 'bound',
+      });
+      await expect(repository.bindStripePaymentIntent(input)).resolves.toEqual({
+        outcome: 'replayed',
+        order: input.changedOrder,
+      });
+    });
+
+    it('rejects one PaymentIntent assigned to another order without changing it', async () => {
+      const firstOrder = awaitingPaymentOrder();
+      const secondOrder = awaitingPaymentOrder();
+      const sharedPaymentIntentId = `pi_shared_${firstOrder.orderId}`;
+      const firstInput = paymentBindingInput(firstOrder, sharedPaymentIntentId);
+      const secondInput = paymentBindingInput(secondOrder, sharedPaymentIntentId);
+      await createStoredOrder(repository, firstOrder);
+      await createStoredOrder(repository, secondOrder);
+      await repository.bindStripePaymentIntent(firstInput);
+
+      await expect(repository.bindStripePaymentIntent(secondInput)).rejects.toBeInstanceOf(
+        StripePaymentIntentBindingConflictError,
+      );
+      await expect(repository.get(secondOrder.merchantId, secondOrder.orderId)).resolves.toEqual(
+        secondOrder,
+      );
+      await expect(repository.getByStripePaymentIntentId(sharedPaymentIntentId)).resolves.toEqual(
+        firstInput.changedOrder,
+      );
+    });
+
+    it('rejects another PaymentIntent for an already-bound order without a partial mapping', async () => {
+      const order = awaitingPaymentOrder();
+      const firstInput = paymentBindingInput(order, `pi_first_${order.orderId}`);
+      const conflictingPaymentIntentId = `pi_second_${order.orderId}`;
+      const conflictingInput = paymentBindingInput(order, conflictingPaymentIntentId);
+      await createStoredOrder(repository, order);
+      await repository.bindStripePaymentIntent(firstInput);
+
+      await expect(repository.bindStripePaymentIntent(conflictingInput)).rejects.toBeInstanceOf(
+        StripePaymentIntentBindingConflictError,
+      );
+      await expect(
+        repository.getByStripePaymentIntentId(conflictingPaymentIntentId),
+      ).resolves.toBeUndefined();
+      await expect(repository.get(order.merchantId, order.orderId)).resolves.toEqual(
+        firstInput.changedOrder,
+      );
+    });
+
+    it('rejects a stale payment binding without creating its lookup mapping', async () => {
+      const storedOrder = awaitingPaymentOrder({ version: 2 });
+      const staleOrder = { ...storedOrder, version: 1 };
+      const stripePaymentIntentId = `pi_stale_${storedOrder.orderId}`;
+      const staleInput = paymentBindingInput(staleOrder, stripePaymentIntentId);
+      await createStoredOrder(repository, storedOrder);
+
+      await expect(repository.bindStripePaymentIntent(staleInput)).rejects.toMatchObject({
+        actualVersion: 2,
+      });
+      await expect(
+        repository.getByStripePaymentIntentId(stripePaymentIntentId),
+      ).resolves.toBeUndefined();
+      await expect(repository.get(storedOrder.merchantId, storedOrder.orderId)).resolves.toEqual(
+        storedOrder,
+      );
+    });
+
+    it('returns no order for an unknown Stripe PaymentIntent', async () => {
+      await expect(
+        repository.getByStripePaymentIntentId('pi_missing_contract_123'),
+      ).resolves.toBeUndefined();
     });
 
     it('replays the original order for the same idempotency input', async () => {

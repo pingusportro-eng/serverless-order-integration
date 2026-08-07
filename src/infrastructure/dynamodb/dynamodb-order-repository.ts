@@ -22,6 +22,15 @@ import {
   type OrderRepository,
 } from '../../application/order-repository.js';
 import {
+  orderFromPaymentBinding,
+  resolvePaymentBindingOrder,
+  stripePaymentIntentIdFromBinding,
+  StripePaymentIntentBindingConflictError,
+  type BindStripePaymentIntentInput,
+  type BindStripePaymentIntentResult,
+  type PaymentRepository,
+} from '../../application/payment-repository.js';
+import {
   PROVIDER_WEBHOOK_CONSUMER,
   ProviderEventIdConflictError,
   DeliveryProviderOrderIdConflictError,
@@ -78,6 +87,16 @@ interface StoredDeliveryProviderOrderItem {
   readonly createdAt: string;
 }
 
+interface StoredStripePaymentIntentItem {
+  readonly pk: string;
+  readonly sk: 'MAPPING';
+  readonly entityType: 'STRIPE_PAYMENT_INTENT';
+  readonly schemaVersion: typeof SCHEMA_VERSION;
+  readonly merchantId: MerchantId;
+  readonly orderId: OrderId;
+  readonly createdAt: string;
+}
+
 interface StoredProcessedEventItem {
   readonly pk: string;
   readonly sk: string;
@@ -108,6 +127,10 @@ function deliveryProviderKey(
   deliveryProviderCode: Order['provider']['deliveryProviderCode'],
 ): string {
   return `DELIVERY_PROVIDER#${deliveryProviderCode}`;
+}
+
+function stripePaymentIntentKey(stripePaymentIntentId: string): string {
+  return `STRIPE_PAYMENT_INTENT#${stripePaymentIntentId}`;
 }
 
 function processedEventConsumerKey(): string {
@@ -193,6 +216,21 @@ function readStoredDeliveryProviderOrder(
   return item as unknown as StoredDeliveryProviderOrderItem;
 }
 
+function readStoredStripePaymentIntent(item: unknown): StoredStripePaymentIntentItem | undefined {
+  if (
+    !isRecord(item) ||
+    item['entityType'] !== 'STRIPE_PAYMENT_INTENT' ||
+    item['schemaVersion'] !== SCHEMA_VERSION ||
+    item['sk'] !== 'MAPPING' ||
+    typeof item['merchantId'] !== 'string' ||
+    typeof item['orderId'] !== 'string'
+  ) {
+    return undefined;
+  }
+
+  return item as unknown as StoredStripePaymentIntentItem;
+}
+
 function readStoredProcessedEvent(item: unknown): StoredProcessedEventItem | undefined {
   if (
     !isRecord(item) ||
@@ -232,7 +270,9 @@ function statusUpdate(tableName: string, order: StoredOrderItem, expectedVersion
   };
 }
 
-export class DynamoDbOrderRepository implements OrderRepository, ProviderWebhookRepository {
+export class DynamoDbOrderRepository
+  implements OrderRepository, ProviderWebhookRepository, PaymentRepository
+{
   constructor(
     private readonly client: DynamoDBDocumentClient,
     private readonly tableName: string,
@@ -314,6 +354,94 @@ export class DynamoDbOrderRepository implements OrderRepository, ProviderWebhook
     );
     const mapping = readStoredDeliveryProviderOrder(result.Item);
     return mapping === undefined ? undefined : this.get(mapping.merchantId, mapping.orderId);
+  }
+
+  async getByStripePaymentIntentId(stripePaymentIntentId: string): Promise<Order | undefined> {
+    const result = await this.client.send(
+      new GetCommand({
+        TableName: this.tableName,
+        Key: { pk: stripePaymentIntentKey(stripePaymentIntentId), sk: 'MAPPING' },
+        ConsistentRead: true,
+      }),
+    );
+    const mapping = readStoredStripePaymentIntent(result.Item);
+    return mapping === undefined ? undefined : this.get(mapping.merchantId, mapping.orderId);
+  }
+
+  async bindStripePaymentIntent(
+    input: BindStripePaymentIntentInput,
+  ): Promise<BindStripePaymentIntentResult> {
+    const stripePaymentIntentId = stripePaymentIntentIdFromBinding(input);
+    const changedOrder = orderFromPaymentBinding(input);
+    const storedOrder = toStoredOrder(changedOrder, input.mutation);
+    const mappingItem: StoredStripePaymentIntentItem = {
+      pk: stripePaymentIntentKey(stripePaymentIntentId),
+      sk: 'MAPPING',
+      entityType: 'STRIPE_PAYMENT_INTENT',
+      schemaVersion: SCHEMA_VERSION,
+      merchantId: changedOrder.merchantId,
+      orderId: changedOrder.orderId,
+      createdAt: changedOrder.updatedAt,
+    };
+
+    try {
+      await this.client.send(
+        new TransactWriteCommand({
+          TransactItems: [
+            {
+              Update: {
+                ...statusUpdate(this.tableName, storedOrder, input.currentOrder.version),
+              },
+            },
+            {
+              Put: {
+                TableName: this.tableName,
+                Item: mappingItem,
+                ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
+              },
+            },
+          ],
+        }),
+      );
+      return { outcome: 'bound', order: structuredClone(changedOrder) };
+    } catch (error: unknown) {
+      if (
+        !(error instanceof TransactionCanceledException) ||
+        !error.CancellationReasons?.some((reason) => reason.Code === 'ConditionalCheckFailed')
+      ) {
+        throw error;
+      }
+
+      const mappingResult = await this.client.send(
+        new GetCommand({
+          TableName: this.tableName,
+          Key: { pk: mappingItem.pk, sk: mappingItem.sk },
+          ConsistentRead: true,
+        }),
+      );
+      const mapping = readStoredStripePaymentIntent(mappingResult.Item);
+      const currentOrder = await this.get(
+        input.currentOrder.merchantId,
+        input.currentOrder.orderId,
+      );
+
+      if (mapping !== undefined) {
+        if (
+          mapping.merchantId !== input.currentOrder.merchantId ||
+          mapping.orderId !== input.currentOrder.orderId ||
+          currentOrder?.payment?.stripePaymentIntentId !== stripePaymentIntentId
+        ) {
+          throw new StripePaymentIntentBindingConflictError();
+        }
+        return { outcome: 'replayed', order: currentOrder };
+      }
+
+      const resolvedOrder = resolvePaymentBindingOrder(currentOrder, input, stripePaymentIntentId);
+      if (resolvedOrder.payment?.stripePaymentIntentId === stripePaymentIntentId) {
+        throw new StripePaymentIntentBindingConflictError();
+      }
+      throw new OrderVersionConflictError(resolvedOrder.version);
+    }
   }
 
   async list(input: ListOrdersInput): Promise<ListOrdersResult> {

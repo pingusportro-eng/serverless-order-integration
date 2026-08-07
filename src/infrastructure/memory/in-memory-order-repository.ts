@@ -13,6 +13,15 @@ import {
   type OrderRepository,
 } from '../../application/order-repository.js';
 import {
+  orderFromPaymentBinding,
+  resolvePaymentBindingOrder,
+  stripePaymentIntentIdFromBinding,
+  StripePaymentIntentBindingConflictError,
+  type BindStripePaymentIntentInput,
+  type BindStripePaymentIntentResult,
+  type PaymentRepository,
+} from '../../application/payment-repository.js';
+import {
   ProviderEventIdConflictError,
   DeliveryProviderOrderIdConflictError,
   type ProviderWebhookRepository,
@@ -43,12 +52,18 @@ function orderListSortKey(order: Pick<Order, 'createdAt' | 'orderId'>): string {
   return `ORDER#${order.createdAt}#${order.orderId}`;
 }
 
-export class InMemoryOrderRepository implements OrderRepository, ProviderWebhookRepository {
+export class InMemoryOrderRepository
+  implements OrderRepository, ProviderWebhookRepository, PaymentRepository
+{
   private readonly orders = new Map<string, Order>();
   private readonly idempotencyEntries = new Map<string, IdempotencyEntry>();
   private readonly merchantOrderIds = new Map<string, OrderId>();
   private readonly providerOrders = new Map<string, { merchantId: MerchantId; orderId: OrderId }>();
   private readonly processedProviderEvents = new Map<string, ProcessedProviderEvent>();
+  private readonly stripePaymentIntents = new Map<
+    string,
+    { merchantId: MerchantId; orderId: OrderId }
+  >();
 
   async create(input: CreateOrderInput): Promise<CreateOrderResult> {
     await Promise.resolve();
@@ -115,6 +130,52 @@ export class InMemoryOrderRepository implements OrderRepository, ProviderWebhook
     }
     const order = this.orders.get(tupleKey(mapping.merchantId, mapping.orderId));
     return order === undefined ? undefined : cloneOrder(order);
+  }
+
+  async getByStripePaymentIntentId(stripePaymentIntentId: string): Promise<Order | undefined> {
+    await Promise.resolve();
+
+    const mapping = this.stripePaymentIntents.get(stripePaymentIntentId);
+    if (mapping === undefined) {
+      return undefined;
+    }
+    const order = this.orders.get(tupleKey(mapping.merchantId, mapping.orderId));
+    return order === undefined ? undefined : cloneOrder(order);
+  }
+
+  async bindStripePaymentIntent(
+    input: BindStripePaymentIntentInput,
+  ): Promise<BindStripePaymentIntentResult> {
+    await Promise.resolve();
+
+    const stripePaymentIntentId = stripePaymentIntentIdFromBinding(input);
+    const mapping = this.stripePaymentIntents.get(stripePaymentIntentId);
+    const orderMapKey = tupleKey(input.currentOrder.merchantId, input.currentOrder.orderId);
+    const storedOrder = this.orders.get(orderMapKey);
+
+    if (mapping !== undefined) {
+      if (
+        mapping.merchantId !== input.currentOrder.merchantId ||
+        mapping.orderId !== input.currentOrder.orderId ||
+        storedOrder?.payment?.stripePaymentIntentId !== stripePaymentIntentId
+      ) {
+        throw new StripePaymentIntentBindingConflictError();
+      }
+      return { outcome: 'replayed', order: cloneOrder(storedOrder) };
+    }
+
+    const currentOrder = resolvePaymentBindingOrder(storedOrder, input, stripePaymentIntentId);
+    if (currentOrder.payment?.stripePaymentIntentId === stripePaymentIntentId) {
+      throw new StripePaymentIntentBindingConflictError();
+    }
+
+    const changedOrder = orderFromPaymentBinding(input);
+    this.orders.set(orderMapKey, cloneOrder(changedOrder));
+    this.stripePaymentIntents.set(stripePaymentIntentId, {
+      merchantId: changedOrder.merchantId,
+      orderId: changedOrder.orderId,
+    });
+    return { outcome: 'bound', order: cloneOrder(changedOrder) };
   }
 
   async list(input: ListOrdersInput): Promise<ListOrdersResult> {
@@ -194,6 +255,7 @@ export class InMemoryOrderRepository implements OrderRepository, ProviderWebhook
       pickup: structuredClone(existingOrder.pickup),
       dropoff: structuredClone(existingOrder.dropoff),
       provider: structuredClone(order.provider),
+      ...(order.payment === undefined ? {} : { payment: structuredClone(order.payment) }),
       createdAt: existingOrder.createdAt,
       updatedAt: order.updatedAt,
       version: order.version,

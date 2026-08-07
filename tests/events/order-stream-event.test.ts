@@ -237,6 +237,62 @@ describe('order stream event mapper', () => {
     expect(domainEventFromOrderStreamRecord(supportItem)).toBeUndefined();
   });
 
+  it('recognizes a payment-only mutation without publishing a delivery event', () => {
+    const payment = applyPaymentStatusChange(
+      initialPayment(),
+      {
+        targetStatus: 'REQUIRES_PAYMENT_METHOD',
+        stripePaymentIntentId: 'pi_mapper_payment_only',
+      },
+      '2026-07-23T08:00:00.000Z',
+    );
+    const order = createOrderFixture({
+      status: 'AWAITING_PAYMENT',
+      payment,
+      updatedAt: payment.updatedAt,
+      version: 2,
+    });
+
+    expect(
+      domainEventFromOrderStreamRecord(
+        record(order, {
+          kind: 'ORDER_PAYMENT_CHANGED',
+          previousPaymentStatus: 'NOT_STARTED',
+          correlationId: CORRELATION_ID,
+          causationId: CAUSATION_ID,
+        }),
+      ),
+    ).toBeUndefined();
+  });
+
+  it('rejects malformed payment-only mutation metadata', () => {
+    const order = createOrderFixture({ status: 'AWAITING_PAYMENT', version: 2 });
+    const invalidStatus = record(order, {
+      kind: 'ORDER_PAYMENT_CHANGED',
+      previousPaymentStatus: 'NOT_STARTED',
+      correlationId: CORRELATION_ID,
+      causationId: CAUSATION_ID,
+    });
+    const image = invalidStatus.dynamodb?.NewImage;
+    if (image?.['mutation']?.M) {
+      image['mutation'].M['previousPaymentStatus'] = { S: 'UNKNOWN' };
+    }
+
+    expect(() => domainEventFromOrderStreamRecord(invalidStatus)).toThrow(
+      'previousPaymentStatus is unsupported',
+    );
+    expect(() =>
+      domainEventFromOrderStreamRecord(
+        record(order, {
+          kind: 'ORDER_PAYMENT_CHANGED',
+          previousPaymentStatus: 'NOT_STARTED',
+          correlationId: CORRELATION_ID,
+          causationId: CAUSATION_ID,
+        }),
+      ),
+    ).toThrow('Payment-change stream metadata is inconsistent');
+  });
+
   it('rejects unsupported item and mutation versions', () => {
     const order = createOrderFixture();
     const unsupportedItem = record(order, statusMutation('PENDING_SUBMISSION'), 'MODIFY', {

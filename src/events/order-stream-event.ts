@@ -6,6 +6,7 @@ import type { DynamoDBRecord } from 'aws-lambda';
 
 import type { FailureDetails, Order } from '../domain/order.js';
 import type { OrderStatus } from '../domain/order-status.js';
+import { PAYMENT_STATUSES, type PaymentStatus } from '../domain/payment.js';
 import type { DomainEvent, DomainEventType } from './domain-event.js';
 import type { OrderMutation } from './order-mutation.js';
 
@@ -75,6 +76,21 @@ function readMutation(value: unknown): OrderMutation {
       causationId,
       previousStatus,
       ...(reason === undefined ? {} : { reason }),
+    };
+  }
+  if (value['kind'] === 'ORDER_PAYMENT_CHANGED') {
+    const previousPaymentStatus = requiredString(
+      value['previousPaymentStatus'],
+      'mutation.previousPaymentStatus',
+    );
+    if (!PAYMENT_STATUSES.some((status) => status === previousPaymentStatus)) {
+      throw new Error('Stream order mutation.previousPaymentStatus is unsupported.');
+    }
+    return {
+      kind: 'ORDER_PAYMENT_CHANGED',
+      correlationId,
+      causationId,
+      previousPaymentStatus: previousPaymentStatus as PaymentStatus,
     };
   }
 
@@ -321,6 +337,13 @@ export function domainEventFromOrderStreamRecord(record: DynamoDBRecord): Domain
         deliveryProviderSubmissionKey: item.order.provider.deliveryProviderSubmissionKey,
       },
     };
+  }
+
+  if (item.mutation.kind === 'ORDER_PAYMENT_CHANGED') {
+    if (record.eventName !== 'MODIFY' || item.order.payment === undefined) {
+      throw new Error('Payment-change stream metadata is inconsistent.');
+    }
+    return undefined;
   }
 
   if (record.eventName !== 'MODIFY') {

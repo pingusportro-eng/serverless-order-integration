@@ -1,4 +1,5 @@
 import type { OrderStatus } from '../domain/order-status.js';
+import type { PaymentStatus } from '../domain/payment.js';
 
 interface OrderMutationTrace {
   readonly correlationId: string;
@@ -15,4 +16,10 @@ export interface OrderStatusChangedMutation extends OrderMutationTrace {
   readonly reason?: string;
 }
 
-export type OrderMutation = OrderCreatedMutation | OrderStatusChangedMutation;
+export interface OrderPaymentChangedMutation extends OrderMutationTrace {
+  readonly kind: 'ORDER_PAYMENT_CHANGED';
+  readonly previousPaymentStatus: PaymentStatus;
+}
+
+export type OrderMutation =
+  OrderCreatedMutation | OrderStatusChangedMutation | OrderPaymentChangedMutation;

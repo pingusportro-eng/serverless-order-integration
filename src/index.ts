@@ -15,6 +15,12 @@ export type {
   OrderListPosition,
   OrderRepository,
 } from './application/order-repository.js';
+export { StripePaymentIntentBindingConflictError } from './application/payment-repository.js';
+export type {
+  BindStripePaymentIntentInput,
+  BindStripePaymentIntentResult,
+  PaymentRepository,
+} from './application/payment-repository.js';
 export { asMerchantId, asOrderId } from './domain/order.js';
 export type {
   DeliveryLocation,
@@ -186,6 +192,7 @@ export { domainEventFromOrderStreamRecord } from './events/order-stream-event.js
 export type {
   OrderCreatedMutation,
   OrderMutation,
+  OrderPaymentChangedMutation,
   OrderStatusChangedMutation,
 } from './events/order-mutation.js';
 export { createStreamPublisherHandler } from './lambda/stream-publisher.js';
