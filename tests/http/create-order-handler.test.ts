@@ -36,7 +36,7 @@ function deterministicDependencies(repository: OrderRepository) {
 }
 
 describe('POST /orders handler', () => {
-  it('creates an order, calculates its total, and hides the delivery-provider submission key', async () => {
+  it('creates a payment-gated order and hides internal provider keys', async () => {
     const repository = new InMemoryOrderRepository();
 
     const response = await handleCreateOrder(deterministicDependencies(repository), request());
@@ -51,13 +51,18 @@ describe('POST /orders handler', () => {
     expect(response.body).toMatchObject({
       orderId: 'ord_orderidentifier0001',
       merchantId: 'mrc_demo',
-      status: 'PENDING_SUBMISSION',
+      status: 'AWAITING_PAYMENT',
       total: { amountMinor: 2598, currency: 'RON' },
+      payment: {
+        status: 'NOT_STARTED',
+        amount: { amountMinor: 2598, currency: 'RON' },
+      },
       createdAt: '2026-07-22T08:00:00.000Z',
       version: 1,
       provider: { deliveryProviderCode: 'mock-delivery' },
     });
     expect(response.body).not.toHaveProperty('provider.deliveryProviderSubmissionKey');
+    expect(response.body).not.toHaveProperty('payment.stripeCreationKey');
   });
 
   it('returns the original order for a case-insensitive idempotent replay', async () => {

@@ -68,6 +68,20 @@ describe('delivery-requested event parser', () => {
     });
   });
 
+  it('rejects a newly created order that is still awaiting payment', () => {
+    const unpaidCreatedEvent = structuredClone(createdEvent);
+    unpaidCreatedEvent['payload'] = {
+      merchantId: 'mrc_demo',
+      status: 'AWAITING_PAYMENT',
+      deliveryProviderCode: 'mock-delivery',
+      deliveryProviderSubmissionKey: 'submission_01JABCDEF0123456789',
+    };
+
+    expect(() => parseDeliveryRequestedEvent(JSON.stringify(unpaidCreatedEvent))).toThrow(
+      'valid delivery payload',
+    );
+  });
+
   it('rejects malformed JSON and a non-object envelope', () => {
     expect(() => parseDeliveryRequestedEvent('{')).toThrow('valid JSON');
     expect(() => parseDeliveryRequestedEvent('[]')).toThrow('valid domain-event envelope');

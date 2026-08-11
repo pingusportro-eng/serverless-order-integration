@@ -133,7 +133,12 @@ describe('orders API Lambda adapter', () => {
       statusCode: 201,
       headers: { 'Content-Type': 'application/json', 'X-Request-Id': 'lambda-request-123' },
     });
-    expect(createdOrder).toMatchObject({ merchantId, status: 'PENDING_SUBMISSION', version: 1 });
+    expect(createdOrder).toMatchObject({
+      merchantId,
+      status: 'AWAITING_PAYMENT',
+      payment: { status: 'NOT_STARTED' },
+      version: 1,
+    });
 
     const orderId = createdOrder['orderId'];
     if (typeof orderId !== 'string') {

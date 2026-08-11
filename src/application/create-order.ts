@@ -7,6 +7,7 @@ import {
   validateCreateOrderRequest,
 } from './create-order-validation.js';
 import { asOrderId, type MerchantId, type Order } from '../domain/order.js';
+import { createInitialOrderPayment } from '../domain/payment.js';
 import type { ValidationIssue } from '../http/problem-details.js';
 
 export interface CreateOrderDependencies {
@@ -76,19 +77,26 @@ export async function createOrder(
   const now = dependencies.now ?? (() => new Date());
   const generateId = dependencies.generateId ?? randomUUID;
   const timestamp = now().toISOString();
+  const orderId = asOrderId(identifier('ord_', generateId));
+  const total = calculateOrderTotal(validation.value);
   const order: Order = {
-    orderId: asOrderId(identifier('ord_', generateId)),
+    orderId,
     merchantId: command.merchantId,
     merchantOrderId: validation.value.merchantOrderId,
-    status: 'PENDING_SUBMISSION',
+    status: 'AWAITING_PAYMENT',
     items: validation.value.items,
-    total: calculateOrderTotal(validation.value),
+    total,
     pickup: validation.value.pickup,
     dropoff: validation.value.dropoff,
     provider: {
       deliveryProviderCode: 'mock-delivery',
       deliveryProviderSubmissionKey: identifier('submission_', generateId),
     },
+    payment: createInitialOrderPayment(
+      total,
+      `stripe-payment-intent:${command.merchantId}:${orderId}`,
+      timestamp,
+    ),
     createdAt: timestamp,
     updatedAt: timestamp,
     version: 1,
