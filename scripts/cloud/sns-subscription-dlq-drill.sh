@@ -305,7 +305,7 @@ resolve_and_verify_stack_resources() {
     .Attributes.RawMessageDelivery == "true" and
     .Attributes.FilterPolicyScope == "MessageAttributes" and
     (.Attributes.FilterPolicy | fromjson) ==
-      {"eventType": ["order.created", "order.submission_retry_requested"]} and
+      {"eventType": ["order.ready_for_submission", "order.submission_retry_requested"]} and
     (.Attributes.RedrivePolicy | fromjson).deadLetterTargetArn == $dlqArn
   ' <<<"$attributes" >/dev/null ||
     fail 'main SNS subscription attributes do not match the deployed contract'

@@ -110,7 +110,7 @@ describe('cloud messaging infrastructure', () => {
       RawMessageDelivery: true,
       FilterPolicyScope: 'MessageAttributes',
       FilterPolicy: {
-        eventType: ['order.created', 'order.submission_retry_requested'],
+        eventType: ['order.ready_for_submission', 'order.submission_retry_requested'],
       },
     });
   });

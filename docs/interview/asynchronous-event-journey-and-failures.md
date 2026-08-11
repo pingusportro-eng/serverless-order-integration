@@ -39,7 +39,7 @@ Publisher Lambda
 SNS domain-events topic
   |
   | subscription filter:
-  | order.created or order.submission_retry_requested
+  | order.ready_for_submission or order.submission_retry_requested
   v
 Delivery SQS queue
   |
@@ -189,6 +189,7 @@ SNS is the publication and fan-out boundary. The publisher sends every domain
 event to one topic, including:
 
 - `order.created`;
+- `order.ready_for_submission`;
 - `order.submitted`;
 - `order.submission_failed`;
 - `order.submission_retry_requested`;
@@ -200,7 +201,7 @@ event to one topic, including:
 The delivery subscription accepts only:
 
 ```text
-order.created
+order.ready_for_submission
 order.submission_retry_requested
 ```
 
@@ -455,17 +456,20 @@ idempotency strategy instead of assuming that a stable event ID is sufficient.
 
 ### Scenario A: normal order delivery
 
-1. Create commits order version `1` in `PENDING_SUBMISSION`.
+1. Create commits order version `1` in `AWAITING_PAYMENT`.
 2. The stream publisher emits `order.created` with aggregate version `1`.
-3. SNS routes it into the Delivery Queue.
-4. The worker loads version `1` and calls the provider.
-5. Provider acceptance is transactionally stored as order version `2` plus the
+3. The delivery subscription ignores `order.created`.
+4. Verified payment moves the order to `PENDING_SUBMISSION`; the publisher
+   emits `order.ready_for_submission`.
+5. SNS routes that event into the Delivery Queue, and the worker calls the
+   provider.
+6. Provider acceptance is transactionally stored as the next order version plus the
    reverse lookup.
-6. The publisher emits `order.submitted`; the delivery subscription ignores
+7. The publisher emits `order.submitted`; the delivery subscription ignores
    it.
-7. Provider pickup and delivery webhooks are authenticated, deduplicated, and
+8. Provider pickup and delivery webhooks are authenticated, deduplicated, and
    applied as later versions.
-8. The publisher emits `order.picked_up` and `order.delivered`.
+9. The publisher emits `order.picked_up` and `order.delivered`.
 
 ### Scenario B: provider returns `429`
 

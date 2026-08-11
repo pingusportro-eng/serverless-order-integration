@@ -91,9 +91,10 @@ to production vendor requests.
 
 ## Domain-event coverage
 
-All eight version-1 event types are mapped and schema-validated locally:
+All nine schema-version-2 event types are mapped and validated locally:
 
 - `order.created`
+- `order.ready_for_submission`
 - `order.submitted`
 - `order.submission_failed`
 - `order.submission_retry_requested`
@@ -105,9 +106,9 @@ All eight version-1 event types are mapped and schema-validated locally:
 The AWS campaign does not need to create every event merely to re-test JSON
 mapping. It must prove both routing classes:
 
-- Actionable: `order.created` and `order.submission_retry_requested` enter the
-  delivery queue.
-- Non-actionable: the other six event types are published to SNS but excluded
+- Actionable: `order.ready_for_submission` and
+  `order.submission_retry_requested` enter the delivery queue.
+- Non-actionable: the other seven event types are published to SNS but excluded
   from the delivery queue.
 
 An automated infrastructure assertion should lock the SNS filter to exactly

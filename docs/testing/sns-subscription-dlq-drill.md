@@ -33,7 +33,7 @@ subscription on the deployed topic:
 ```text
 Domain-events SNS topic
   |
-  | existing filter: order.created or retry_requested
+  | existing filter: order.ready_for_submission or retry_requested
   +------------------------------------------> Delivery queue (unchanged)
   |
   | temporary filter: sns.subscription_dlq_drill

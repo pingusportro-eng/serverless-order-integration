@@ -1,11 +1,10 @@
 import type {
-  OrderCreatedEvent,
   OrderReadyForSubmissionEvent,
   OrderSubmissionRetryRequestedEvent,
 } from './domain-event.js';
 
 export type DeliveryRequestedEvent =
-  OrderCreatedEvent | OrderReadyForSubmissionEvent | OrderSubmissionRetryRequestedEvent;
+  OrderReadyForSubmissionEvent | OrderSubmissionRetryRequestedEvent;
 
 const ENVELOPE_FIELDS = new Set([
   'eventId',
@@ -18,12 +17,6 @@ const ENVELOPE_FIELDS = new Set([
   'correlationId',
   'causationId',
   'payload',
-]);
-const CREATED_PAYLOAD_FIELDS = new Set([
-  'merchantId',
-  'status',
-  'deliveryProviderCode',
-  'deliveryProviderSubmissionKey',
 ]);
 const RETRY_PAYLOAD_FIELDS = new Set([
   'merchantId',
@@ -105,10 +98,6 @@ export function parseDeliveryRequestedEvent(body: string): DeliveryRequestedEven
   const payload = value['payload'];
   if (!hasCommonPayload(payload)) {
     throw new Error('SQS message does not contain a valid delivery payload.');
-  }
-
-  if (value['eventType'] === 'order.created' && hasOnlyFields(payload, CREATED_PAYLOAD_FIELDS)) {
-    return value as unknown as OrderCreatedEvent;
   }
 
   if (

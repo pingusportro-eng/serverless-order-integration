@@ -444,7 +444,7 @@ Resources:
       FilterPolicyScope: MessageAttributes
       FilterPolicy:
         eventType:
-          - order.created
+          - order.ready_for_submission
           - order.submission_retry_requested
 
   SynchronousHttpApi:

@@ -4,24 +4,28 @@ import { beforeAll, describe, expect, it } from 'vitest';
 
 import { parseDeliveryRequestedEvent } from '../../src/events/delivery-requested-event.js';
 
-const fixtureUrl = new URL('../fixtures/domain-events/order-created.v2.json', import.meta.url);
+const fixtureUrl = new URL(
+  '../fixtures/domain-events/order-ready-for-submission.v2.json',
+  import.meta.url,
+);
 
 describe('delivery-requested event parser', () => {
-  let createdEvent: Record<string, unknown>;
+  let readyEvent: Record<string, unknown>;
 
   beforeAll(async () => {
-    createdEvent = JSON.parse(await readFile(fixtureUrl, 'utf8')) as Record<string, unknown>;
+    readyEvent = JSON.parse(await readFile(fixtureUrl, 'utf8')) as Record<string, unknown>;
   });
 
-  it('accepts a created event', () => {
-    expect(parseDeliveryRequestedEvent(JSON.stringify(createdEvent))).toMatchObject({
-      eventType: 'order.created',
-      aggregateVersion: 1,
+  it('accepts an order that became ready after verified payment', () => {
+    expect(parseDeliveryRequestedEvent(JSON.stringify(readyEvent))).toMatchObject({
+      eventType: 'order.ready_for_submission',
+      aggregateVersion: 2,
+      payload: { previousStatus: 'AWAITING_PAYMENT' },
     });
   });
 
   it('accepts padded platform request IDs as trace references', () => {
-    const event = structuredClone(createdEvent);
+    const event = structuredClone(readyEvent);
     event['correlationId'] = 'BC8AYho8FiAEPYQ==';
     event['causationId'] = 'BC8AYho8FiAEPYQ=';
 
@@ -32,7 +36,7 @@ describe('delivery-requested event parser', () => {
   });
 
   it('accepts a submission retry request with its required reason', () => {
-    const retryEvent = structuredClone(createdEvent);
+    const retryEvent = structuredClone(readyEvent);
     retryEvent['eventType'] = 'order.submission_retry_requested';
     retryEvent['aggregateVersion'] = 3;
     retryEvent['payload'] = {
@@ -50,35 +54,19 @@ describe('delivery-requested event parser', () => {
     });
   });
 
-  it('accepts an order that became ready after verified payment', () => {
-    const readyEvent = structuredClone(createdEvent);
-    readyEvent['eventType'] = 'order.ready_for_submission';
-    readyEvent['aggregateVersion'] = 2;
-    readyEvent['payload'] = {
+  it('rejects order.created even when its payload claims the order is pending submission', () => {
+    const createdEvent = structuredClone(readyEvent);
+    createdEvent['eventType'] = 'order.created';
+    createdEvent['aggregateVersion'] = 1;
+    createdEvent['payload'] = {
       merchantId: 'mrc_demo',
-      previousStatus: 'AWAITING_PAYMENT',
       status: 'PENDING_SUBMISSION',
       deliveryProviderCode: 'mock-delivery',
       deliveryProviderSubmissionKey: 'submission_01JABCDEF0123456789',
     };
 
-    expect(parseDeliveryRequestedEvent(JSON.stringify(readyEvent))).toMatchObject({
-      eventType: 'order.ready_for_submission',
-      payload: { previousStatus: 'AWAITING_PAYMENT' },
-    });
-  });
-
-  it('rejects a newly created order that is still awaiting payment', () => {
-    const unpaidCreatedEvent = structuredClone(createdEvent);
-    unpaidCreatedEvent['payload'] = {
-      merchantId: 'mrc_demo',
-      status: 'AWAITING_PAYMENT',
-      deliveryProviderCode: 'mock-delivery',
-      deliveryProviderSubmissionKey: 'submission_01JABCDEF0123456789',
-    };
-
-    expect(() => parseDeliveryRequestedEvent(JSON.stringify(unpaidCreatedEvent))).toThrow(
-      'valid delivery payload',
+    expect(() => parseDeliveryRequestedEvent(JSON.stringify(createdEvent))).toThrow(
+      'not actionable',
     );
   });
 
@@ -88,11 +76,11 @@ describe('delivery-requested event parser', () => {
   });
 
   it('rejects invalid envelope identifiers and unknown fields', () => {
-    const invalidId = structuredClone(createdEvent);
+    const invalidId = structuredClone(readyEvent);
     invalidId['aggregateId'] = 'customer-123456789';
-    const misplacedPadding = structuredClone(createdEvent);
+    const misplacedPadding = structuredClone(readyEvent);
     misplacedPadding['causationId'] = 'BC8=AYho8FiAEPYQ';
-    const unknownField = structuredClone(createdEvent);
+    const unknownField = structuredClone(readyEvent);
     unknownField['secret'] = 'must not be accepted';
 
     expect(() => parseDeliveryRequestedEvent(JSON.stringify(invalidId))).toThrow(
@@ -107,7 +95,7 @@ describe('delivery-requested event parser', () => {
   });
 
   it('rejects a malformed delivery payload', () => {
-    const event = structuredClone(createdEvent);
+    const event = structuredClone(readyEvent);
     event['payload'] = { merchantId: 'not-a-merchant' };
 
     expect(() => parseDeliveryRequestedEvent(JSON.stringify(event))).toThrow(
@@ -116,9 +104,9 @@ describe('delivery-requested event parser', () => {
   });
 
   it('rejects non-actionable events and invalid retry details', () => {
-    const submitted = structuredClone(createdEvent);
+    const submitted = structuredClone(readyEvent);
     submitted['eventType'] = 'order.submitted';
-    const retry = structuredClone(createdEvent);
+    const retry = structuredClone(readyEvent);
     retry['eventType'] = 'order.submission_retry_requested';
     retry['payload'] = {
       merchantId: 'mrc_demo',

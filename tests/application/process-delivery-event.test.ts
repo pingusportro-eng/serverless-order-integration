@@ -10,7 +10,7 @@ import {
   type OrderRepository,
 } from '../../src/application/order-repository.js';
 import { asMerchantId, asOrderId, type Order } from '../../src/domain/order.js';
-import type { OrderCreatedEvent } from '../../src/events/domain-event.js';
+import type { OrderReadyForSubmissionEvent } from '../../src/events/domain-event.js';
 import {
   VENDOR_SUBMISSION_FAILURE_CODES,
   VendorSubmissionError,
@@ -37,10 +37,10 @@ const VENDOR_FAILURE_CASES = [
 const RETRYABLE_VENDOR_FAILURES = VENDOR_FAILURE_CASES.filter((failure) => failure.retryable);
 const TERMINAL_VENDOR_FAILURES = VENDOR_FAILURE_CASES.filter((failure) => !failure.retryable);
 
-function eventFor(order: Order): OrderCreatedEvent {
+function eventFor(order: Order): OrderReadyForSubmissionEvent {
   return {
     eventId: 'evt_01JPROCESSDELIVERY12345',
-    eventType: 'order.created',
+    eventType: 'order.ready_for_submission',
     schemaVersion: 2,
     aggregateType: 'ORDER',
     aggregateId: order.orderId,
@@ -50,6 +50,7 @@ function eventFor(order: Order): OrderCreatedEvent {
     causationId: 'request_process_delivery_123',
     payload: {
       merchantId: order.merchantId,
+      previousStatus: 'AWAITING_PAYMENT',
       status: 'PENDING_SUBMISSION',
       deliveryProviderCode: 'mock-delivery',
       deliveryProviderSubmissionKey: order.provider.deliveryProviderSubmissionKey,

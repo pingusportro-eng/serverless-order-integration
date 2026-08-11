@@ -60,7 +60,7 @@ API Gateway -> Orders API Lambda -> DynamoDB orders table
                      +------------------+------------------+
                      |                                     |
                      | filtered subscription:              | terminal subscription
-                     | order.created or                     | delivery failure
+                     | order.ready_for_submission or        | delivery failure
                      | order.submission_retry_requested     v
                      v                              SNS subscription DLQ
               Delivery SQS queue ------> Worker DLQ

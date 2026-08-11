@@ -58,7 +58,7 @@ the fan-out point for every event type.
 The delivery subscription filters on the `eventType` message attribute and
 accepts only:
 
-- `order.created`
+- `order.ready_for_submission`
 - `order.submission_retry_requested`
 
 Raw message delivery makes the domain-event JSON the SQS body, matching the

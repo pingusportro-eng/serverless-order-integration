@@ -3,7 +3,7 @@
     {
       "messageId": "message-success-001",
       "receiptHandle": "receipt-success-001",
-      "body": "{\"eventId\":\"evt_01JABCDEF0123456789A\",\"eventType\":\"order.created\",\"schemaVersion\":2,\"aggregateType\":\"ORDER\",\"aggregateId\":\"ord_01JABCDEF0123456789\",\"aggregateVersion\":1,\"occurredAt\":\"2026-07-23T10:00:00.000Z\",\"correlationId\":\"corr_01JABCDEF0123456789\",\"causationId\":\"request_01JABCDEF0123456789\",\"payload\":{\"merchantId\":\"mrc_demo\",\"status\":\"PENDING_SUBMISSION\",\"deliveryProviderCode\":\"mock-delivery\",\"deliveryProviderSubmissionKey\":\"submission_01JABCDEF0123456789\"}}",
+      "body": "{\"eventId\":\"evt_01JABCDEF0123456789A\",\"eventType\":\"order.ready_for_submission\",\"schemaVersion\":2,\"aggregateType\":\"ORDER\",\"aggregateId\":\"ord_01JABCDEF0123456789\",\"aggregateVersion\":1,\"occurredAt\":\"2026-07-23T10:00:00.000Z\",\"correlationId\":\"corr_01JABCDEF0123456789\",\"causationId\":\"request_01JABCDEF0123456789\",\"payload\":{\"merchantId\":\"mrc_demo\",\"previousStatus\":\"AWAITING_PAYMENT\",\"status\":\"PENDING_SUBMISSION\",\"deliveryProviderCode\":\"mock-delivery\",\"deliveryProviderSubmissionKey\":\"submission_01JABCDEF0123456789\"}}",
       "attributes": {
         "ApproximateReceiveCount": "1",
         "SentTimestamp": "1784800800000",
@@ -35,7 +35,7 @@
     {
       "messageId": "message-duplicate-003",
       "receiptHandle": "receipt-duplicate-003",
-      "body": "{\"eventId\":\"evt_01JABCDEF0123456789A\",\"eventType\":\"order.created\",\"schemaVersion\":2,\"aggregateType\":\"ORDER\",\"aggregateId\":\"ord_01JABCDEF0123456789\",\"aggregateVersion\":1,\"occurredAt\":\"2026-07-23T10:00:00.000Z\",\"correlationId\":\"corr_01JABCDEF0123456789\",\"causationId\":\"request_01JABCDEF0123456789\",\"payload\":{\"merchantId\":\"mrc_demo\",\"status\":\"PENDING_SUBMISSION\",\"deliveryProviderCode\":\"mock-delivery\",\"deliveryProviderSubmissionKey\":\"submission_01JABCDEF0123456789\"}}",
+      "body": "{\"eventId\":\"evt_01JABCDEF0123456789A\",\"eventType\":\"order.ready_for_submission\",\"schemaVersion\":2,\"aggregateType\":\"ORDER\",\"aggregateId\":\"ord_01JABCDEF0123456789\",\"aggregateVersion\":1,\"occurredAt\":\"2026-07-23T10:00:00.000Z\",\"correlationId\":\"corr_01JABCDEF0123456789\",\"causationId\":\"request_01JABCDEF0123456789\",\"payload\":{\"merchantId\":\"mrc_demo\",\"previousStatus\":\"AWAITING_PAYMENT\",\"status\":\"PENDING_SUBMISSION\",\"deliveryProviderCode\":\"mock-delivery\",\"deliveryProviderSubmissionKey\":\"submission_01JABCDEF0123456789\"}}",
       "attributes": {
         "ApproximateReceiveCount": "2",
         "SentTimestamp": "1784800800000",
@@ -51,7 +51,7 @@
     {
       "messageId": "message-transient-004",
       "receiptHandle": "receipt-transient-004",
-      "body": "{\"eventId\":\"evt_01JABCDEF0123456789B\",\"eventType\":\"order.created\",\"schemaVersion\":2,\"aggregateType\":\"ORDER\",\"aggregateId\":\"ord_01JABCDEF0123456790\",\"aggregateVersion\":1,\"occurredAt\":\"2026-07-23T10:00:01.000Z\",\"correlationId\":\"corr_01JABCDEF0123456790\",\"causationId\":\"request_01JABCDEF0123456790\",\"payload\":{\"merchantId\":\"mrc_demo\",\"status\":\"PENDING_SUBMISSION\",\"deliveryProviderCode\":\"mock-delivery\",\"deliveryProviderSubmissionKey\":\"submission_01JABCDEF0123456790\"}}",
+      "body": "{\"eventId\":\"evt_01JABCDEF0123456789B\",\"eventType\":\"order.ready_for_submission\",\"schemaVersion\":2,\"aggregateType\":\"ORDER\",\"aggregateId\":\"ord_01JABCDEF0123456790\",\"aggregateVersion\":1,\"occurredAt\":\"2026-07-23T10:00:01.000Z\",\"correlationId\":\"corr_01JABCDEF0123456790\",\"causationId\":\"request_01JABCDEF0123456790\",\"payload\":{\"merchantId\":\"mrc_demo\",\"previousStatus\":\"AWAITING_PAYMENT\",\"status\":\"PENDING_SUBMISSION\",\"deliveryProviderCode\":\"mock-delivery\",\"deliveryProviderSubmissionKey\":\"submission_01JABCDEF0123456790\"}}",
       "attributes": {
         "ApproximateReceiveCount": "1",
         "SentTimestamp": "1784800801000",

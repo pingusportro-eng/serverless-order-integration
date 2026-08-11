@@ -162,7 +162,7 @@
                         <mxPoint x="-5" as="offset"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="edge-sns-queue" value="Filter: order.created + retry_requested&lt;br&gt;Raw event JSON" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C9256E;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#FFFFFF;" parent="1" source="sns" target="delivery-queue" edge="1">
+                <mxCell id="edge-sns-queue" value="Filter: order.ready_for_submission + retry_requested&lt;br&gt;Raw event JSON" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#C9256E;strokeWidth=2;endArrow=block;endFill=1;fontSize=12;labelBackgroundColor=#FFFFFF;" parent="1" source="sns" target="delivery-queue" edge="1">
                     <mxGeometry y="35" relative="1" as="geometry">
                         <mxPoint as="offset"/>
                     </mxGeometry>

@@ -259,7 +259,7 @@ case "$service:$operation" in
             PendingConfirmation: "false",
             RawMessageDelivery: "true",
             FilterPolicyScope: "MessageAttributes",
-            FilterPolicy: "{\"eventType\":[\"order.created\",\"order.submission_retry_requested\"]}",
+            FilterPolicy: "{\"eventType\":[\"order.ready_for_submission\",\"order.submission_retry_requested\"]}",
             RedrivePolicy: ({deadLetterTargetArn: $dlqArn} | tojson)
           }
         }

@@ -54,9 +54,7 @@ function safelyCompletedBefore(event: DeliveryRequestedEvent, order: Order): boo
   }
 
   return (
-    order.provider.deliveryProviderOrderId !== undefined ||
-    order.status === 'SUBMISSION_FAILED' ||
-    (event.eventType === 'order.created' && order.status === 'PENDING_SUBMISSION')
+    order.provider.deliveryProviderOrderId !== undefined || order.status === 'SUBMISSION_FAILED'
   );
 }
 
