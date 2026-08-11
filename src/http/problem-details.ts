@@ -1,6 +1,6 @@
 import type { HttpHeaders, HttpResponse } from './response.js';
 
-export type ProblemStatus = 400 | 401 | 403 | 404 | 409 | 412 | 422 | 428 | 500;
+export type ProblemStatus = 400 | 401 | 403 | 404 | 409 | 412 | 422 | 428 | 500 | 502 | 503;
 
 export type ProblemCode =
   | 'MALFORMED_REQUEST'
@@ -15,6 +15,10 @@ export type ProblemCode =
   | 'VERSION_MISMATCH'
   | 'PRECONDITION_REQUIRED'
   | 'VALIDATION_ERROR'
+  | 'PAYMENT_PREPARATION_NOT_ALLOWED'
+  | 'PAYMENT_INTENT_CONFLICT'
+  | 'PAYMENT_PROVIDER_ERROR'
+  | 'PAYMENT_PROVIDER_UNAVAILABLE'
   | 'INTERNAL_ERROR';
 
 export interface ValidationIssue {

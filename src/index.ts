@@ -31,6 +31,12 @@ export type {
   PrepareStripePaymentIntentDependencies,
   PrepareStripePaymentIntentResult,
 } from './application/prepare-stripe-payment-intent.js';
+export { handlePrepareStripePaymentIntent } from './http/prepare-stripe-payment-intent-handler.js';
+export type {
+  PreparedStripePaymentIntentRepresentation,
+  PrepareStripePaymentIntentHttpRequest,
+  PrepareStripePaymentIntentHttpResponse,
+} from './http/prepare-stripe-payment-intent-handler.js';
 export {
   assertStripePaymentIntentInput,
   STRIPE_CLIENT_FAILURE_CODES,
