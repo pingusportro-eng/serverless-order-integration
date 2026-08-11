@@ -2,11 +2,14 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from '
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { OrderRepository } from '../../src/application/order-repository.js';
-import { asMerchantId } from '../../src/domain/order.js';
+import { asMerchantId, type Order } from '../../src/domain/order.js';
+import { createInitialOrderPayment } from '../../src/domain/payment.js';
 import { createOrderCursorCodec } from '../../src/http/order-cursor.js';
 import { InMemoryOrderRepository } from '../../src/infrastructure/memory/in-memory-order-repository.js';
+import { FakeStripePaymentClient } from '../../src/integrations/fake-stripe-payment-client.js';
 import { createOrdersApiHandler } from '../../src/lambda/orders-api.js';
 import { createOrderRequestFixture } from '../fixtures/create-order-request.js';
+import { createOrderFixture } from '../fixtures/order.js';
 
 interface EventOptions {
   readonly routeKey: string;
@@ -59,12 +62,42 @@ function responseBody(response: APIGatewayProxyStructuredResultV2): Record<strin
   return JSON.parse(response.body) as Record<string, unknown>;
 }
 
+function awaitingPaymentOrder(): Order {
+  const order = createOrderFixture({
+    merchantId: asMerchantId('mrc_demo'),
+    status: 'AWAITING_PAYMENT',
+  });
+  return {
+    ...order,
+    payment: createInitialOrderPayment(
+      order.total,
+      `stripe-payment-intent:${order.merchantId}:${order.orderId}`,
+      order.createdAt,
+    ),
+  };
+}
+
+async function storeOrder(repository: InMemoryOrderRepository, order: Order): Promise<void> {
+  await repository.create({
+    order,
+    idempotencyKey: `create-${order.orderId}`,
+    requestFingerprint: `create-fingerprint-${order.orderId}`,
+    mutation: {
+      kind: 'ORDER_CREATED',
+      correlationId: 'corr_lambda_payment_fixture',
+      causationId: 'request_lambda_payment_fixture',
+    },
+  });
+}
+
 describe('orders API Lambda adapter', () => {
   let repository: InMemoryOrderRepository;
+  let stripeClient: FakeStripePaymentClient;
   const merchantId = asMerchantId('mrc_demo');
 
   beforeEach(() => {
     repository = new InMemoryOrderRepository();
+    stripeClient = new FakeStripePaymentClient();
   });
 
   function handler(requireAccessToken = false, requireOperatorGroup = false) {
@@ -74,6 +107,11 @@ describe('orders API Lambda adapter', () => {
       cursorCodec: createOrderCursorCodec('lambda-test-cursor-signing-secret-0123456789'),
       requireAccessToken,
       requireOperatorGroup,
+      paymentPreparation: {
+        repository,
+        stripeClient,
+        now: () => new Date('2026-08-11T10:00:00.000Z'),
+      },
       now: () => new Date('2026-07-22T12:00:00.000Z'),
       logSink: () => undefined,
     });
@@ -127,6 +165,123 @@ describe('orders API Lambda adapter', () => {
 
     expect(response.statusCode).toBe(200);
     expect(responseBody(response)).toEqual({ items: [] });
+  });
+
+  it('routes PaymentIntent creation and its natural replay', async () => {
+    const order = awaitingPaymentOrder();
+    await storeOrder(repository, order);
+    const event = eventFixture({
+      routeKey: 'POST /orders/{orderId}/payment-intents',
+      method: 'POST',
+      path: `/orders/${order.orderId}/payment-intents`,
+      pathParameters: { orderId: order.orderId },
+      headers: { 'x-correlation-id': 'corr_lambda_payment_route' },
+    });
+
+    const first = await handler()(event);
+    const replay = await handler()(event);
+    const firstBody = responseBody(first);
+    const replayBody = responseBody(replay);
+
+    expect(first).toMatchObject({
+      statusCode: 201,
+      headers: { 'Cache-Control': 'no-store', ETag: '"2"' },
+    });
+    expect(replay).toMatchObject({
+      statusCode: 200,
+      headers: { 'Cache-Control': 'no-store', ETag: '"2"' },
+    });
+    expect(replayBody).toMatchObject({
+      orderId: order.orderId,
+      orderVersion: 2,
+      stripePaymentIntentId: firstBody['stripePaymentIntentId'],
+      clientSecret: firstBody['clientSecret'],
+    });
+    expect(stripeClient.createCalls).toHaveLength(1);
+  });
+
+  it('requires a verified access token before reaching the PaymentIntent route', async () => {
+    const order = awaitingPaymentOrder();
+    await storeOrder(repository, order);
+    const event = eventFixture({
+      routeKey: 'POST /orders/{orderId}/payment-intents',
+      method: 'POST',
+      path: `/orders/${order.orderId}/payment-intents`,
+      pathParameters: { orderId: order.orderId },
+    });
+
+    const unauthorized = await handler(true)(event);
+    expect(unauthorized.statusCode).toBe(401);
+    expect(stripeClient.createCalls).toHaveLength(0);
+
+    Object.assign(event.requestContext, {
+      authorizer: {
+        principalId: 'synthetic-user',
+        integrationLatency: 1,
+        jwt: {
+          claims: { token_use: 'access' },
+          scopes: [],
+        },
+      },
+    });
+    const authorized = await handler(true)(event);
+
+    expect(authorized.statusCode).toBe(201);
+    expect(stripeClient.createCalls).toHaveLength(1);
+  });
+
+  it('never writes the PaymentIntent client secret to request logs', async () => {
+    const order = awaitingPaymentOrder();
+    await storeOrder(repository, order);
+    const logLines: string[] = [];
+    const observableHandler = createOrdersApiHandler({
+      repository,
+      merchantId,
+      cursorCodec: createOrderCursorCodec('lambda-test-cursor-signing-secret-0123456789'),
+      requireAccessToken: false,
+      requireOperatorGroup: false,
+      paymentPreparation: { repository, stripeClient },
+      logSink: (line) => {
+        logLines.push(line);
+      },
+    });
+
+    const response = await observableHandler(
+      eventFixture({
+        routeKey: 'POST /orders/{orderId}/payment-intents',
+        method: 'POST',
+        path: `/orders/${order.orderId}/payment-intents`,
+        pathParameters: { orderId: order.orderId },
+      }),
+    );
+    const body = responseBody(response);
+    const clientSecret = body['clientSecret'];
+
+    expect(response.statusCode).toBe(201);
+    expect(typeof clientSecret).toBe('string');
+    expect(logLines.join('\n')).not.toContain(clientSecret);
+  });
+
+  it('keeps the payment route unavailable until its runtime capability is installed', async () => {
+    const routeWithoutPayment = createOrdersApiHandler({
+      repository,
+      merchantId,
+      cursorCodec: createOrderCursorCodec('lambda-test-cursor-signing-secret-0123456789'),
+      requireAccessToken: false,
+      requireOperatorGroup: false,
+    });
+
+    const response = await routeWithoutPayment(
+      eventFixture({
+        routeKey: 'POST /orders/{orderId}/payment-intents',
+        method: 'POST',
+        path: '/orders/ord_12345678/payment-intents',
+        pathParameters: { orderId: 'ord_12345678' },
+      }),
+    );
+
+    expect(response.statusCode).toBe(404);
+    expect(responseBody(response)).toMatchObject({ code: 'MALFORMED_REQUEST' });
   });
 
   it('returns a safe error for malformed JSON', async () => {

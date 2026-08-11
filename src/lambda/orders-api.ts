@@ -7,12 +7,14 @@ import type {
 } from 'aws-lambda';
 
 import type { OrderRepository } from '../application/order-repository.js';
+import type { PrepareStripePaymentIntentDependencies } from '../application/prepare-stripe-payment-intent.js';
 import { asMerchantId, type MerchantId } from '../domain/order.js';
 import { handleChangeOrderStatus } from '../http/change-order-status-handler.js';
 import { handleCreateOrder } from '../http/create-order-handler.js';
 import { handleGetOrder } from '../http/get-order-handler.js';
 import { handleListOrders, type ListOrdersQuery } from '../http/list-orders-handler.js';
 import { createOrderCursorCodec, type OrderCursorCodec } from '../http/order-cursor.js';
+import { handlePrepareStripePaymentIntent } from '../http/prepare-stripe-payment-intent-handler.js';
 import { problemResponse } from '../http/problem-details.js';
 import type { HttpResponse } from '../http/response.js';
 import { DynamoDbOrderRepository } from '../infrastructure/dynamodb/dynamodb-order-repository.js';
@@ -28,6 +30,7 @@ export interface OrdersApiDependencies {
   readonly merchantId: MerchantId;
   readonly requireAccessToken: boolean;
   readonly requireOperatorGroup: boolean;
+  readonly paymentPreparation?: PrepareStripePaymentIntentDependencies;
   readonly now?: () => Date;
   readonly logSink?: LogSink;
 }
@@ -190,6 +193,18 @@ function malformedJsonResponse(requestId: string): APIGatewayProxyStructuredResu
   );
 }
 
+function routeNotFoundResponse(requestId: string): HttpResponse<unknown> {
+  return problemResponse(
+    {
+      status: 404,
+      code: 'MALFORMED_REQUEST',
+      title: 'Route not found',
+      detail: 'The requested route is not available.',
+    },
+    requestId,
+  );
+}
+
 function exceptionName(error: unknown): string {
   return error instanceof Error && error.name ? error.name : 'UnknownError';
 }
@@ -220,6 +235,16 @@ async function route(
         requestId,
         orderId: event.pathParameters?.['orderId'] ?? '',
       });
+    case 'POST /orders/{orderId}/payment-intents':
+      if (dependencies.paymentPreparation === undefined) {
+        return routeNotFoundResponse(requestId);
+      }
+      return handlePrepareStripePaymentIntent(dependencies.paymentPreparation, {
+        merchantId: dependencies.merchantId,
+        requestId,
+        orderId: event.pathParameters?.['orderId'] ?? '',
+        headers: event.headers,
+      });
     case 'PATCH /orders/{orderId}/status':
       return handleChangeOrderStatus(dependencies, {
         merchantId: dependencies.merchantId,
@@ -229,15 +254,7 @@ async function route(
         body,
       });
     default:
-      return problemResponse(
-        {
-          status: 404,
-          code: 'MALFORMED_REQUEST',
-          title: 'Route not found',
-          detail: 'The requested route is not available.',
-        },
-        requestId,
-      );
+      return routeNotFoundResponse(requestId);
   }
 }
 
