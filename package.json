@@ -4,6 +4,9 @@
   "private": true,
   "description": "A local-first serverless order integration learning project.",
   "type": "module",
+  "workspaces": [
+    "ui"
+  ],
   "engines": {
     "node": ">=24 <25",
     "npm": ">=11 <12"
@@ -11,7 +14,7 @@
   "packageManager": "npm@11.6.2",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run build",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test:coverage && npm run build && npm run check --workspace ui",
     "cloud:deploy": "node scripts/cloud/development-lab.mjs deploy",
     "cloud:destroy": "node scripts/cloud/development-lab.mjs destroy",
     "cloud:order:create": "node scripts/cloud/development-lab.mjs create-order",

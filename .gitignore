@@ -10,10 +10,14 @@ coverage/
 .env
 .env.*
 !.env.example
+ui/.env.local
 ssl/
 
 # Local service data
 .dynamodb/
+
+# Frontend output
+ui/dist/
 
 # Logs
 *.log

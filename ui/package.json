@@ -1,0 +1,37 @@
+{
+  "name": "@serverless-order-integration/ui",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11 <12"
+  },
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "check": "npm run typecheck && npm run test:coverage && npm run build",
+    "dev": "vite --host 127.0.0.1 --port 3002",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.2",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "@vitejs/plugin-react": "5.1.4",
+    "@vitest/coverage-v8": "4.1.10",
+    "jsdom": "29.1.1",
+    "typescript": "6.0.3",
+    "vite": "7.3.6",
+    "vitest": "4.1.10"
+  },
+  "dependencies": {
+    "@stripe/react-stripe-js": "6.8.1",
+    "@stripe/stripe-js": "9.13.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  }
+}
