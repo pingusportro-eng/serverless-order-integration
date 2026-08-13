@@ -17,13 +17,20 @@ import {
   type BindStripePaymentIntentInput,
   type PaymentRepository,
 } from '../../src/application/payment-repository.js';
+import {
+  StripeEventIdConflictError,
+  type StripeWebhookRepository,
+} from '../../src/application/stripe-webhook-repository.js';
 import { applyOrderStatusChange } from '../../src/domain/order-status-transition.js';
 import { asMerchantId, asOrderId, type Order } from '../../src/domain/order.js';
 import { createInitialOrderPayment } from '../../src/domain/payment.js';
 import { applyPaymentStatusChange } from '../../src/domain/payment-status-transition.js';
 import { createOrderFixture } from '../fixtures/order.js';
 
-type TestedRepository = OrderRepository & ProviderWebhookRepository & PaymentRepository;
+type TestedRepository = OrderRepository &
+  ProviderWebhookRepository &
+  PaymentRepository &
+  StripeWebhookRepository;
 type RepositoryFactory = () => TestedRepository | Promise<TestedRepository>;
 
 function submittedOrder(order: Order): Order {
@@ -223,6 +230,111 @@ export function orderRepositoryContract(name: string, createRepository: Reposito
       await expect(
         repository.getByStripePaymentIntentId('pi_missing_contract_123'),
       ).resolves.toBeUndefined();
+    });
+
+    it('atomically records Stripe success, repairs its mapping, and deduplicates the event', async () => {
+      const order = awaitingPaymentOrder();
+      const stripePaymentIntentId = `pi_webhook_${order.orderId}`;
+      const changedAt = '2026-08-06T10:02:00.000Z';
+      if (order.payment === undefined) {
+        throw new Error('Expected an initial payment fixture.');
+      }
+      const payment = applyPaymentStatusChange(
+        order.payment,
+        { targetStatus: 'SUCCEEDED', stripePaymentIntentId },
+        changedAt,
+      );
+      const changedOrder = applyOrderStatusChange(
+        { ...order, payment },
+        { targetStatus: 'PENDING_SUBMISSION' },
+        changedAt,
+      );
+      const input = {
+        event: {
+          eventId: `evt_stripe_${order.orderId}`,
+          eventType: 'payment_intent.succeeded',
+          eventFingerprint: 'a'.repeat(64),
+          stripePaymentIntentId,
+          processedAt: changedAt,
+        },
+        currentOrder: order,
+        changedOrder,
+        mutation: {
+          kind: 'ORDER_STATUS_CHANGED' as const,
+          previousStatus: order.status,
+          correlationId: 'corr_stripe_repository_123',
+          causationId: `evt_stripe_${order.orderId}`,
+        },
+        ensurePaymentIntentMapping: true,
+      };
+      await createStoredOrder(repository, order);
+
+      await expect(repository.applyStripeWebhookChange(input)).resolves.toBe('recorded');
+      await expect(repository.applyStripeWebhookChange(input)).resolves.toBe('duplicate');
+      await expect(repository.get(order.merchantId, order.orderId)).resolves.toEqual(changedOrder);
+      await expect(repository.getByStripePaymentIntentId(stripePaymentIntentId)).resolves.toEqual(
+        changedOrder,
+      );
+    });
+
+    it('atomically records an ignored Stripe event and repairs its missing mapping', async () => {
+      const initialOrder = awaitingPaymentOrder();
+      const stripePaymentIntentId = `pi_ignored_${initialOrder.orderId}`;
+      const order = {
+        ...initialOrder,
+        payment: applyPaymentStatusChange(
+          initialOrder.payment as NonNullable<Order['payment']>,
+          { targetStatus: 'REQUIRES_PAYMENT_METHOD', stripePaymentIntentId },
+          '2026-08-06T10:02:20.000Z',
+        ),
+      };
+      const input = {
+        event: {
+          eventId: `evt_stripe_ignored_${order.orderId}`,
+          eventType: 'payment_intent.created',
+          eventFingerprint: 'f'.repeat(64),
+          stripePaymentIntentId,
+          processedAt: '2026-08-06T10:02:30.000Z',
+        },
+        currentOrder: order,
+        ensurePaymentIntentMapping: true,
+      };
+      await createStoredOrder(repository, order);
+
+      await expect(repository.recordIgnoredStripeWebhook(input)).resolves.toBe('recorded');
+      await expect(repository.recordIgnoredStripeWebhook(input)).resolves.toBe('duplicate');
+      await expect(repository.get(order.merchantId, order.orderId)).resolves.toEqual(order);
+      await expect(repository.getByStripePaymentIntentId(stripePaymentIntentId)).resolves.toEqual(
+        order,
+      );
+    });
+
+    it('rejects reuse of one Stripe event ID with a different signed payload', async () => {
+      const eventId = `evt_stripe_repository_conflict_${createOrderFixture().orderId}`;
+      const input = {
+        event: {
+          eventId,
+          eventType: 'payment_intent.created',
+          eventFingerprint: 'b'.repeat(64),
+          stripePaymentIntentId: 'pi_reconciliation_unknown_123',
+          processedAt: '2026-08-06T10:03:00.000Z',
+        },
+        reasonCode: 'ORDER_NOT_FOUND',
+        missingOrder: {
+          merchantId: asMerchantId(`mrc_missing_${eventId}`),
+          orderId: asOrderId(`ord_missing_${eventId}`),
+        },
+      };
+
+      await expect(repository.recordStripeWebhookReconciliationRequired(input)).resolves.toBe(
+        'recorded',
+      );
+      await expect(
+        repository.recordStripeWebhookReconciliationRequired({
+          ...input,
+          event: { ...input.event, eventFingerprint: 'c'.repeat(64) },
+        }),
+      ).rejects.toBeInstanceOf(StripeEventIdConflictError);
     });
 
     it('replays the original order for the same idempotency input', async () => {

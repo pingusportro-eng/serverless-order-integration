@@ -301,9 +301,13 @@ export function createStripePaymentClient(
         throw new TypeError('Stripe PaymentIntent ID must not be empty.');
       }
       try {
-        return stripePaymentIntentSnapshot(
+        const snapshot = stripePaymentIntentSnapshot(
           await stripe.paymentIntents.retrieve(stripePaymentIntentId),
         );
+        if (snapshot.stripePaymentIntentId !== stripePaymentIntentId) {
+          throw contractMismatch('Stripe returned a different PaymentIntent than requested.');
+        }
+        return snapshot;
       } catch (error: unknown) {
         throw mapStripeClientError(error);
       }

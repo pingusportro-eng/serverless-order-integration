@@ -3,6 +3,7 @@ import {
   GetCommand,
   QueryCommand,
   TransactWriteCommand,
+  type TransactWriteCommandInput,
   type DynamoDBDocumentClient,
 } from '@aws-sdk/lib-dynamodb';
 
@@ -38,6 +39,18 @@ import {
   type RecordProviderWebhookInput,
   type RecordProviderWebhookResult,
 } from '../../application/provider-webhook-repository.js';
+import {
+  STRIPE_WEBHOOK_CONSUMER,
+  STRIPE_WEBHOOK_OUTCOMES,
+  StripeEventIdConflictError,
+  type ApplyStripeWebhookChangeInput,
+  type RecordIgnoredStripeWebhookInput,
+  type RecordStripeWebhookReconciliationRequiredInput,
+  type RecordStripeWebhookResult,
+  type StripeWebhookEventRecord,
+  type StripeWebhookOutcome,
+  type StripeWebhookRepository,
+} from '../../application/stripe-webhook-repository.js';
 import type { MerchantId, Order, OrderId } from '../../domain/order.js';
 import type { OrderMutation, OrderStatusChangedMutation } from '../../events/order-mutation.js';
 
@@ -107,6 +120,25 @@ interface StoredProcessedEventItem {
   readonly processedAt: string;
 }
 
+interface StoredStripeProcessedEventItem {
+  readonly pk: string;
+  readonly sk: string;
+  readonly entityType: 'PROCESSED_EVENT';
+  readonly schemaVersion: typeof SCHEMA_VERSION;
+  readonly eventFingerprint: string;
+  readonly eventType: string;
+  readonly stripePaymentIntentId: string;
+  readonly outcome: StripeWebhookOutcome;
+  readonly reasonCode?: string;
+  readonly processedAt: string;
+}
+
+type DynamoTransactionItem = NonNullable<TransactWriteCommandInput['TransactItems']>[number];
+
+type StripeOrderExpectation =
+  | { readonly kind: 'existing'; readonly order: Order }
+  | { readonly kind: 'missing'; readonly merchantId: MerchantId; readonly orderId: OrderId };
+
 function merchantKey(merchantId: MerchantId): string {
   return `MERCHANT#${merchantId}`;
 }
@@ -133,12 +165,47 @@ function stripePaymentIntentKey(stripePaymentIntentId: string): string {
   return `STRIPE_PAYMENT_INTENT#${stripePaymentIntentId}`;
 }
 
-function processedEventConsumerKey(): string {
-  return `CONSUMER#${PROVIDER_WEBHOOK_CONSUMER}`;
+function processedEventConsumerKey(consumerName: string): string {
+  return `CONSUMER#${consumerName}`;
 }
 
 function eventKey(eventId: string): string {
   return `EVENT#${eventId}`;
+}
+
+function stripeProcessedEventItem(
+  event: StripeWebhookEventRecord,
+  outcome: StripeWebhookOutcome,
+  reasonCode?: string,
+): StoredStripeProcessedEventItem {
+  return {
+    pk: processedEventConsumerKey(STRIPE_WEBHOOK_CONSUMER),
+    sk: eventKey(event.eventId),
+    entityType: 'PROCESSED_EVENT',
+    schemaVersion: SCHEMA_VERSION,
+    eventFingerprint: event.eventFingerprint,
+    eventType: event.eventType,
+    stripePaymentIntentId: event.stripePaymentIntentId,
+    outcome,
+    ...(reasonCode === undefined ? {} : { reasonCode }),
+    processedAt: event.processedAt,
+  };
+}
+
+function stripePaymentIntentMappingItem(
+  stripePaymentIntentId: string,
+  order: Order,
+  createdAt: string,
+): StoredStripePaymentIntentItem {
+  return {
+    pk: stripePaymentIntentKey(stripePaymentIntentId),
+    sk: 'MAPPING',
+    entityType: 'STRIPE_PAYMENT_INTENT',
+    schemaVersion: SCHEMA_VERSION,
+    merchantId: order.merchantId,
+    orderId: order.orderId,
+    createdAt,
+  };
 }
 
 function orderListSortKey(order: Order): string {
@@ -244,6 +311,22 @@ function readStoredProcessedEvent(item: unknown): StoredProcessedEventItem | und
   return item as unknown as StoredProcessedEventItem;
 }
 
+function readStoredStripeProcessedEvent(item: unknown): StoredStripeProcessedEventItem | undefined {
+  if (
+    !isRecord(item) ||
+    item['entityType'] !== 'PROCESSED_EVENT' ||
+    item['schemaVersion'] !== SCHEMA_VERSION ||
+    typeof item['eventFingerprint'] !== 'string' ||
+    typeof item['eventType'] !== 'string' ||
+    typeof item['stripePaymentIntentId'] !== 'string' ||
+    !STRIPE_WEBHOOK_OUTCOMES.some((outcome) => outcome === item['outcome']) ||
+    typeof item['processedAt'] !== 'string'
+  ) {
+    return undefined;
+  }
+  return item as unknown as StoredStripeProcessedEventItem;
+}
+
 function statusUpdate(tableName: string, order: StoredOrderItem, expectedVersion: number) {
   return {
     TableName: tableName,
@@ -271,7 +354,7 @@ function statusUpdate(tableName: string, order: StoredOrderItem, expectedVersion
 }
 
 export class DynamoDbOrderRepository
-  implements OrderRepository, ProviderWebhookRepository, PaymentRepository
+  implements OrderRepository, ProviderWebhookRepository, PaymentRepository, StripeWebhookRepository
 {
   constructor(
     private readonly client: DynamoDBDocumentClient,
@@ -374,15 +457,11 @@ export class DynamoDbOrderRepository
     const stripePaymentIntentId = stripePaymentIntentIdFromBinding(input);
     const changedOrder = orderFromPaymentBinding(input);
     const storedOrder = toStoredOrder(changedOrder, input.mutation);
-    const mappingItem: StoredStripePaymentIntentItem = {
-      pk: stripePaymentIntentKey(stripePaymentIntentId),
-      sk: 'MAPPING',
-      entityType: 'STRIPE_PAYMENT_INTENT',
-      schemaVersion: SCHEMA_VERSION,
-      merchantId: changedOrder.merchantId,
-      orderId: changedOrder.orderId,
-      createdAt: changedOrder.updatedAt,
-    };
+    const mappingItem = stripePaymentIntentMappingItem(
+      stripePaymentIntentId,
+      changedOrder,
+      changedOrder.updatedAt,
+    );
 
     try {
       await this.client.send(
@@ -562,7 +641,7 @@ export class DynamoDbOrderRepository
     }
 
     const eventItem: StoredProcessedEventItem = {
-      pk: processedEventConsumerKey(),
+      pk: processedEventConsumerKey(PROVIDER_WEBHOOK_CONSUMER),
       sk: eventKey(input.eventId),
       entityType: 'PROCESSED_EVENT',
       schemaVersion: SCHEMA_VERSION,
@@ -639,6 +718,191 @@ export class DynamoDbOrderRepository
         throw new OrderNotFoundError();
       }
       throw new OrderVersionConflictError(currentOrder.version);
+    }
+  }
+
+  async applyStripeWebhookChange(
+    input: ApplyStripeWebhookChangeInput,
+  ): Promise<RecordStripeWebhookResult> {
+    assertNextOrderVersion(input.changedOrder, input.currentOrder.version);
+    const mappingItem = input.ensurePaymentIntentMapping
+      ? stripePaymentIntentMappingItem(
+          input.event.stripePaymentIntentId,
+          input.currentOrder,
+          input.event.processedAt,
+        )
+      : undefined;
+    return this.executeStripeWebhookTransaction(
+      [
+        {
+          Update: {
+            ...statusUpdate(
+              this.tableName,
+              toStoredOrder(input.changedOrder, input.mutation),
+              input.currentOrder.version,
+            ),
+          },
+        },
+      ],
+      stripeProcessedEventItem(input.event, 'APPLIED'),
+      { kind: 'existing', order: input.currentOrder },
+      mappingItem,
+    );
+  }
+
+  async recordIgnoredStripeWebhook(
+    input: RecordIgnoredStripeWebhookInput,
+  ): Promise<RecordStripeWebhookResult> {
+    const mappingItem = input.ensurePaymentIntentMapping
+      ? stripePaymentIntentMappingItem(
+          input.event.stripePaymentIntentId,
+          input.currentOrder,
+          input.event.processedAt,
+        )
+      : undefined;
+    return this.executeStripeWebhookTransaction(
+      [this.stripeOrderVersionCondition(input.currentOrder)],
+      stripeProcessedEventItem(input.event, 'IGNORED'),
+      { kind: 'existing', order: input.currentOrder },
+      mappingItem,
+    );
+  }
+
+  async recordStripeWebhookReconciliationRequired(
+    input: RecordStripeWebhookReconciliationRequiredInput,
+  ): Promise<RecordStripeWebhookResult> {
+    if ('currentOrder' in input) {
+      return this.executeStripeWebhookTransaction(
+        [this.stripeOrderVersionCondition(input.currentOrder)],
+        stripeProcessedEventItem(input.event, 'RECONCILIATION_REQUIRED', input.reasonCode),
+        { kind: 'existing', order: input.currentOrder },
+      );
+    }
+    return this.executeStripeWebhookTransaction(
+      [this.stripeMissingOrderCondition(input.missingOrder.merchantId, input.missingOrder.orderId)],
+      stripeProcessedEventItem(input.event, 'RECONCILIATION_REQUIRED', input.reasonCode),
+      {
+        kind: 'missing',
+        merchantId: input.missingOrder.merchantId,
+        orderId: input.missingOrder.orderId,
+      },
+    );
+  }
+
+  private stripeOrderVersionCondition(order: Order): DynamoTransactionItem {
+    return {
+      ConditionCheck: {
+        TableName: this.tableName,
+        Key: { pk: merchantKey(order.merchantId), sk: orderKey(order.orderId) },
+        ConditionExpression: '#version = :expectedVersion',
+        ExpressionAttributeNames: { '#version': 'version' },
+        ExpressionAttributeValues: { ':expectedVersion': order.version },
+      },
+    };
+  }
+
+  private stripeMissingOrderCondition(
+    merchantId: MerchantId,
+    orderId: OrderId,
+  ): DynamoTransactionItem {
+    return {
+      ConditionCheck: {
+        TableName: this.tableName,
+        Key: { pk: merchantKey(merchantId), sk: orderKey(orderId) },
+        ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
+      },
+    };
+  }
+
+  private async executeStripeWebhookTransaction(
+    orderOperations: readonly DynamoTransactionItem[],
+    eventItem: StoredStripeProcessedEventItem,
+    orderExpectation: StripeOrderExpectation,
+    mappingItem?: StoredStripePaymentIntentItem,
+  ): Promise<RecordStripeWebhookResult> {
+    try {
+      await this.client.send(
+        new TransactWriteCommand({
+          TransactItems: [
+            ...orderOperations,
+            ...(mappingItem === undefined
+              ? []
+              : [
+                  {
+                    Put: {
+                      TableName: this.tableName,
+                      Item: mappingItem,
+                      ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
+                    },
+                  },
+                ]),
+            {
+              Put: {
+                TableName: this.tableName,
+                Item: eventItem,
+                ConditionExpression: 'attribute_not_exists(pk) AND attribute_not_exists(sk)',
+              },
+            },
+          ],
+        }),
+      );
+      return 'recorded';
+    } catch (error: unknown) {
+      if (!(error instanceof TransactionCanceledException)) {
+        throw error;
+      }
+
+      const eventResult = await this.client.send(
+        new GetCommand({
+          TableName: this.tableName,
+          Key: { pk: eventItem.pk, sk: eventItem.sk },
+          ConsistentRead: true,
+        }),
+      );
+      const existingEvent = readStoredStripeProcessedEvent(eventResult.Item);
+      if (existingEvent !== undefined) {
+        if (existingEvent.eventFingerprint === eventItem.eventFingerprint) {
+          return 'duplicate';
+        }
+        throw new StripeEventIdConflictError();
+      }
+
+      if (mappingItem !== undefined) {
+        const mappingResult = await this.client.send(
+          new GetCommand({
+            TableName: this.tableName,
+            Key: { pk: mappingItem.pk, sk: mappingItem.sk },
+            ConsistentRead: true,
+          }),
+        );
+        const mapping = readStoredStripePaymentIntent(mappingResult.Item);
+        if (
+          mapping !== undefined &&
+          (mapping.merchantId !== mappingItem.merchantId || mapping.orderId !== mappingItem.orderId)
+        ) {
+          throw new StripePaymentIntentBindingConflictError();
+        }
+      }
+
+      const expectedMerchantId =
+        orderExpectation.kind === 'existing'
+          ? orderExpectation.order.merchantId
+          : orderExpectation.merchantId;
+      const expectedOrderId =
+        orderExpectation.kind === 'existing'
+          ? orderExpectation.order.orderId
+          : orderExpectation.orderId;
+      const currentOrder = await this.get(expectedMerchantId, expectedOrderId);
+      if (orderExpectation.kind === 'existing') {
+        if (currentOrder === undefined) {
+          throw new OrderNotFoundError();
+        }
+        throw new OrderVersionConflictError(currentOrder.version);
+      }
+      if (currentOrder !== undefined) {
+        throw new OrderVersionConflictError(currentOrder.version);
+      }
+      throw error;
     }
   }
 

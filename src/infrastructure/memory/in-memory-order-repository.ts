@@ -28,6 +28,16 @@ import {
   type RecordProviderWebhookInput,
   type RecordProviderWebhookResult,
 } from '../../application/provider-webhook-repository.js';
+import {
+  StripeEventIdConflictError,
+  type ApplyStripeWebhookChangeInput,
+  type RecordIgnoredStripeWebhookInput,
+  type RecordStripeWebhookReconciliationRequiredInput,
+  type RecordStripeWebhookResult,
+  type StripeWebhookEventRecord,
+  type StripeWebhookOutcome,
+  type StripeWebhookRepository,
+} from '../../application/stripe-webhook-repository.js';
 import type { MerchantId, Order, OrderId } from '../../domain/order.js';
 import type { OrderStatusChangedMutation } from '../../events/order-mutation.js';
 
@@ -38,6 +48,14 @@ interface IdempotencyEntry {
 
 interface ProcessedProviderEvent {
   readonly fingerprint: string;
+}
+
+interface ProcessedStripeEvent {
+  readonly fingerprint: string;
+  readonly eventType: string;
+  readonly stripePaymentIntentId: string;
+  readonly outcome: StripeWebhookOutcome;
+  readonly reasonCode?: string;
 }
 
 function tupleKey(...parts: readonly string[]): string {
@@ -53,13 +71,14 @@ function orderListSortKey(order: Pick<Order, 'createdAt' | 'orderId'>): string {
 }
 
 export class InMemoryOrderRepository
-  implements OrderRepository, ProviderWebhookRepository, PaymentRepository
+  implements OrderRepository, ProviderWebhookRepository, PaymentRepository, StripeWebhookRepository
 {
   private readonly orders = new Map<string, Order>();
   private readonly idempotencyEntries = new Map<string, IdempotencyEntry>();
   private readonly merchantOrderIds = new Map<string, OrderId>();
   private readonly providerOrders = new Map<string, { merchantId: MerchantId; orderId: OrderId }>();
   private readonly processedProviderEvents = new Map<string, ProcessedProviderEvent>();
+  private readonly processedStripeEvents = new Map<string, ProcessedStripeEvent>();
   private readonly stripePaymentIntents = new Map<
     string,
     { merchantId: MerchantId; orderId: OrderId }
@@ -303,5 +322,144 @@ export class InMemoryOrderRepository
     }
     this.processedProviderEvents.set(eventMapKey, { fingerprint: input.eventFingerprint });
     return 'recorded';
+  }
+
+  async applyStripeWebhookChange(
+    input: ApplyStripeWebhookChangeInput,
+  ): Promise<RecordStripeWebhookResult> {
+    await Promise.resolve();
+
+    const duplicate = this.stripeEventDuplicate(input.event);
+    if (duplicate !== undefined) {
+      return duplicate;
+    }
+    const { orderMapKey } = this.stripeCurrentOrder(input.currentOrder);
+    this.assertStripePaymentIntentMapping(
+      input.event.stripePaymentIntentId,
+      input.currentOrder,
+      input.ensurePaymentIntentMapping,
+    );
+    assertNextOrderVersion(input.changedOrder, input.currentOrder.version);
+
+    this.orders.set(orderMapKey, cloneOrder(input.changedOrder));
+    if (input.ensurePaymentIntentMapping) {
+      this.storeStripePaymentIntentMapping(input.event.stripePaymentIntentId, input.currentOrder);
+    }
+    this.storeStripeEvent(input.event, 'APPLIED');
+    return 'recorded';
+  }
+
+  async recordIgnoredStripeWebhook(
+    input: RecordIgnoredStripeWebhookInput,
+  ): Promise<RecordStripeWebhookResult> {
+    await Promise.resolve();
+
+    const duplicate = this.stripeEventDuplicate(input.event);
+    if (duplicate !== undefined) {
+      return duplicate;
+    }
+    this.stripeCurrentOrder(input.currentOrder);
+    this.assertStripePaymentIntentMapping(
+      input.event.stripePaymentIntentId,
+      input.currentOrder,
+      input.ensurePaymentIntentMapping,
+    );
+
+    if (input.ensurePaymentIntentMapping) {
+      this.storeStripePaymentIntentMapping(input.event.stripePaymentIntentId, input.currentOrder);
+    }
+    this.storeStripeEvent(input.event, 'IGNORED');
+    return 'recorded';
+  }
+
+  async recordStripeWebhookReconciliationRequired(
+    input: RecordStripeWebhookReconciliationRequiredInput,
+  ): Promise<RecordStripeWebhookResult> {
+    await Promise.resolve();
+
+    const duplicate = this.stripeEventDuplicate(input.event);
+    if (duplicate !== undefined) {
+      return duplicate;
+    }
+    if ('currentOrder' in input) {
+      this.stripeCurrentOrder(input.currentOrder);
+    } else {
+      const storedOrder = this.orders.get(
+        tupleKey(input.missingOrder.merchantId, input.missingOrder.orderId),
+      );
+      if (storedOrder !== undefined) {
+        throw new OrderVersionConflictError(storedOrder.version);
+      }
+    }
+
+    this.storeStripeEvent(input.event, 'RECONCILIATION_REQUIRED', input.reasonCode);
+    return 'recorded';
+  }
+
+  private stripeEventDuplicate(
+    event: StripeWebhookEventRecord,
+  ): RecordStripeWebhookResult | undefined {
+    const existingEvent = this.processedStripeEvents.get(tupleKey('stripe-webhook', event.eventId));
+    if (existingEvent === undefined) {
+      return undefined;
+    }
+    if (existingEvent.fingerprint === event.eventFingerprint) {
+      return 'duplicate';
+    }
+    throw new StripeEventIdConflictError();
+  }
+
+  private stripeCurrentOrder(currentOrder: Order): { readonly orderMapKey: string } {
+    const orderMapKey = tupleKey(currentOrder.merchantId, currentOrder.orderId);
+    const storedOrder = this.orders.get(orderMapKey);
+    if (storedOrder === undefined) {
+      throw new OrderNotFoundError();
+    }
+    if (storedOrder.version !== currentOrder.version) {
+      throw new OrderVersionConflictError(storedOrder.version);
+    }
+    return { orderMapKey };
+  }
+
+  private assertStripePaymentIntentMapping(
+    stripePaymentIntentId: string,
+    order: Order,
+    ensureMapping: boolean,
+  ): void {
+    if (!ensureMapping) {
+      return;
+    }
+    const existingMapping = this.stripePaymentIntents.get(stripePaymentIntentId);
+    if (existingMapping === undefined) {
+      return;
+    }
+    if (
+      existingMapping.merchantId !== order.merchantId ||
+      existingMapping.orderId !== order.orderId
+    ) {
+      throw new StripePaymentIntentBindingConflictError();
+    }
+    throw new OrderVersionConflictError(order.version);
+  }
+
+  private storeStripePaymentIntentMapping(stripePaymentIntentId: string, order: Order): void {
+    this.stripePaymentIntents.set(stripePaymentIntentId, {
+      merchantId: order.merchantId,
+      orderId: order.orderId,
+    });
+  }
+
+  private storeStripeEvent(
+    event: StripeWebhookEventRecord,
+    outcome: StripeWebhookOutcome,
+    reasonCode?: string,
+  ): void {
+    this.processedStripeEvents.set(tupleKey('stripe-webhook', event.eventId), {
+      fingerprint: event.eventFingerprint,
+      eventType: event.eventType,
+      stripePaymentIntentId: event.stripePaymentIntentId,
+      outcome,
+      ...(reasonCode === undefined ? {} : { reasonCode }),
+    });
   }
 }

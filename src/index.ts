@@ -49,6 +49,48 @@ export type {
   StripePaymentClient,
   StripePaymentIntentSnapshot,
 } from './application/stripe-payment-client.js';
+export {
+  processStripeWebhook,
+  SUPPORTED_STRIPE_WEBHOOK_EVENTS,
+} from './application/process-stripe-webhook.js';
+export type {
+  ProcessStripeWebhookCommand,
+  ProcessStripeWebhookDependencies,
+  ProcessStripeWebhookResult,
+  SupportedStripeWebhookEventType,
+} from './application/process-stripe-webhook.js';
+export {
+  STRIPE_WEBHOOK_CONSUMER,
+  STRIPE_WEBHOOK_OUTCOMES,
+  StripeEventIdConflictError,
+  StripeWebhookReconciliationError,
+} from './application/stripe-webhook-repository.js';
+export type {
+  ApplyStripeWebhookChangeInput,
+  RecordIgnoredStripeWebhookInput,
+  RecordStripeWebhookReconciliationRequiredInput,
+  RecordStripeWebhookResult,
+  StripeWebhookEventRecord,
+  StripeWebhookOrderMutation,
+  StripeWebhookOrderExpectation,
+  StripeWebhookOutcome,
+  StripeWebhookRepository,
+} from './application/stripe-webhook-repository.js';
+export { handleStripeWebhook } from './http/stripe-webhook-handler.js';
+export type {
+  StripeWebhookHandlerDependencies,
+  StripeWebhookHttpRequest,
+  StripeWebhookHttpResponse,
+  StripeWebhookProcessingObservation,
+} from './http/stripe-webhook-handler.js';
+export {
+  InvalidStripeWebhookError,
+  verifyStripeWebhook,
+} from './http/stripe-webhook-verification.js';
+export type {
+  VerifiedStripeWebhookEvent,
+  VerifyStripeWebhookInput,
+} from './http/stripe-webhook-verification.js';
 export { asMerchantId, asOrderId } from './domain/order.js';
 export type {
   DeliveryLocation,

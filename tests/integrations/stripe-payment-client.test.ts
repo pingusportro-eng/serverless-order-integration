@@ -112,6 +112,14 @@ describe('Stripe payment client adapter', () => {
     expect(sdk.create).not.toHaveBeenCalled();
   });
 
+  it('rejects a retrieved PaymentIntent whose identity differs from the requested ID', async () => {
+    const sdk = sdkClient({ retrieveResult: paymentIntent({ id: 'pi_different_456' }) });
+
+    await expect(
+      clientWithSdk(sdk.client).retrievePaymentIntent('pi_adapter_123'),
+    ).rejects.toMatchObject({ code: 'CONTRACT_MISMATCH', retryable: false });
+  });
+
   it.each([
     ['requires_payment_method', 'REQUIRES_PAYMENT_METHOD'],
     ['requires_confirmation', 'REQUIRES_CONFIRMATION'],

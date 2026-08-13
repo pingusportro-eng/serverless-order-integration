@@ -300,6 +300,14 @@ Permanent mismatches include amount or currency changes, conflicting mappings,
 unexpected manual-capture state, or inconsistent merchant/order metadata. If
 the reconciliation marker cannot be committed, the handler returns `500`.
 
+After a new reconciliation marker commits, the Lambda writes one structured
+`stripe.webhook.reconciliation_required` error entry containing only safe
+identifiers and the reason code. A duplicate delivery does not repeat that error
+entry. This lab deliberately has no proactive reconciliation alarm; an operator
+must inspect the error logs or query the durable markers. A production design
+would normally add a metric filter and alarm or a dedicated reconciliation
+workflow.
+
 There is no Lambda DLQ on this synchronous API Gateway invocation. Stripe owns
 automatic delivery retry. A separate webhook inbox queue is deliberately out
 of scope for the first slice.
@@ -495,11 +503,11 @@ still requires a separate bounded cost review and user approval.
 - [ ] Domain tests cover every payment and order transition.
 - [ ] The Stripe port uses deterministic fakes for success, timeout, decline,
       action-required, processing, cancellation, and conflicting data.
-- [ ] Repository tests prove atomic order and PaymentIntent-mapping writes plus
+- [x] Repository tests prove atomic order and PaymentIntent-mapping writes plus
       atomic webhook event-marker writes.
 - [ ] Webhook tests use exact raw bytes and valid, invalid, duplicate, stale,
       out-of-order, and concurrent events.
-- [ ] A delayed failure cannot overwrite `SUCCEEDED`.
+- [x] A delayed failure cannot overwrite `SUCCEEDED`.
 - [ ] Automatic-capture mismatch becomes `RECONCILIATION_REQUIRED`.
 - [ ] Stripe creation ambiguity reuses the stable Stripe key.
 - [ ] Stripe success followed by a DynamoDB failure is recovered without

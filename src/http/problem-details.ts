@@ -19,6 +19,7 @@ export type ProblemCode =
   | 'PAYMENT_INTENT_CONFLICT'
   | 'PAYMENT_PROVIDER_ERROR'
   | 'PAYMENT_PROVIDER_UNAVAILABLE'
+  | 'INVALID_STRIPE_WEBHOOK'
   | 'INTERNAL_ERROR';
 
 export interface ValidationIssue {
