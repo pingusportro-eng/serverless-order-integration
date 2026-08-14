@@ -30,6 +30,25 @@ input {
   font: inherit;
 }
 
+button {
+  border: 0;
+  border-radius: 0.65rem;
+  padding: 0.75rem 1rem;
+  color: white;
+  background: #27685d;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+code {
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+}
+
 .app-shell {
   width: min(960px, calc(100% - 2rem));
   margin: 0 auto;
@@ -71,6 +90,134 @@ h1 {
   color: #52606a;
   font-size: 1.15rem;
   line-height: 1.7;
+}
+
+.auth-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #d59a2a;
+  border-radius: 0.85rem;
+  color: #6c4711;
+  background: #fff3d7;
+  font-size: 0.88rem;
+}
+
+.auth-banner strong {
+  flex: none;
+  text-transform: uppercase;
+}
+
+.order-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(260px, 1fr);
+  gap: 1.5rem 2rem;
+  margin-bottom: 1.5rem;
+  padding: 1.5rem;
+  border: 1px solid #d8dfdb;
+  border-radius: 1.25rem;
+  background: rgb(255 255 255 / 82%);
+  box-shadow: 0 1.5rem 4rem rgb(42 65 61 / 8%);
+}
+
+.order-panel h2 {
+  margin-bottom: 0.6rem;
+}
+
+.panel-copy {
+  color: #68747d;
+  line-height: 1.55;
+}
+
+.order-panel form {
+  display: grid;
+  align-content: start;
+  gap: 0.7rem;
+}
+
+.order-panel label,
+.operation-status dt {
+  color: #52606a;
+  font-size: 0.75rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.order-panel input {
+  width: 100%;
+  border: 1px solid #bfcac5;
+  border-radius: 0.65rem;
+  padding: 0.7rem 0.8rem;
+  color: #17212b;
+  background: white;
+}
+
+.order-panel input:focus {
+  border-color: #27685d;
+  outline: 3px solid rgb(39 104 93 / 15%);
+}
+
+.order-summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 0;
+  color: #52606a;
+  font-size: 0.88rem;
+}
+
+.order-summary strong {
+  color: #17212b;
+}
+
+.secondary-button {
+  color: #27685d;
+  background: #e4eeea;
+}
+
+.operation-status {
+  grid-column: 1 / -1;
+  border-top: 1px solid #e2e7e4;
+  padding-top: 1rem;
+}
+
+.operation-status dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem 1.5rem;
+  margin: 0;
+}
+
+.operation-status dl div {
+  min-width: 0;
+}
+
+.operation-status dd {
+  overflow-wrap: anywhere;
+  margin: 0.25rem 0 0;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+  font-size: 0.82rem;
+}
+
+.error-message,
+.success-message {
+  margin: 1rem 0 0;
+  border-radius: 0.6rem;
+  padding: 0.75rem;
+  font-size: 0.88rem;
+}
+
+.error-message {
+  color: #8a2929;
+  background: #fbe7e7;
+}
+
+.success-message {
+  color: #17634f;
+  background: #dff1eb;
 }
 
 .journey {
@@ -161,6 +308,11 @@ h1 {
   background: #d9f2e8;
 }
 
+.step-state--complete {
+  color: #31598f;
+  background: #e2ebf7;
+}
+
 .step-state--waiting {
   color: #68747d;
   background: #edf1ef;
@@ -173,6 +325,19 @@ h1 {
 
   .journey-step {
     grid-template-columns: auto 1fr;
+  }
+
+  .auth-banner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .order-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .operation-status dl {
+    grid-template-columns: 1fr;
   }
 
   .step-state {
