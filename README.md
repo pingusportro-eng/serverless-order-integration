@@ -425,6 +425,12 @@ Start DynamoDB Local, build the Lambda bundle, and serve the API at
 npm run sam:local
 ```
 
+This interactive command requires `STRIPE_SECRET_KEY=sk_test_...` in the
+git-ignored `.env.development.local` file. It refuses live-mode keys, requires
+that file to use mode `0600`, copies only the Stripe key and bounded timeout to
+an ignored mode-`0600` SAM runtime file, and deletes that file when SAM stops.
+The key is never printed. `STRIPE_TIMEOUT_MS` defaults to `5000` when omitted.
+
 Stop the API with `Ctrl+C`. DynamoDB Local remains available so its data can be
 reused; stop it separately with `npm run dynamodb:stop` when finished.
 

@@ -18,6 +18,7 @@ import { handlePrepareStripePaymentIntent } from '../http/prepare-stripe-payment
 import { problemResponse } from '../http/problem-details.js';
 import type { HttpResponse } from '../http/response.js';
 import { DynamoDbOrderRepository } from '../infrastructure/dynamodb/dynamodb-order-repository.js';
+import { createStripePaymentClient } from '../integrations/stripe-payment-client.js';
 import { createLogger, type LogSink } from '../observability/logger.js';
 import { createRequestId } from '../observability/request-id.js';
 
@@ -57,6 +58,14 @@ function booleanEnvironment(name: string): boolean {
     return false;
   }
   throw new Error(`The ${name} environment variable must be true or false.`);
+}
+
+function positiveIntegerEnvironment(name: string): number {
+  const value = Number(requireEnvironment(name));
+  if (!Number.isSafeInteger(value) || value <= 0) {
+    throw new Error(`The ${name} environment variable must be a positive integer.`);
+  }
+  return value;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -349,12 +358,26 @@ function createDefaultHandler(): OrdersApiHandler {
     { marshallOptions: { removeUndefinedValues: true } },
   );
 
+  const repository = new DynamoDbOrderRepository(client, requireEnvironment('TABLE_NAME'));
+  const stripeSecretKey = process.env['STRIPE_SECRET_KEY']?.trim();
+
   return createOrdersApiHandler({
-    repository: new DynamoDbOrderRepository(client, requireEnvironment('TABLE_NAME')),
+    repository,
     cursorCodec: createOrderCursorCodec(requireEnvironment('CURSOR_SIGNING_SECRET')),
     merchantId: asMerchantId(requireEnvironment('MERCHANT_ID')),
     requireAccessToken: booleanEnvironment('REQUIRE_ACCESS_TOKEN'),
     requireOperatorGroup: booleanEnvironment('REQUIRE_OPERATOR_GROUP'),
+    ...(stripeSecretKey === undefined || stripeSecretKey.length === 0
+      ? {}
+      : {
+          paymentPreparation: {
+            repository,
+            stripeClient: createStripePaymentClient({
+              apiKey: stripeSecretKey,
+              timeoutMs: positiveIntegerEnvironment('STRIPE_TIMEOUT_MS'),
+            }),
+          },
+        }),
   });
 }
 
