@@ -36,6 +36,26 @@ export interface CreatedOrder {
   };
 }
 
+export const PREPARED_PAYMENT_STATUSES = [
+  'REQUIRES_PAYMENT_METHOD',
+  'REQUIRES_CONFIRMATION',
+  'REQUIRES_ACTION',
+  'PROCESSING',
+  'SUCCEEDED',
+  'CANCELLED',
+] as const;
+
+export type PreparedPaymentStatus = (typeof PREPARED_PAYMENT_STATUSES)[number];
+
+export interface PreparedPaymentIntent {
+  readonly orderId: string;
+  readonly orderVersion: number;
+  readonly stripePaymentIntentId: string;
+  readonly status: PreparedPaymentStatus;
+  readonly amount: Money;
+  readonly clientSecret: string;
+}
+
 export interface ProblemDetails {
   readonly status: number;
   readonly code: string;

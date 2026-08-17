@@ -26,7 +26,7 @@ const ORDER: CreatedOrder = {
 };
 
 function client(createOrder: OrdersApiClient['createOrder']): OrdersApiClient {
-  return { createOrder };
+  return { createOrder, preparePaymentIntent: vi.fn<OrdersApiClient['preparePaymentIntent']>() };
 }
 
 describe('create-order idempotency controller', () => {

@@ -30,6 +30,21 @@ Resources:
     Type: AWS::Serverless::HttpApi
     Properties:
       StageName: $default
+      CorsConfiguration:
+        AllowOrigins:
+          - http://127.0.0.1:3002
+        AllowHeaders:
+          - Authorization
+          - Content-Type
+          - Idempotency-Key
+          - If-Match
+          - X-Correlation-Id
+        AllowMethods:
+          - GET
+          - POST
+          - PATCH
+          - OPTIONS
+        MaxAge: 600
 
   OrdersApiFunction:
     Type: AWS::Serverless::Function
@@ -63,6 +78,12 @@ Resources:
             ApiId: !Ref LocalHttpApi
             Method: GET
             Path: /orders/{orderId}
+        PreparePaymentIntent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref LocalHttpApi
+            Method: POST
+            Path: /orders/{orderId}/payment-intents
         ChangeOrderStatus:
           Type: HttpApi
           Properties:

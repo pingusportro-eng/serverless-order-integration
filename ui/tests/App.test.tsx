@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { CreatedOrder } from '../src/api/contracts.js';
+import type { CreatedOrder, PreparedPaymentIntent } from '../src/api/contracts.js';
 import type { OrdersApiClient } from '../src/api/orders-api-client.js';
 import { App } from '../src/App.js';
 
@@ -17,8 +17,20 @@ const CREATED_ORDER: CreatedOrder = {
   },
 };
 
-function client(createOrder = vi.fn<OrdersApiClient['createOrder']>()): OrdersApiClient {
-  return { createOrder };
+const PREPARED_PAYMENT: PreparedPaymentIntent = {
+  orderId: 'ord_12345678',
+  orderVersion: 2,
+  stripePaymentIntentId: 'pi_12345678',
+  status: 'REQUIRES_PAYMENT_METHOD',
+  amount: { amountMinor: 1299, currency: 'RON' },
+  clientSecret: 'pi_12345678_secret_do-not-render',
+};
+
+function client(
+  createOrder = vi.fn<OrdersApiClient['createOrder']>(),
+  preparePaymentIntent = vi.fn<OrdersApiClient['preparePaymentIntent']>(),
+): OrdersApiClient {
+  return { createOrder, preparePaymentIntent };
 }
 
 describe('App', () => {
@@ -76,5 +88,54 @@ describe('App', () => {
     expect(within(createStep).getByText('Complete')).toBeVisible();
     expect(within(prepareStep).getByText('Ready')).toBeVisible();
     expect(within(confirmStep).getByText('Waiting')).toBeVisible();
+  });
+
+  it('prepares the order payment without rendering the client secret', async () => {
+    const createOrder = vi.fn<OrdersApiClient['createOrder']>().mockResolvedValue(CREATED_ORDER);
+    const preparePaymentIntent = vi
+      .fn<OrdersApiClient['preparePaymentIntent']>()
+      .mockResolvedValue(PREPARED_PAYMENT);
+    render(
+      <App
+        ordersApiClient={client(createOrder, preparePaymentIntent)}
+        authMode="local-bypass"
+        createId={() => 'operation-123'}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Create order first' })).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Create order' }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Prepare payment' })).toBeEnabled();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare payment' }));
+    await waitFor(() => {
+      expect(screen.getByText('pi_12345678')).toBeVisible();
+    });
+
+    expect(preparePaymentIntent).toHaveBeenCalledWith({
+      orderId: 'ord_12345678',
+      correlationId: 'ui-prepare-payment:ord_12345678:operation-123',
+    });
+    const paymentPanel = screen
+      .getByRole('heading', { name: 'Prepare the Stripe payment' })
+      .closest('section');
+    if (paymentPanel === null) {
+      throw new Error('The payment preparation panel is missing.');
+    }
+    expect(within(paymentPanel).getByText('REQUIRES_PAYMENT_METHOD')).toBeVisible();
+    expect(within(paymentPanel).getByText('12.99 RON')).toBeVisible();
+    expect(screen.queryByText(PREPARED_PAYMENT.clientSecret)).not.toBeInTheDocument();
+    expect(document.body.textContent).not.toContain(PREPARED_PAYMENT.clientSecret);
+
+    const steps = screen.getAllByRole('listitem');
+    const prepareStep = steps[1];
+    const confirmStep = steps[2];
+    if (prepareStep === undefined || confirmStep === undefined) {
+      throw new Error('The expected payment journey steps are missing.');
+    }
+    expect(within(prepareStep).getByText('Complete')).toBeVisible();
+    expect(within(confirmStep).getByText('Ready')).toBeVisible();
   });
 });

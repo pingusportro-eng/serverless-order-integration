@@ -6,6 +6,7 @@ import {
   type CreateOrderSubmissionSnapshot,
 } from './create-order-submission.js';
 import { defaultCreateOrderRequest } from './default-order.js';
+import { PreparePaymentIntent, type PaymentPreparationSnapshot } from './prepare-payment-intent.js';
 
 interface JourneyStep {
   readonly title: string;
@@ -19,7 +20,7 @@ export interface AppProps {
   readonly createId?: () => string;
 }
 
-function journey(orderCreated: boolean): readonly JourneyStep[] {
+function journey(orderCreated: boolean, paymentPrepared: boolean): readonly JourneyStep[] {
   return [
     {
       title: 'Create order',
@@ -29,12 +30,12 @@ function journey(orderCreated: boolean): readonly JourneyStep[] {
     {
       title: 'Prepare payment',
       description: 'Create or retrieve the order’s Stripe PaymentIntent.',
-      state: orderCreated ? 'ready' : 'waiting',
+      state: paymentPrepared ? 'complete' : orderCreated ? 'ready' : 'waiting',
     },
     {
       title: 'Confirm payment',
       description: 'Enter a Stripe test card in the secure Payment Element.',
-      state: 'waiting',
+      state: paymentPrepared ? 'ready' : 'waiting',
     },
     {
       title: 'Verify payment',
@@ -47,6 +48,21 @@ function journey(orderCreated: boolean): readonly JourneyStep[] {
       state: 'waiting',
     },
   ];
+}
+
+function paymentActionLabel(state: PaymentPreparationSnapshot['state']): string {
+  switch (state) {
+    case 'NOT_STARTED':
+      return 'Prepare payment';
+    case 'IN_FLIGHT':
+      return 'Preparing payment…';
+    case 'RETRYABLE':
+      return 'Retry payment preparation';
+    case 'SUCCEEDED':
+      return 'Payment prepared';
+    case 'REJECTED':
+      return 'Preparation rejected';
+  }
 }
 
 function actionLabel(state: CreateOrderSubmissionSnapshot['state']): string {
@@ -68,6 +84,8 @@ function actionLabel(state: CreateOrderSubmissionSnapshot['state']): string {
 export function App({ ordersApiClient, authMode, createId }: AppProps) {
   const submission = useRef<CreateOrderSubmission | undefined>(undefined);
   submission.current ??= new CreateOrderSubmission(ordersApiClient, createId);
+  const paymentPreparation = useRef<PreparePaymentIntent | undefined>(undefined);
+  paymentPreparation.current ??= new PreparePaymentIntent(ordersApiClient, createId);
   const [snapshot, setSnapshot] = useState<CreateOrderSubmissionSnapshot>(() => {
     const currentSubmission = submission.current;
     if (currentSubmission === undefined) {
@@ -75,10 +93,18 @@ export function App({ ordersApiClient, authMode, createId }: AppProps) {
     }
     return currentSubmission.snapshot();
   });
+  const [paymentSnapshot, setPaymentSnapshot] = useState<PaymentPreparationSnapshot>(() => {
+    const currentPreparation = paymentPreparation.current;
+    if (currentPreparation === undefined) {
+      throw new Error('The payment-preparation controller is missing.');
+    }
+    return currentPreparation.snapshot();
+  });
   const [merchantOrderId, setMerchantOrderId] = useState('pos-order-10042');
 
   const orderCreated = snapshot.order !== undefined;
-  const steps = journey(orderCreated);
+  const paymentPrepared = paymentSnapshot.state === 'SUCCEEDED';
+  const steps = journey(orderCreated, paymentPrepared);
   const canEdit = snapshot.state === 'NOT_STARTED';
   const canSubmit = snapshot.state === 'NOT_STARTED' || snapshot.state === 'OUTCOME_UNKNOWN';
 
@@ -104,6 +130,26 @@ export function App({ ordersApiClient, authMode, createId }: AppProps) {
   function resetDraft(): void {
     submission.current?.reset();
     setSnapshot(submission.current?.snapshot() ?? { state: 'NOT_STARTED', attemptCount: 0 });
+  }
+
+  async function runPreparePayment(): Promise<void> {
+    const currentPreparation = paymentPreparation.current;
+    const order = snapshot.order;
+    if (currentPreparation === undefined || order === undefined) {
+      return;
+    }
+    try {
+      const pending =
+        paymentSnapshot.state === 'RETRYABLE'
+          ? currentPreparation.retry()
+          : currentPreparation.prepare(order.orderId);
+      setPaymentSnapshot(currentPreparation.snapshot());
+      await pending;
+    } catch {
+      // The controller exposes a safe message and never exposes the client secret in its snapshot.
+    } finally {
+      setPaymentSnapshot(currentPreparation.snapshot());
+    }
   }
 
   return (
@@ -197,6 +243,84 @@ export function App({ ordersApiClient, authMode, createId }: AppProps) {
               Created <strong>{snapshot.order.orderId}</strong> at version {snapshot.order.version}.
             </p>
           )}
+        </div>
+      </section>
+
+      <section className="order-panel payment-panel" aria-labelledby="prepare-payment-title">
+        <div>
+          <p className="eyebrow">Step two</p>
+          <h2 id="prepare-payment-title">Prepare the Stripe payment</h2>
+          <p className="panel-copy">
+            The server derives the amount and reuses one PaymentIntent for this order.
+          </p>
+        </div>
+
+        <div className="payment-action">
+          <button
+            type="button"
+            disabled={
+              !orderCreated ||
+              (paymentSnapshot.state !== 'NOT_STARTED' && paymentSnapshot.state !== 'RETRYABLE')
+            }
+            onClick={() => {
+              void runPreparePayment();
+            }}
+          >
+            {orderCreated ? paymentActionLabel(paymentSnapshot.state) : 'Create order first'}
+          </button>
+          <p>
+            No browser idempotency key is needed: the order and server-derived Stripe key identify
+            this operation.
+          </p>
+        </div>
+
+        <div className="operation-status" aria-live="polite">
+          <dl>
+            <div>
+              <dt>Preparation state</dt>
+              <dd>{paymentSnapshot.state}</dd>
+            </div>
+            <div>
+              <dt>Attempts</dt>
+              <dd>{paymentSnapshot.attemptCount}</dd>
+            </div>
+            {paymentSnapshot.stripePaymentIntentId === undefined ? null : (
+              <div>
+                <dt>PaymentIntent ID</dt>
+                <dd>{paymentSnapshot.stripePaymentIntentId}</dd>
+              </div>
+            )}
+            {paymentSnapshot.status === undefined ? null : (
+              <div>
+                <dt>Stripe status</dt>
+                <dd>{paymentSnapshot.status}</dd>
+              </div>
+            )}
+            {paymentSnapshot.amountLabel === undefined ? null : (
+              <div>
+                <dt>Amount</dt>
+                <dd>{paymentSnapshot.amountLabel}</dd>
+              </div>
+            )}
+            {paymentSnapshot.orderVersion === undefined ? null : (
+              <div>
+                <dt>Order version</dt>
+                <dd>{paymentSnapshot.orderVersion}</dd>
+              </div>
+            )}
+            {paymentSnapshot.correlationId === undefined ? null : (
+              <div>
+                <dt>Correlation ID</dt>
+                <dd>{paymentSnapshot.correlationId}</dd>
+              </div>
+            )}
+          </dl>
+          {paymentSnapshot.error === undefined ? null : (
+            <p className="error-message">{paymentSnapshot.error}</p>
+          )}
+          {paymentPrepared ? (
+            <p className="success-message">Payment is ready for Stripe’s secure Payment Element.</p>
+          ) : null}
         </div>
       </section>
 

@@ -1,4 +1,11 @@
-import type { CreateOrderRequest, CreatedOrder, Money, ProblemDetails } from './contracts.js';
+import {
+  PREPARED_PAYMENT_STATUSES,
+  type CreateOrderRequest,
+  type CreatedOrder,
+  type Money,
+  type PreparedPaymentIntent,
+  type ProblemDetails,
+} from './contracts.js';
 
 export type BrowserAuthorization =
   | { readonly mode: 'local-bypass' }
@@ -10,8 +17,14 @@ export interface CreateOrderCommand {
   readonly correlationId: string;
 }
 
+export interface PreparePaymentIntentCommand {
+  readonly orderId: string;
+  readonly correlationId: string;
+}
+
 export interface OrdersApiClient {
   createOrder(command: CreateOrderCommand): Promise<CreatedOrder>;
+  preparePaymentIntent(command: PreparePaymentIntentCommand): Promise<PreparedPaymentIntent>;
 }
 
 export class OrdersApiRejectedError extends Error {
@@ -30,6 +43,27 @@ export class OrdersApiOutcomeUnknownError extends Error {
 
   constructor(
     message = 'The create-order outcome is unknown and must be retried with the same key.',
+  ) {
+    super(message);
+  }
+}
+
+export class PaymentPreparationRejectedError extends Error {
+  override readonly name = 'PaymentPreparationRejectedError';
+
+  constructor(
+    readonly status: number,
+    readonly problem: ProblemDetails,
+  ) {
+    super(problem.detail);
+  }
+}
+
+export class PaymentPreparationOutcomeUnknownError extends Error {
+  override readonly name = 'PaymentPreparationOutcomeUnknownError';
+
+  constructor(
+    message = 'Payment preparation has an unknown outcome and can be retried for the same order.',
   ) {
     super(message);
   }
@@ -91,6 +125,35 @@ function readCreatedOrder(value: unknown): CreatedOrder | undefined {
   };
 }
 
+function readPreparedPaymentIntent(value: unknown): PreparedPaymentIntent | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const amount = readMoney(value['amount']);
+  const status = value['status'];
+  if (
+    typeof value['orderId'] !== 'string' ||
+    !Number.isSafeInteger(value['orderVersion']) ||
+    (value['orderVersion'] as number) < 1 ||
+    typeof value['stripePaymentIntentId'] !== 'string' ||
+    value['stripePaymentIntentId'].length === 0 ||
+    !PREPARED_PAYMENT_STATUSES.some((candidate) => candidate === status) ||
+    amount === undefined ||
+    typeof value['clientSecret'] !== 'string' ||
+    value['clientSecret'].length === 0
+  ) {
+    return undefined;
+  }
+  return {
+    orderId: value['orderId'],
+    orderVersion: value['orderVersion'] as number,
+    stripePaymentIntentId: value['stripePaymentIntentId'],
+    status: status as PreparedPaymentIntent['status'],
+    amount,
+    clientSecret: value['clientSecret'],
+  };
+}
+
 function fallbackProblem(status: number): ProblemDetails {
   return {
     status,
@@ -142,6 +205,13 @@ function canSafelyReplaceOperation(status: number): boolean {
   return status >= 400 && status < 500 && status !== 408 && status !== 429;
 }
 
+function isDefinitePaymentRejection(status: number, problem: ProblemDetails): boolean {
+  return (
+    canSafelyReplaceOperation(status) ||
+    (status === 502 && problem.code === 'PAYMENT_PROVIDER_ERROR')
+  );
+}
+
 export function createOrdersApiClient(input: {
   readonly baseUrl: string;
   readonly authorization: BrowserAuthorization;
@@ -189,6 +259,46 @@ export function createOrdersApiClient(input: {
         );
       }
       return order;
+    },
+
+    async preparePaymentIntent(command) {
+      let response: Response;
+      try {
+        response = await request(
+          `${baseUrl}/orders/${encodeURIComponent(command.orderId)}/payment-intents`,
+          {
+            method: 'POST',
+            headers: {
+              'X-Correlation-Id': command.correlationId,
+              ...authorizationHeader(input.authorization),
+            },
+          },
+        );
+      } catch (error) {
+        if (error instanceof BrowserAuthenticationRequiredError) {
+          throw error;
+        }
+        throw new PaymentPreparationOutcomeUnknownError();
+      }
+
+      const body = parseJson(await response.text());
+      if (!response.ok) {
+        const problem = readProblem(body, response.status);
+        if (isDefinitePaymentRejection(response.status, problem)) {
+          throw new PaymentPreparationRejectedError(response.status, problem);
+        }
+        throw new PaymentPreparationOutcomeUnknownError(
+          `${problem.detail} Retry payment preparation for the same order.`,
+        );
+      }
+
+      const preparedPayment = readPreparedPaymentIntent(body);
+      if (preparedPayment === undefined || preparedPayment.orderId !== command.orderId) {
+        throw new PaymentPreparationOutcomeUnknownError(
+          'The orders API returned an invalid payment response; retry for the same order.',
+        );
+      }
+      return preparedPayment;
     },
   };
 }
