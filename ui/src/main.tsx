@@ -1,3 +1,4 @@
+import { loadStripe } from '@stripe/stripe-js';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 
@@ -12,6 +13,7 @@ if (rootElement === null) {
 }
 
 const configuration = readUiConfiguration(import.meta.env);
+const stripe = loadStripe(configuration.stripePublishableKey);
 const ordersApiClient = createOrdersApiClient({
   baseUrl: configuration.apiBaseUrl,
   authorization:
@@ -22,6 +24,6 @@ const ordersApiClient = createOrdersApiClient({
 
 createRoot(rootElement).render(
   <StrictMode>
-    <App ordersApiClient={ordersApiClient} authMode={configuration.authMode} />
+    <App ordersApiClient={ordersApiClient} authMode={configuration.authMode} stripe={stripe} />
   </StrictMode>,
 );

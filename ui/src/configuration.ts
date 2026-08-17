@@ -1,6 +1,20 @@
 export interface UiConfiguration {
   readonly apiBaseUrl: string;
   readonly authMode: 'local-bypass' | 'cognito';
+  readonly stripePublishableKey: string;
+}
+
+function stripePublishableKey(environment: Readonly<Record<string, unknown>>): string {
+  const value = optionalString(environment, 'VITE_STRIPE_PUBLISHABLE_KEY');
+  if (value === undefined) {
+    throw new InvalidUiConfigurationError('VITE_STRIPE_PUBLISHABLE_KEY is required.');
+  }
+  if (!value.startsWith('pk_test_') || value.length === 'pk_test_'.length) {
+    throw new InvalidUiConfigurationError(
+      'VITE_STRIPE_PUBLISHABLE_KEY must be a Stripe Sandbox publishable key beginning with pk_test_.',
+    );
+  }
+  return value;
 }
 
 export class InvalidUiConfigurationError extends Error {
@@ -47,5 +61,6 @@ export function readUiConfiguration(
   return {
     apiBaseUrl: apiBaseUrl(environment),
     authMode: cognitoDomain === undefined ? 'local-bypass' : 'cognito',
+    stripePublishableKey: stripePublishableKey(environment),
   };
 }

@@ -5,6 +5,25 @@ import type { CreatedOrder, PreparedPaymentIntent } from '../src/api/contracts.j
 import type { OrdersApiClient } from '../src/api/orders-api-client.js';
 import { App } from '../src/App.js';
 
+vi.mock('../src/stripe-payment-form.js', () => ({
+  StripePaymentForm: ({
+    amountLabel,
+    onConfirmed,
+  }: {
+    readonly amountLabel: string;
+    readonly onConfirmed: (status: string) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() => {
+        onConfirmed('SUCCEEDED');
+      }}
+    >
+      Confirm test payment for {amountLabel}
+    </button>
+  ),
+}));
+
 const CREATED_ORDER: CreatedOrder = {
   orderId: 'ord_12345678',
   merchantOrderId: 'pos-order-10042',
@@ -35,7 +54,7 @@ function client(
 
 describe('App', () => {
   it('presents the learning journey and identifies the local authentication boundary', () => {
-    render(<App ordersApiClient={client()} authMode="local-bypass" />);
+    render(<App ordersApiClient={client()} authMode="local-bypass" stripe={null} />);
 
     expect(screen.getByRole('heading', { level: 1, name: 'Order Integration Lab' })).toBeVisible();
     expect(screen.getByText('Local auth bypass')).toBeVisible();
@@ -60,6 +79,7 @@ describe('App', () => {
       <App
         ordersApiClient={client(createOrder)}
         authMode="local-bypass"
+        stripe={null}
         createId={() => 'operation-123'}
       />,
     );
@@ -99,6 +119,7 @@ describe('App', () => {
       <App
         ordersApiClient={client(createOrder, preparePaymentIntent)}
         authMode="local-bypass"
+        stripe={null}
         createId={() => 'operation-123'}
       />,
     );
@@ -128,6 +149,7 @@ describe('App', () => {
     expect(within(paymentPanel).getByText('12.99 RON')).toBeVisible();
     expect(screen.queryByText(PREPARED_PAYMENT.clientSecret)).not.toBeInTheDocument();
     expect(document.body.textContent).not.toContain(PREPARED_PAYMENT.clientSecret);
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm test payment for 12.99 RON' }));
 
     const steps = screen.getAllByRole('listitem');
     const prepareStep = steps[1];
@@ -136,6 +158,6 @@ describe('App', () => {
       throw new Error('The expected payment journey steps are missing.');
     }
     expect(within(prepareStep).getByText('Complete')).toBeVisible();
-    expect(within(confirmStep).getByText('Ready')).toBeVisible();
+    expect(within(confirmStep).getByText('Complete')).toBeVisible();
   });
 });

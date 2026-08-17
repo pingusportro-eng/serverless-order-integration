@@ -1,3 +1,4 @@
+import type { Stripe } from '@stripe/stripe-js';
 import { useRef, useState } from 'react';
 
 import type { OrdersApiClient } from './api/orders-api-client.js';
@@ -7,6 +8,7 @@ import {
 } from './create-order-submission.js';
 import { defaultCreateOrderRequest } from './default-order.js';
 import { PreparePaymentIntent, type PaymentPreparationSnapshot } from './prepare-payment-intent.js';
+import { StripePaymentForm } from './stripe-payment-form.js';
 
 interface JourneyStep {
   readonly title: string;
@@ -17,10 +19,15 @@ interface JourneyStep {
 export interface AppProps {
   readonly ordersApiClient: OrdersApiClient;
   readonly authMode: 'local-bypass' | 'cognito';
+  readonly stripe: PromiseLike<Stripe | null> | Stripe | null;
   readonly createId?: () => string;
 }
 
-function journey(orderCreated: boolean, paymentPrepared: boolean): readonly JourneyStep[] {
+function journey(
+  orderCreated: boolean,
+  paymentPrepared: boolean,
+  paymentConfirmed: boolean,
+): readonly JourneyStep[] {
   return [
     {
       title: 'Create order',
@@ -35,7 +42,7 @@ function journey(orderCreated: boolean, paymentPrepared: boolean): readonly Jour
     {
       title: 'Confirm payment',
       description: 'Enter a Stripe test card in the secure Payment Element.',
-      state: paymentPrepared ? 'ready' : 'waiting',
+      state: paymentConfirmed ? 'complete' : paymentPrepared ? 'ready' : 'waiting',
     },
     {
       title: 'Verify payment',
@@ -81,7 +88,7 @@ function actionLabel(state: CreateOrderSubmissionSnapshot['state']): string {
   }
 }
 
-export function App({ ordersApiClient, authMode, createId }: AppProps) {
+export function App({ ordersApiClient, authMode, stripe, createId }: AppProps) {
   const submission = useRef<CreateOrderSubmission | undefined>(undefined);
   submission.current ??= new CreateOrderSubmission(ordersApiClient, createId);
   const paymentPreparation = useRef<PreparePaymentIntent | undefined>(undefined);
@@ -101,10 +108,12 @@ export function App({ ordersApiClient, authMode, createId }: AppProps) {
     return currentPreparation.snapshot();
   });
   const [merchantOrderId, setMerchantOrderId] = useState('pos-order-10042');
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
 
   const orderCreated = snapshot.order !== undefined;
   const paymentPrepared = paymentSnapshot.state === 'SUCCEEDED';
-  const steps = journey(orderCreated, paymentPrepared);
+  const clientSecret = paymentPreparation.current.clientSecret();
+  const steps = journey(orderCreated, paymentPrepared, paymentConfirmed);
   const canEdit = snapshot.state === 'NOT_STARTED';
   const canSubmit = snapshot.state === 'NOT_STARTED' || snapshot.state === 'OUTCOME_UNKNOWN';
 
@@ -322,6 +331,36 @@ export function App({ ordersApiClient, authMode, createId }: AppProps) {
             <p className="success-message">Payment is ready for Stripe’s secure Payment Element.</p>
           ) : null}
         </div>
+      </section>
+
+      <section className="order-panel stripe-panel" aria-labelledby="confirm-payment-title">
+        <div>
+          <p className="eyebrow">Step three</p>
+          <h2 id="confirm-payment-title">Confirm with Stripe</h2>
+          <p className="panel-copy">
+            Card details stay inside Stripe’s hosted fields and never pass through our API.
+          </p>
+        </div>
+
+        {clientSecret === undefined ? (
+          <div className="payment-action">
+            <button type="button" disabled>
+              Prepare payment first
+            </button>
+            <p>The secure payment form appears only after PaymentIntent preparation succeeds.</p>
+          </div>
+        ) : (
+          <div className="stripe-form-column">
+            <StripePaymentForm
+              clientSecret={clientSecret}
+              amountLabel={paymentSnapshot.amountLabel ?? 'the prepared amount'}
+              stripe={stripe}
+              onConfirmed={() => {
+                setPaymentConfirmed(true);
+              }}
+            />
+          </div>
+        )}
       </section>
 
       <section className="journey" aria-labelledby="journey-title">
