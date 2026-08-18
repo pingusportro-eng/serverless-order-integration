@@ -10,8 +10,10 @@ import { parseEnv } from 'node:util';
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const localEnvironmentPath = join(projectRoot, '.env.development.local');
 const uiEnvironmentPath = join(projectRoot, 'ui', '.env.local');
+const samFixturePath = join(projectRoot, 'sam-local-fixture.json');
 const apiBaseUrl = 'http://127.0.0.1:3000';
 const uiBaseUrl = 'http://127.0.0.1:3002';
+const vendorBaseUrl = 'http://127.0.0.1:4000';
 
 export const STRIPE_EVENT_ALLOWLIST = [
   'payment_intent.created',
@@ -72,6 +74,23 @@ function stripePublishableKey(environment) {
   if (value === undefined || !value.startsWith('pk_test_')) {
     fail('ui/.env.local must contain a Stripe Sandbox VITE_STRIPE_PUBLISHABLE_KEY');
   }
+}
+
+function vendorAuthToken(environment) {
+  const value = environment.VENDOR_AUTH_TOKEN?.trim();
+  if (value === undefined || value.length < 32 || value.includes('replace-with')) {
+    fail('.env.development.local must contain a non-placeholder VENDOR_AUTH_TOKEN');
+  }
+  return value;
+}
+
+async function vendorWebhookSigningSecret() {
+  const fixture = JSON.parse(await readFile(samFixturePath, 'utf8'));
+  const value = fixture?.VendorWebhookFunction?.WEBHOOK_SIGNING_SECRET;
+  if (typeof value !== 'string' || value.length < 32) {
+    fail('sam-local-fixture.json must contain the local vendor webhook signing secret');
+  }
+  return value;
 }
 
 function startProcess(label, command, arguments_, options = {}) {
@@ -155,14 +174,19 @@ async function portIsAvailable(port) {
 }
 
 async function requireAvailablePorts() {
-  for (const port of [3000, 3002]) {
+  for (const port of [3000, 3002, 4000]) {
     if (!(await portIsAvailable(port))) {
       fail(`port ${port} is already in use; stop the earlier local API or UI first`);
     }
   }
 }
 
-async function waitForHttp(url, managedProcesses, timeoutMs = 120_000) {
+async function waitForHttp(
+  url,
+  managedProcesses,
+  timeoutMs = 120_000,
+  ready = (response) => response.ok,
+) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     for (const managed of managedProcesses) {
@@ -172,7 +196,7 @@ async function waitForHttp(url, managedProcesses, timeoutMs = 120_000) {
     }
     try {
       const response = await globalThis.fetch(url);
-      if (response.ok) {
+      if (ready(response)) {
         return;
       }
     } catch {
@@ -216,6 +240,8 @@ async function runLocalLab() {
   ]);
   const apiKey = stripeApiKey(localEnvironment);
   stripePublishableKey(uiEnvironment);
+  const deliveryVendorToken = vendorAuthToken(localEnvironment);
+  const deliveryWebhookSecret = await vendorWebhookSigningSecret();
 
   const stripeEnvironment = { ...process.env, STRIPE_API_KEY: apiKey };
   const signingSecret = await commandOutput(
@@ -228,6 +254,7 @@ async function runLocalLab() {
   }
 
   await runCommand('npm', ['run', 'dynamodb:bootstrap']);
+  await runCommand('npm', ['run', 'build']);
   await runCommand('npm', ['run', 'sam:build']);
 
   const managedProcesses = [];
@@ -237,7 +264,7 @@ async function runLocalLab() {
       return;
     }
     stopping = true;
-    process.stdout.write('\nStopping the local payment lab...\n');
+    process.stdout.write('\nStopping the local payment and delivery lab...\n');
     for (const managed of managedProcesses.toReversed()) {
       stopProcess(managed);
     }
@@ -274,6 +301,18 @@ async function runLocalLab() {
     const ui = startProcess('ui', 'npm', ['run', 'dev', '--workspace', 'ui']);
     managedProcesses.push(ui);
 
+    const vendor = startProcess('vendor', 'node', ['scripts/mock-vendor/start-local.mjs'], {
+      env: {
+        ...process.env,
+        MOCK_VENDOR_PORT: '4000',
+        MOCK_VENDOR_SCENARIO: 'success',
+        MOCK_VENDOR_TOKEN: deliveryVendorToken,
+        MOCK_VENDOR_WEBHOOK_URL: `${apiBaseUrl}/webhooks/vendor`,
+        MOCK_VENDOR_WEBHOOK_SECRET: deliveryWebhookSecret,
+      },
+    });
+    managedProcesses.push(vendor);
+
     await Promise.all([
       Promise.race([
         stripeReady,
@@ -286,12 +325,41 @@ async function runLocalLab() {
       ]),
       waitForHttp(`${apiBaseUrl}/orders?limit=1`, managedProcesses),
       waitForHttp(uiBaseUrl, managedProcesses),
+      waitForHttp(vendorBaseUrl, managedProcesses, 120_000, (response) => response.status === 404),
     ]);
 
-    process.stdout.write('\nLOCAL PAYMENT LAB READY\n\n');
+    let relayReadyResolve;
+    const relayReady = new Promise((resolve) => {
+      relayReadyResolve = resolve;
+    });
+    const relay = startProcess('relay', 'node', ['scripts/local/delivery-relay.mjs'], {
+      env: {
+        ...process.env,
+        TABLE_NAME: 'serverless-order-integration-local',
+        DYNAMODB_ENDPOINT: 'http://127.0.0.1:8000',
+        VENDOR_BASE_URL: vendorBaseUrl,
+        VENDOR_AUTH_TOKEN: deliveryVendorToken,
+        VENDOR_TIMEOUT_MS: '3000',
+      },
+      onLine: (line) => {
+        if (line.startsWith('Local delivery relay ready;')) {
+          relayReadyResolve();
+        }
+      },
+    });
+    managedProcesses.push(relay);
+    await Promise.race([
+      relayReady,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Local delivery relay did not become ready.')), 30_000),
+      ),
+    ]);
+
+    process.stdout.write('\nLOCAL PAYMENT AND DELIVERY LAB READY\n\n');
     process.stdout.write(`UI:             ${uiBaseUrl}\n`);
     process.stdout.write(`API:            ${apiBaseUrl}\n`);
     process.stdout.write(`Stripe webhook: ${apiBaseUrl}/webhooks/stripe\n`);
+    process.stdout.write(`Mock vendor:    ${vendorBaseUrl}\n`);
     process.stdout.write('Stripe mode:    Sandbox\n\n');
     process.stdout.write('Press Ctrl+C once to stop every process owned by this local lab.\n');
 
@@ -320,7 +388,9 @@ async function runLocalLab() {
     await Promise.all(managedProcesses.map((managed) => waitForExit(managed)));
     process.removeListener('SIGINT', beginStop);
     process.removeListener('SIGTERM', beginStop);
-    process.stdout.write('Local payment lab stopped. DynamoDB Local data was preserved.\n');
+    process.stdout.write(
+      'Local payment and delivery lab stopped. DynamoDB Local data was preserved.\n',
+    );
   }
 }
 

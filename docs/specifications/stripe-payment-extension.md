@@ -462,7 +462,7 @@ npm run local:lab
 Before its first run, the two ignored mode-`0600` environment files contain:
 
 ```text
-.env.development.local  -> STRIPE_SECRET_KEY=sk_test_...
+.env.development.local  -> STRIPE_SECRET_KEY=sk_test_..., VENDOR_AUTH_TOKEN=...
 ui/.env.local           -> VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
 ```
 
@@ -477,15 +477,22 @@ The command starts and supervises:
 - DynamoDB Local on `127.0.0.1:8000`;
 - the local API on `127.0.0.1:3000`;
 - the React UI on `127.0.0.1:3002`;
-- Stripe CLI forwarding Sandbox events to the local webhook.
+- Stripe CLI forwarding Sandbox events to the local webhook;
+- the authenticated mock delivery provider on `127.0.0.1:4000`; and
+- a local publisher/delivery relay.
 
 It provides combined labelled logs and watch-mode feedback. `Ctrl+C` stops its
-owned API, UI, and Stripe forwarding processes. DynamoDB Local data is
-preserved for inspection. It does not deploy or contact AWS. The local
-payment exercise is not presented as proof of Cognito, IAM, API Gateway,
-managed Lambda event-source mappings, SNS, SQS, DLQs, or CloudFormation
-behavior. Extending the same supervisor with the local publisher/delivery relay
-and mock vendor remains a separate reviewable slice.
+owned API, UI, Stripe forwarding, mock vendor, and relay processes. DynamoDB
+Local data is preserved for inspection. It does not deploy or contact AWS.
+
+DynamoDB Local does not reproduce the managed DynamoDB Streams, SNS, or SQS
+services used by the cloud architecture. The explicitly labelled local relay
+therefore polls new order versions, constructs the same `NEW_IMAGE` records
+consumed by the real stream mapper, applies the reviewed SNS subscription
+filter, and invokes the real delivery-worker application path. Its in-memory
+queue models bounded receive retries only for local feedback; it is not durable
+and is not evidence of AWS ordering, visibility-timeout, retry, or DLQ
+semantics. The AWS cloud drills remain the proof for those properties.
 
 ### Reviewed cloud lab
 
@@ -534,7 +541,7 @@ normal pull-request checks.
 
 ### Opt-in local Stripe exercise
 
-- [ ] Success proceeds from `AWAITING_PAYMENT` through provider delivery.
+- [x] Success proceeds from `AWAITING_PAYMENT` through provider delivery.
 - [ ] A declined card keeps delivery blocked and then succeeds using the same
       PaymentIntent.
 - [ ] A 3D Secure test completes through the Payment Element.

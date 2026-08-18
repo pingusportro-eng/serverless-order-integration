@@ -5,6 +5,7 @@ import {
   redactStripeOutput,
   stripeListenArguments,
 } from '../../scripts/local/development-lab.mjs';
+import { readFile } from 'node:fs/promises';
 
 describe('local payment lab', () => {
   it('forwards only the reviewed Stripe PaymentIntent event allowlist', () => {
@@ -28,5 +29,14 @@ describe('local payment lab', () => {
     expect(output).toBe(
       'key=[redacted Stripe API key] secret=[redacted Stripe signing secret] client=[redacted client secret]',
     );
+  });
+
+  it('starts the local vendor and relay without exposing AWS services', async () => {
+    const source = await readFile('scripts/local/development-lab.mjs', 'utf8');
+
+    expect(source).toContain("['scripts/mock-vendor/start-local.mjs']");
+    expect(source).toContain("['scripts/local/delivery-relay.mjs']");
+    expect(source).toContain("MOCK_VENDOR_SCENARIO: 'success'");
+    expect(source).not.toContain('cloudflared');
   });
 });
