@@ -14,7 +14,18 @@ function fail(message) {
   throw new Error(`SAM local: ${message}`);
 }
 
-export function buildSamLocalEnvironment(fixture, localEnvironment) {
+function optionalFunctionEnvironment(fixture, functionName) {
+  const environment = fixture[functionName];
+  if (environment === undefined) {
+    return undefined;
+  }
+  if (typeof environment !== 'object' || environment === null || Array.isArray(environment)) {
+    fail(`sam-local-fixture.json must define ${functionName} as an object`);
+  }
+  return environment;
+}
+
+export function buildSamLocalEnvironment(fixture, localEnvironment, { stripeWebhookSecret } = {}) {
   const stripeSecretKey = localEnvironment.STRIPE_SECRET_KEY?.trim();
   if (stripeSecretKey === undefined || stripeSecretKey.length === 0) {
     fail('STRIPE_SECRET_KEY is missing from .env.development.local');
@@ -41,6 +52,15 @@ export function buildSamLocalEnvironment(fixture, localEnvironment) {
     fail('sam-local-fixture.json must define OrdersApiFunction');
   }
 
+  if (
+    stripeWebhookSecret !== undefined &&
+    (!stripeWebhookSecret.startsWith('whsec_') || stripeWebhookSecret.length === 'whsec_'.length)
+  ) {
+    fail('the ephemeral Stripe webhook secret must begin with whsec_');
+  }
+
+  const stripeWebhookEnvironment = optionalFunctionEnvironment(fixture, 'StripeWebhookFunction');
+
   return {
     ...fixture,
     OrdersApiFunction: {
@@ -48,6 +68,18 @@ export function buildSamLocalEnvironment(fixture, localEnvironment) {
       STRIPE_SECRET_KEY: stripeSecretKey,
       STRIPE_TIMEOUT_MS: stripeTimeoutMs,
     },
+    ...(stripeWebhookEnvironment === undefined
+      ? {}
+      : {
+          StripeWebhookFunction: {
+            ...stripeWebhookEnvironment,
+            STRIPE_SECRET_KEY: stripeSecretKey,
+            STRIPE_TIMEOUT_MS: stripeTimeoutMs,
+            ...(stripeWebhookSecret === undefined
+              ? {}
+              : { STRIPE_WEBHOOK_SECRET: stripeWebhookSecret }),
+          },
+        }),
   };
 }
 
@@ -55,6 +87,7 @@ export async function createSamLocalEnvironmentFile({
   environmentPath = localEnvironmentPath,
   sourceFixturePath = fixturePath,
   outputPath = runtimeEnvironmentPath,
+  stripeWebhookSecret,
 } = {}) {
   let environmentFileStat;
   try {
@@ -72,7 +105,9 @@ export async function createSamLocalEnvironmentFile({
   ]);
   const localEnvironment = parseEnv(environmentSource);
   const fixture = JSON.parse(fixtureSource);
-  const runtimeEnvironment = buildSamLocalEnvironment(fixture, localEnvironment);
+  const runtimeEnvironment = buildSamLocalEnvironment(fixture, localEnvironment, {
+    ...(stripeWebhookSecret === undefined ? {} : { stripeWebhookSecret }),
+  });
 
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, `${JSON.stringify(runtimeEnvironment, null, 2)}\n`, { mode: 0o600 });
@@ -80,11 +115,24 @@ export async function createSamLocalEnvironmentFile({
 }
 
 async function runSamLocal() {
-  const environmentFile = await createSamLocalEnvironmentFile();
+  const stripeWebhookSecret = process.env['STRIPE_WEBHOOK_SECRET']?.trim();
+  const environmentFile = await createSamLocalEnvironmentFile({
+    ...(stripeWebhookSecret === undefined || stripeWebhookSecret.length === 0
+      ? {}
+      : { stripeWebhookSecret }),
+  });
   process.stdout.write('Stripe Sandbox payment preparation enabled for SAM local.\n');
+  process.stdout.write(
+    stripeWebhookSecret === undefined || stripeWebhookSecret.length === 0
+      ? 'Stripe webhook forwarding is not enabled for this SAM local process.\n'
+      : 'Stripe Sandbox webhook verification enabled with an ephemeral CLI secret.\n',
+  );
   process.stdout.write(
     'The Stripe secret key is loaded from the ignored local environment and is not logged.\n',
   );
+
+  const childEnvironment = { ...process.env, SAM_CLI_TELEMETRY: '0' };
+  delete childEnvironment['STRIPE_WEBHOOK_SECRET'];
 
   const child = spawn(
     'sam',
@@ -98,7 +146,7 @@ async function runSamLocal() {
     ],
     {
       cwd: projectRoot,
-      env: { ...process.env, SAM_CLI_TELEMETRY: '0' },
+      env: childEnvironment,
       stdio: 'inherit',
     },
   );

@@ -24,6 +24,10 @@ describe('SAM local Stripe environment', () => {
     const fixture = {
       OrdersApiFunction: { DYNAMODB_ENDPOINT: 'http://dynamodb-local:8000' },
       VendorWebhookFunction: { WEBHOOK_SIGNING_SECRET: 'known-local-fixture' },
+      StripeWebhookFunction: {
+        DYNAMODB_ENDPOINT: 'http://dynamodb-local:8000',
+        STRIPE_WEBHOOK_TOLERANCE_SECONDS: '300',
+      },
     };
 
     const result = buildSamLocalEnvironment(fixture, {
@@ -39,9 +43,38 @@ describe('SAM local Stripe environment', () => {
         STRIPE_TIMEOUT_MS: '4200',
       },
       VendorWebhookFunction: { WEBHOOK_SIGNING_SECRET: 'known-local-fixture' },
+      StripeWebhookFunction: {
+        DYNAMODB_ENDPOINT: 'http://dynamodb-local:8000',
+        STRIPE_WEBHOOK_TOLERANCE_SECONDS: '300',
+        STRIPE_SECRET_KEY: 'sk_test_synthetic_local_key',
+        STRIPE_TIMEOUT_MS: '4200',
+      },
     });
     expect(JSON.stringify(result)).not.toContain('unrelated-secret');
-    expect(fixture.OrdersApiFunction).not.toHaveProperty('STRIPE_SECRET_KEY');
+    expect(fixture['OrdersApiFunction']).not.toHaveProperty('STRIPE_SECRET_KEY');
+  });
+
+  it('injects the ephemeral Stripe CLI webhook secret only into its webhook function', () => {
+    const result = buildSamLocalEnvironment(
+      {
+        OrdersApiFunction: {},
+        StripeWebhookFunction: { DYNAMODB_ENDPOINT: 'local' },
+      },
+      { STRIPE_SECRET_KEY: 'sk_test_synthetic_local_key' },
+      { stripeWebhookSecret: 'whsec_synthetic_cli_secret' },
+    );
+
+    expect(result).toMatchObject({
+      OrdersApiFunction: {
+        STRIPE_SECRET_KEY: 'sk_test_synthetic_local_key',
+      },
+      StripeWebhookFunction: {
+        DYNAMODB_ENDPOINT: 'local',
+        STRIPE_SECRET_KEY: 'sk_test_synthetic_local_key',
+        STRIPE_WEBHOOK_SECRET: 'whsec_synthetic_cli_secret',
+      },
+    });
+    expect(result['OrdersApiFunction']).not.toHaveProperty('STRIPE_WEBHOOK_SECRET');
   });
 
   it.each([
@@ -59,6 +92,16 @@ describe('SAM local Stripe environment', () => {
     expect(() => buildSamLocalEnvironment({ OrdersApiFunction: {} }, environment)).toThrow(
       expectedMessage,
     );
+  });
+
+  it('rejects a malformed ephemeral Stripe CLI webhook secret', () => {
+    expect(() =>
+      buildSamLocalEnvironment(
+        { OrdersApiFunction: {}, StripeWebhookFunction: {} },
+        { STRIPE_SECRET_KEY: 'sk_test_synthetic_local_key' },
+        { stripeWebhookSecret: 'not-a-webhook-secret' },
+      ),
+    ).toThrow('must begin with whsec_');
   });
 
   it('writes a mode-0600 runtime file without copying unrelated local secrets', async () => {

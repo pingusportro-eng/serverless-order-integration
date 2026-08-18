@@ -130,6 +130,36 @@ Resources:
         Sourcemap: true
         Target: es2022
 
+  StripeWebhookFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: stripe-webhook.handler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref OrdersTableName
+          DYNAMODB_ENDPOINT: !Ref DynamoDbEndpoint
+          STRIPE_SECRET_KEY: ''
+          STRIPE_TIMEOUT_MS: '5000'
+          STRIPE_WEBHOOK_SECRET: ''
+          STRIPE_WEBHOOK_TOLERANCE_SECONDS: '300'
+      Events:
+        StripeWebhook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref LocalHttpApi
+            Method: POST
+            Path: /webhooks/stripe
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/lambda/stripe-webhook.ts
+        Format: cjs
+        Minify: false
+        Sourcemap: true
+        Target: es2022
+
 Outputs:
   LocalApiUrl:
     Description: URL used by sam local start-api; no API is deployed by this template step.

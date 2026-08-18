@@ -459,20 +459,33 @@ store, log, or programmatically fill those fields.
 npm run local:lab
 ```
 
+Before its first run, the two ignored mode-`0600` environment files contain:
+
+```text
+.env.development.local  -> STRIPE_SECRET_KEY=sk_test_...
+ui/.env.local           -> VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
+```
+
+The Stripe CLI must be installed. The supervisor supplies the Sandbox API key
+through the Stripe process environment, never through command arguments. It
+obtains the CLI signing secret, injects it only into a temporary mode-`0600`
+SAM runtime file, redacts Stripe credentials from combined output, and deletes
+the runtime file when SAM stops.
+
 The command starts and supervises:
 
 - DynamoDB Local on `127.0.0.1:8000`;
 - the local API on `127.0.0.1:3000`;
 - the React UI on `127.0.0.1:3002`;
-- the mock delivery vendor on `127.0.0.1:4000`;
-- Stripe CLI forwarding Sandbox events to the local webhook; and
-- a clearly labelled local relay for the publisher and delivery application
-  logic.
+- Stripe CLI forwarding Sandbox events to the local webhook.
 
 It provides combined labelled logs and watch-mode feedback. `Ctrl+C` stops its
-owned processes and containers. It does not deploy or contact AWS. The local
-relay is not presented as proof of Cognito, IAM, API Gateway, managed Lambda
-event-source mappings, SNS, SQS, DLQs, or CloudFormation behavior.
+owned API, UI, and Stripe forwarding processes. DynamoDB Local data is
+preserved for inspection. It does not deploy or contact AWS. The local
+payment exercise is not presented as proof of Cognito, IAM, API Gateway,
+managed Lambda event-source mappings, SNS, SQS, DLQs, or CloudFormation
+behavior. Extending the same supervisor with the local publisher/delivery relay
+and mock vendor remains a separate reviewable slice.
 
 ### Reviewed cloud lab
 

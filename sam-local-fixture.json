@@ -7,5 +7,9 @@
     "DYNAMODB_ENDPOINT": "http://dynamodb-local:8000",
     "WEBHOOK_SIGNING_SECRET": "LOCAL_ONLY_WEBHOOK_SECRET_0123456789",
     "WEBHOOK_TOLERANCE_SECONDS": "300"
+  },
+  "StripeWebhookFunction": {
+    "DYNAMODB_ENDPOINT": "http://dynamodb-local:8000",
+    "STRIPE_WEBHOOK_TOLERANCE_SECONDS": "300"
   }
 }

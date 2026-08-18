@@ -29,6 +29,7 @@
     "format:check": "prettier --check .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "local:lab": "node scripts/local/development-lab.mjs",
     "mock-vendor:start": "npm run build && node --env-file=.env.development.local scripts/mock-vendor/start-local.mjs",
     "oidc:validate": "npm run deployment:validate && SAM_CLI_TELEMETRY=0 sam validate --lint --template-file infrastructure/github-oidc-bootstrap.yaml",
     "sam:build": "SAM_CLI_TELEMETRY=0 sam build",
