@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import type { CreatedOrder, PreparedPaymentIntent } from '../src/api/contracts.js';
+import type { CreatedOrder, PreparedPaymentIntent, TrackedOrder } from '../src/api/contracts.js';
 import type { OrdersApiClient } from '../src/api/orders-api-client.js';
 import { App } from '../src/App.js';
 
@@ -45,11 +45,19 @@ const PREPARED_PAYMENT: PreparedPaymentIntent = {
   clientSecret: 'pi_12345678_secret_do-not-render',
 };
 
+const DELIVERED_ORDER: TrackedOrder = {
+  orderId: 'ord_12345678',
+  status: 'DELIVERED',
+  version: 6,
+  payment: { status: 'SUCCEEDED' },
+};
+
 function client(
   createOrder = vi.fn<OrdersApiClient['createOrder']>(),
   preparePaymentIntent = vi.fn<OrdersApiClient['preparePaymentIntent']>(),
+  getOrder = vi.fn<OrdersApiClient['getOrder']>().mockResolvedValue(DELIVERED_ORDER),
 ): OrdersApiClient {
-  return { createOrder, preparePaymentIntent };
+  return { createOrder, preparePaymentIntent, getOrder };
 }
 
 describe('App', () => {
@@ -159,5 +167,62 @@ describe('App', () => {
     }
     expect(within(prepareStep).getByText('Complete')).toBeVisible();
     expect(within(confirmStep).getByText('Complete')).toBeVisible();
+  });
+
+  it('tracks the authoritative stored order after Stripe confirmation', async () => {
+    const createOrder = vi.fn<OrdersApiClient['createOrder']>().mockResolvedValue(CREATED_ORDER);
+    const preparePaymentIntent = vi
+      .fn<OrdersApiClient['preparePaymentIntent']>()
+      .mockResolvedValue(PREPARED_PAYMENT);
+    const getOrder = vi
+      .fn<OrdersApiClient['getOrder']>()
+      .mockResolvedValueOnce({
+        orderId: 'ord_12345678',
+        status: 'PENDING_SUBMISSION',
+        version: 3,
+        payment: { status: 'SUCCEEDED' },
+      })
+      .mockResolvedValueOnce(DELIVERED_ORDER);
+    render(
+      <App
+        ordersApiClient={client(createOrder, preparePaymentIntent, getOrder)}
+        authMode="local-bypass"
+        stripe={null}
+        createId={() => 'operation-123'}
+        trackingOptions={{ wait: async () => Promise.resolve(), maxAttempts: 3 }}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create order' }));
+    await screen.findByRole('button', { name: 'Prepare payment' });
+    fireEvent.click(screen.getByRole('button', { name: 'Prepare payment' }));
+    await screen.findByRole('button', { name: 'Confirm test payment for 12.99 RON' });
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm test payment for 12.99 RON' }));
+
+    await screen.findByRole('button', { name: 'Delivery completed' });
+    const trackingPanel = screen
+      .getByRole('heading', { name: 'Observe the stored journey' })
+      .closest('section');
+    if (trackingPanel === null) {
+      throw new Error('The stored journey panel is missing.');
+    }
+    expect(within(trackingPanel).getAllByText('DELIVERED', { selector: 'dd' })).toHaveLength(2);
+    expect(within(trackingPanel).getByText('6', { selector: 'dd' })).toBeVisible();
+    expect(getOrder).toHaveBeenCalledTimes(2);
+    const firstTrackingCall = getOrder.mock.calls[0]?.[0];
+    expect(firstTrackingCall).toMatchObject({
+      orderId: 'ord_12345678',
+      correlationId: 'ui-track-order:ord_12345678:operation-123',
+    });
+    expect(firstTrackingCall?.signal).toBeInstanceOf(AbortSignal);
+
+    const steps = screen.getAllByRole('listitem');
+    const verifyStep = steps[3];
+    const deliveryStep = steps[4];
+    if (verifyStep === undefined || deliveryStep === undefined) {
+      throw new Error('The stored journey steps are missing.');
+    }
+    expect(within(verifyStep).getByText('Complete')).toBeVisible();
+    expect(within(deliveryStep).getByText('Complete')).toBeVisible();
   });
 });

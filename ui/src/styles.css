@@ -353,6 +353,11 @@ h1 {
   background: #edf1ef;
 }
 
+.step-state--failed {
+  color: #8a2929;
+  background: #fbe7e7;
+}
+
 @media (max-width: 620px) {
   .app-shell {
     padding: 3rem 0;

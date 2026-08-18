@@ -264,4 +264,88 @@ describe('orders API browser client', () => {
       client.preparePaymentIntent({ orderId: 'ord_12345678', correlationId: 'corr-payment-123' }),
     ).rejects.toBeInstanceOf(PaymentPreparationOutcomeUnknownError);
   });
+
+  it('reads and projects the authoritative stored order for journey tracking', async () => {
+    const storedOrder = {
+      ...CREATED_ORDER,
+      status: 'PICKED_UP',
+      version: 5,
+      payment: {
+        status: 'SUCCEEDED',
+        amount: { amountMinor: 1299, currency: 'RON' },
+        stripePaymentIntentId: 'pi_12345678',
+      },
+    };
+    const browserFetch = vi
+      .fn<(input: string, init: RequestInit) => Promise<Response>>()
+      .mockResolvedValue(new Response(JSON.stringify(storedOrder), { status: 200 }));
+    const client = createOrdersApiClient({
+      baseUrl: 'http://127.0.0.1:3000',
+      authorization: { mode: 'local-bypass' },
+      fetch: browserFetch,
+    });
+    const signal = new AbortController().signal;
+
+    await expect(
+      client.getOrder({
+        orderId: 'ord_12345678',
+        correlationId: 'ui-track-order:ord_12345678:tracking-123',
+        signal,
+      }),
+    ).resolves.toEqual({
+      orderId: 'ord_12345678',
+      status: 'PICKED_UP',
+      version: 5,
+      payment: { status: 'SUCCEEDED' },
+    });
+    expect(browserFetch).toHaveBeenCalledWith('http://127.0.0.1:3000/orders/ord_12345678', {
+      method: 'GET',
+      headers: { 'X-Correlation-Id': 'ui-track-order:ord_12345678:tracking-123' },
+      signal,
+    });
+  });
+
+  it('classifies a missing tracked order as a definite rejection', async () => {
+    const client = createOrdersApiClient({
+      baseUrl: 'http://127.0.0.1:3000',
+      authorization: { mode: 'local-bypass' },
+      fetch: vi.fn(async () =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              status: 404,
+              code: 'ORDER_NOT_FOUND',
+              title: 'Order not found',
+              detail: 'The requested order does not exist.',
+            }),
+            { status: 404 },
+          ),
+        ),
+      ),
+    });
+
+    await expect(
+      client.getOrder({ orderId: 'ord_12345678', correlationId: 'corr-track-123' }),
+    ).rejects.toMatchObject({
+      name: 'OrderTrackingRejectedError',
+      status: 404,
+      problem: { code: 'ORDER_NOT_FOUND' },
+    });
+  });
+
+  it.each([
+    ['network failure', () => Promise.reject(new TypeError('network unavailable'))],
+    ['server failure', () => Promise.resolve(new Response('{}', { status: 503 }))],
+    ['invalid success body', () => Promise.resolve(new Response('{}', { status: 200 }))],
+  ])('keeps tracking %s retryable', async (_label, response) => {
+    const client = createOrdersApiClient({
+      baseUrl: 'http://127.0.0.1:3000',
+      authorization: { mode: 'local-bypass' },
+      fetch: vi.fn(response),
+    });
+
+    await expect(
+      client.getOrder({ orderId: 'ord_12345678', correlationId: 'corr-track-123' }),
+    ).rejects.toMatchObject({ name: 'OrderTrackingUnavailableError' });
+  });
 });

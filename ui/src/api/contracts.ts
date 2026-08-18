@@ -56,6 +56,32 @@ export interface PreparedPaymentIntent {
   readonly clientSecret: string;
 }
 
+export const TRACKED_ORDER_STATUSES = [
+  'AWAITING_PAYMENT',
+  'PENDING_SUBMISSION',
+  'SUBMISSION_FAILED',
+  'SUBMITTED',
+  'PICKED_UP',
+  'DELIVERED',
+  'DELIVERY_FAILED',
+  'CANCELLED',
+] as const;
+
+export type TrackedOrderStatus = (typeof TRACKED_ORDER_STATUSES)[number];
+
+export const TRACKED_PAYMENT_STATUSES = ['NOT_STARTED', ...PREPARED_PAYMENT_STATUSES] as const;
+
+export type TrackedPaymentStatus = (typeof TRACKED_PAYMENT_STATUSES)[number];
+
+export interface TrackedOrder {
+  readonly orderId: string;
+  readonly status: TrackedOrderStatus;
+  readonly version: number;
+  readonly payment?: {
+    readonly status: TrackedPaymentStatus;
+  };
+}
+
 export interface ProblemDetails {
   readonly status: number;
   readonly code: string;

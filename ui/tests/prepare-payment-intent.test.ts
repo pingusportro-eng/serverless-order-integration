@@ -18,7 +18,11 @@ const PAYMENT: PreparedPaymentIntent = {
 };
 
 function client(preparePaymentIntent: OrdersApiClient['preparePaymentIntent']): OrdersApiClient {
-  return { createOrder: vi.fn<OrdersApiClient['createOrder']>(), preparePaymentIntent };
+  return {
+    createOrder: vi.fn<OrdersApiClient['createOrder']>(),
+    preparePaymentIntent,
+    getOrder: vi.fn<OrdersApiClient['getOrder']>(),
+  };
 }
 
 describe('payment preparation controller', () => {

@@ -1,5 +1,5 @@
 import type { Stripe } from '@stripe/stripe-js';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import type { OrdersApiClient } from './api/orders-api-client.js';
 import {
@@ -7,13 +7,18 @@ import {
   type CreateOrderSubmissionSnapshot,
 } from './create-order-submission.js';
 import { defaultCreateOrderRequest } from './default-order.js';
+import {
+  OrderJourneyTracker,
+  type OrderJourneyTrackerOptions,
+  type OrderJourneyTrackingSnapshot,
+} from './order-journey-tracker.js';
 import { PreparePaymentIntent, type PaymentPreparationSnapshot } from './prepare-payment-intent.js';
 import { StripePaymentForm } from './stripe-payment-form.js';
 
 interface JourneyStep {
   readonly title: string;
   readonly description: string;
-  readonly state: 'complete' | 'ready' | 'waiting';
+  readonly state: 'complete' | 'ready' | 'waiting' | 'failed';
 }
 
 export interface AppProps {
@@ -21,13 +26,20 @@ export interface AppProps {
   readonly authMode: 'local-bypass' | 'cognito';
   readonly stripe: PromiseLike<Stripe | null> | Stripe | null;
   readonly createId?: () => string;
+  readonly trackingOptions?: Omit<OrderJourneyTrackerOptions, 'createId'>;
 }
 
 function journey(
   orderCreated: boolean,
   paymentPrepared: boolean,
   paymentConfirmed: boolean,
+  tracking: OrderJourneyTrackingSnapshot,
 ): readonly JourneyStep[] {
+  const storedPaymentVerified = tracking.order?.payment?.status === 'SUCCEEDED';
+  const trackingFailed =
+    tracking.state === 'ATTENTION_REQUIRED' ||
+    tracking.state === 'REJECTED' ||
+    tracking.state === 'TIMED_OUT';
   return [
     {
       title: 'Create order',
@@ -47,12 +59,19 @@ function journey(
     {
       title: 'Verify payment',
       description: 'Observe the signed webhook update the stored order.',
-      state: 'waiting',
+      state: storedPaymentVerified ? 'complete' : paymentConfirmed ? 'ready' : 'waiting',
     },
     {
       title: 'Track delivery',
       description: 'Follow the asynchronous provider journey to completion.',
-      state: 'waiting',
+      state:
+        tracking.state === 'DELIVERED'
+          ? 'complete'
+          : trackingFailed
+            ? 'failed'
+            : storedPaymentVerified
+              ? 'ready'
+              : 'waiting',
     },
   ];
 }
@@ -88,11 +107,16 @@ function actionLabel(state: CreateOrderSubmissionSnapshot['state']): string {
   }
 }
 
-export function App({ ordersApiClient, authMode, stripe, createId }: AppProps) {
+export function App({ ordersApiClient, authMode, stripe, createId, trackingOptions }: AppProps) {
   const submission = useRef<CreateOrderSubmission | undefined>(undefined);
   submission.current ??= new CreateOrderSubmission(ordersApiClient, createId);
   const paymentPreparation = useRef<PreparePaymentIntent | undefined>(undefined);
   paymentPreparation.current ??= new PreparePaymentIntent(ordersApiClient, createId);
+  const orderTracker = useRef<OrderJourneyTracker | undefined>(undefined);
+  orderTracker.current ??= new OrderJourneyTracker(ordersApiClient, {
+    ...trackingOptions,
+    ...(createId === undefined ? {} : { createId }),
+  });
   const [snapshot, setSnapshot] = useState<CreateOrderSubmissionSnapshot>(() => {
     const currentSubmission = submission.current;
     if (currentSubmission === undefined) {
@@ -107,13 +131,27 @@ export function App({ ordersApiClient, authMode, stripe, createId }: AppProps) {
     }
     return currentPreparation.snapshot();
   });
+  const [trackingSnapshot, setTrackingSnapshot] = useState<OrderJourneyTrackingSnapshot>(() => {
+    const currentTracker = orderTracker.current;
+    if (currentTracker === undefined) {
+      throw new Error('The order-journey tracker is missing.');
+    }
+    return currentTracker.snapshot();
+  });
   const [merchantOrderId, setMerchantOrderId] = useState('pos-order-10042');
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+
+  useEffect(
+    () => () => {
+      orderTracker.current?.stop();
+    },
+    [],
+  );
 
   const orderCreated = snapshot.order !== undefined;
   const paymentPrepared = paymentSnapshot.state === 'SUCCEEDED';
   const clientSecret = paymentPreparation.current.clientSecret();
-  const steps = journey(orderCreated, paymentPrepared, paymentConfirmed);
+  const steps = journey(orderCreated, paymentPrepared, paymentConfirmed, trackingSnapshot);
   const canEdit = snapshot.state === 'NOT_STARTED';
   const canSubmit = snapshot.state === 'NOT_STARTED' || snapshot.state === 'OUTCOME_UNKNOWN';
 
@@ -158,6 +196,19 @@ export function App({ ordersApiClient, authMode, stripe, createId }: AppProps) {
       // The controller exposes a safe message and never exposes the client secret in its snapshot.
     } finally {
       setPaymentSnapshot(currentPreparation.snapshot());
+    }
+  }
+
+  async function runOrderTracking(): Promise<void> {
+    const currentTracker = orderTracker.current;
+    const order = snapshot.order;
+    if (currentTracker === undefined || order === undefined) {
+      return;
+    }
+    try {
+      await currentTracker.start(order.orderId, setTrackingSnapshot);
+    } catch {
+      // A Stripe confirmation callback is accepted only once, so tracking is started only once.
     }
   }
 
@@ -357,10 +408,80 @@ export function App({ ordersApiClient, authMode, stripe, createId }: AppProps) {
               stripe={stripe}
               onConfirmed={() => {
                 setPaymentConfirmed(true);
+                void runOrderTracking();
               }}
             />
           </div>
         )}
+      </section>
+
+      <section className="order-panel tracking-panel" aria-labelledby="track-order-title">
+        <div>
+          <p className="eyebrow">Step four</p>
+          <h2 id="track-order-title">Observe the stored journey</h2>
+          <p className="panel-copy">
+            Bounded reads verify the signed Stripe webhook and the asynchronous delivery outcome.
+          </p>
+        </div>
+
+        <div className="payment-action">
+          <button type="button" disabled>
+            {trackingSnapshot.state === 'NOT_STARTED'
+              ? 'Confirm payment first'
+              : trackingSnapshot.state === 'POLLING'
+                ? 'Tracking stored order…'
+                : trackingSnapshot.state === 'DELIVERED'
+                  ? 'Delivery completed'
+                  : 'Tracking stopped'}
+          </button>
+          <p>
+            The browser confirmation is not authoritative; this view follows state read back from
+            our API.
+          </p>
+        </div>
+
+        <div className="operation-status" aria-live="polite">
+          <dl>
+            <div>
+              <dt>Tracking state</dt>
+              <dd>{trackingSnapshot.state}</dd>
+            </div>
+            <div>
+              <dt>Read attempts</dt>
+              <dd>{trackingSnapshot.attemptCount}</dd>
+            </div>
+            {trackingSnapshot.order === undefined ? null : (
+              <>
+                <div>
+                  <dt>Stored order status</dt>
+                  <dd>{trackingSnapshot.order.status}</dd>
+                </div>
+                <div>
+                  <dt>Stored order version</dt>
+                  <dd>{trackingSnapshot.order.version}</dd>
+                </div>
+                <div>
+                  <dt>Stored payment status</dt>
+                  <dd>{trackingSnapshot.order.payment?.status ?? 'NOT_RECORDED'}</dd>
+                </div>
+              </>
+            )}
+            {trackingSnapshot.correlationId === undefined ? null : (
+              <div>
+                <dt>Correlation ID</dt>
+                <dd>{trackingSnapshot.correlationId}</dd>
+              </div>
+            )}
+          </dl>
+          {trackingSnapshot.error === undefined ? null : (
+            <p className="error-message">{trackingSnapshot.error}</p>
+          )}
+          {trackingSnapshot.state === 'DELIVERED' ? (
+            <p className="success-message">
+              The stored order reached <strong>DELIVERED</strong>.
+            </p>
+          ) : null}
+        </div>
       </section>
 
       <section className="journey" aria-labelledby="journey-title">
@@ -389,7 +510,9 @@ export function App({ ordersApiClient, authMode, stripe, createId }: AppProps) {
                   ? 'Complete'
                   : step.state === 'ready'
                     ? 'Ready'
-                    : 'Waiting'}
+                    : step.state === 'failed'
+                      ? 'Attention'
+                      : 'Waiting'}
               </span>
             </li>
           ))}

@@ -1,10 +1,13 @@
 import {
   PREPARED_PAYMENT_STATUSES,
+  TRACKED_ORDER_STATUSES,
+  TRACKED_PAYMENT_STATUSES,
   type CreateOrderRequest,
   type CreatedOrder,
   type Money,
   type PreparedPaymentIntent,
   type ProblemDetails,
+  type TrackedOrder,
 } from './contracts.js';
 
 export type BrowserAuthorization =
@@ -22,9 +25,16 @@ export interface PreparePaymentIntentCommand {
   readonly correlationId: string;
 }
 
+export interface GetOrderCommand {
+  readonly orderId: string;
+  readonly correlationId: string;
+  readonly signal?: AbortSignal;
+}
+
 export interface OrdersApiClient {
   createOrder(command: CreateOrderCommand): Promise<CreatedOrder>;
   preparePaymentIntent(command: PreparePaymentIntentCommand): Promise<PreparedPaymentIntent>;
+  getOrder(command: GetOrderCommand): Promise<TrackedOrder>;
 }
 
 export class OrdersApiRejectedError extends Error {
@@ -65,6 +75,25 @@ export class PaymentPreparationOutcomeUnknownError extends Error {
   constructor(
     message = 'Payment preparation has an unknown outcome and can be retried for the same order.',
   ) {
+    super(message);
+  }
+}
+
+export class OrderTrackingRejectedError extends Error {
+  override readonly name = 'OrderTrackingRejectedError';
+
+  constructor(
+    readonly status: number,
+    readonly problem: ProblemDetails,
+  ) {
+    super(problem.detail);
+  }
+}
+
+export class OrderTrackingUnavailableError extends Error {
+  override readonly name = 'OrderTrackingUnavailableError';
+
+  constructor(message = 'The latest stored order state is temporarily unavailable.') {
     super(message);
   }
 }
@@ -151,6 +180,35 @@ function readPreparedPaymentIntent(value: unknown): PreparedPaymentIntent | unde
     status: status as PreparedPaymentIntent['status'],
     amount,
     clientSecret: value['clientSecret'],
+  };
+}
+
+function readTrackedOrder(value: unknown): TrackedOrder | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  const status = value['status'];
+  const payment = value['payment'];
+  if (
+    typeof value['orderId'] !== 'string' ||
+    !TRACKED_ORDER_STATUSES.some((candidate) => candidate === status) ||
+    !Number.isSafeInteger(value['version']) ||
+    (value['version'] as number) < 1 ||
+    (payment !== undefined &&
+      (!isRecord(payment) ||
+        !TRACKED_PAYMENT_STATUSES.some((candidate) => candidate === payment['status'])))
+  ) {
+    return undefined;
+  }
+  return {
+    orderId: value['orderId'],
+    status: status as TrackedOrder['status'],
+    version: value['version'] as number,
+    ...(payment === undefined
+      ? {}
+      : {
+          payment: { status: payment['status'] as NonNullable<TrackedOrder['payment']>['status'] },
+        }),
   };
 }
 
@@ -299,6 +357,42 @@ export function createOrdersApiClient(input: {
         );
       }
       return preparedPayment;
+    },
+
+    async getOrder(command) {
+      let response: Response;
+      try {
+        response = await request(`${baseUrl}/orders/${encodeURIComponent(command.orderId)}`, {
+          method: 'GET',
+          headers: {
+            'X-Correlation-Id': command.correlationId,
+            ...authorizationHeader(input.authorization),
+          },
+          ...(command.signal === undefined ? {} : { signal: command.signal }),
+        });
+      } catch (error) {
+        if (error instanceof BrowserAuthenticationRequiredError || command.signal?.aborted) {
+          throw error;
+        }
+        throw new OrderTrackingUnavailableError();
+      }
+
+      const body = parseJson(await response.text());
+      if (!response.ok) {
+        const problem = readProblem(body, response.status);
+        if (canSafelyReplaceOperation(response.status)) {
+          throw new OrderTrackingRejectedError(response.status, problem);
+        }
+        throw new OrderTrackingUnavailableError(problem.detail);
+      }
+
+      const order = readTrackedOrder(body);
+      if (order === undefined || order.orderId !== command.orderId) {
+        throw new OrderTrackingUnavailableError(
+          'The orders API returned an invalid order-tracking response.',
+        );
+      }
+      return order;
     },
   };
 }
