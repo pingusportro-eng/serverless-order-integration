@@ -320,11 +320,101 @@ of history. The operator command:
 npm run stripe:reconcile
 ```
 
-finds relevant failed deliveries and resends or reprocesses them after the
-endpoint is restored. Reprocessing still retrieves the PaymentIntent's current
-state and uses the same transactional deduplication path. An outage beyond
-automatic retry therefore reduces availability but does not permit unpaid
-fulfilment.
+discovers relevant events and reprocesses a reviewed, bounded campaign after
+the endpoint is restored. Reprocessing still retrieves the PaymentIntent's
+current state and uses the same transactional deduplication path. An outage
+beyond automatic retry therefore reduces availability but does not permit
+unpaid fulfilment.
+
+### Reconciliation command contract
+
+The first implementation is deliberately limited to this project's local
+Stripe Sandbox lab and DynamoDB Local. It must refuse live-mode events, a
+non-local DynamoDB endpoint, or an unexpected Stripe account. Production
+reconciliation would require a separately reviewed operator identity,
+authorization policy, audit trail, and deployment workflow.
+
+Stripe's `delivery_success=false` event-list filter is useful for registered
+webhook endpoints, but it is not sufficient for the local lab: a failure while
+Stripe CLI forwards an event to localhost is not a durable registered-endpoint
+delivery failure. Local discovery therefore scans an explicit bounded event
+time range, then applies the ownership and event-type rules below. The command
+does not claim that every discovered event failed delivery.
+
+The command has two separate operations:
+
+```bash
+npm run stripe:reconcile -- preview --since <RFC3339> [--until <RFC3339>] [--limit <n>]
+npm run stripe:reconcile -- execute --campaign <campaign-id>
+```
+
+`preview` is read-only. It queries Stripe, retrieves the current PaymentIntent
+for each candidate, and writes an ignored mode-`0600` campaign manifest under
+`.aws-sam/stripe-reconcile/`. The default limit is 20 events and the hard limit
+is 100. `--until` defaults to the preview start time, so a campaign cannot grow
+while it is being reviewed. Exact event IDs may be supplied instead of a time
+range when an operator already has them from logs or the Stripe Dashboard.
+
+A candidate must satisfy all of these rules:
+
+- the Stripe event is in test mode and belongs to the expected Stripe account;
+- its type is in `SUPPORTED_STRIPE_WEBHOOK_EVENTS`;
+- it identifies a PaymentIntent owned by this application through the expected
+  metadata namespace, merchant ID, and order ID; and
+- it falls inside the reviewed time range or its exact event ID was requested.
+
+The safe manifest contains only the campaign ID, target Stripe account, local
+table identity, fixed time bounds, event ID, event type, event creation time,
+PaymentIntent ID, merchant ID, order ID, and canonical event fingerprint. It
+must never contain a Stripe secret, webhook secret, client secret, raw event
+payload, payment-method data, or card data.
+
+`execute` processes only the exact manifest. Before every mutation it re-fetches
+the event, verifies the Stripe account and test mode again, and requires the
+canonical fingerprint to equal the reviewed value. A changed manifest, changed
+event identity, different environment, or limit violation stops execution
+without a business mutation.
+
+The canonical fingerprint must be identical whether the event came from a
+signed webhook or Stripe's Events API. It is computed from a deterministic
+serialization of the immutable semantic envelope: event ID, type, account,
+API version, creation time, live-mode flag, and `data`. Mutable delivery
+bookkeeping such as `pending_webhooks` is excluded. This replaces a raw-body
+hash before the command is implemented; otherwise a legitimate API retrieval
+could conflict with the same event previously received as a webhook.
+
+Execution does not forge a webhook signature and does not replay an old state
+transition blindly. Authentication to Stripe's API establishes the event's
+origin; the command preserves the original Stripe event ID, retrieves the
+PaymentIntent's current authoritative state, and calls the same
+`processStripeWebhook` application use case as the HTTP webhook. Its correlation
+ID has the form `stripe-reconcile:<campaign-id>:<event-id>`.
+
+Each event therefore converges through the existing transaction:
+
+- a missed current change is applied once;
+- an already processed event is ignored as a valid duplicate;
+- the same event ID with different semantic content is rejected;
+- a permanent ownership, amount, currency, mapping, or state mismatch records
+  `RECONCILIATION_REQUIRED`; and
+- a transient Stripe or DynamoDB failure remains unprocessed and can be resumed
+  from the same campaign.
+
+Events are processed sequentially in event creation order. Execution records a
+safe per-event outcome (`applied`, `ignored`, `reconciliation_required`, or
+`failed`) and a final campaign summary. Any reconciliation-required or failed
+event makes the command exit non-zero; successful and duplicate events are
+still committed and remain safe to revisit.
+
+The local outage exercise is complete only when it proves all of the following:
+
+1. a successful Stripe payment occurs while webhook forwarding is unavailable;
+2. the order remains `AWAITING_PAYMENT` and delivery does not start;
+3. preview discovers the owned event without mutating DynamoDB;
+4. execution applies the reviewed campaign after connectivity is restored;
+5. the order reaches delivery through the normal DynamoDB Stream handoff; and
+6. executing the same campaign again causes no additional order transition or
+   provider submission.
 
 References:
 
