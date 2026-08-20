@@ -1,11 +1,10 @@
-import { createHash } from 'node:crypto';
-
 import Stripe from 'stripe';
 
 import {
   SUPPORTED_STRIPE_WEBHOOK_EVENTS,
   type SupportedStripeWebhookEventType,
 } from '../application/process-stripe-webhook.js';
+import { stripeEventFingerprint } from '../integrations/stripe-event-fingerprint.js';
 
 export interface VerifiedStripeWebhookEvent {
   readonly eventId: string;
@@ -63,7 +62,7 @@ export function verifyStripeWebhook(input: VerifyStripeWebhookInput): VerifiedSt
   if (event.id.length === 0 || event.type.length === 0) {
     throw new InvalidStripeWebhookError('The Stripe event envelope is invalid.');
   }
-  const fingerprint = createHash('sha256').update(input.rawBody).digest('hex');
+  const fingerprint = stripeEventFingerprint(event);
   if (!supportedEventType(event.type)) {
     return {
       eventId: event.id,
