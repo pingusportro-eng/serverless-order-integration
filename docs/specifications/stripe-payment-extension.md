@@ -359,8 +359,9 @@ A candidate must satisfy all of these rules:
 
 - the Stripe event is in test mode and belongs to the expected Stripe account;
 - its type is in `SUPPORTED_STRIPE_WEBHOOK_EVENTS`;
-- it identifies a PaymentIntent owned by this application through the expected
-  metadata namespace, merchant ID, and order ID; and
+- it identifies a PaymentIntent owned by this application through
+  `application=serverless-order-integration` metadata plus the expected
+  merchant ID and order ID; and
 - it falls inside the reviewed time range or its exact event ID was requested.
 
 The safe manifest contains only the campaign ID, target Stripe account, local

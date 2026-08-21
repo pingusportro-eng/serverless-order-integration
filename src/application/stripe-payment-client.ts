@@ -1,6 +1,8 @@
 import type { MerchantId, Money, OrderId } from '../domain/order.js';
 import type { PaymentStatus } from '../domain/payment.js';
 
+export const STRIPE_APPLICATION_METADATA_NAMESPACE = 'serverless-order-integration';
+
 export interface CreateStripePaymentIntentInput {
   readonly merchantId: MerchantId;
   readonly orderId: OrderId;

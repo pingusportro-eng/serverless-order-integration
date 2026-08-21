@@ -87,7 +87,11 @@ describe('Stripe payment client adapter', () => {
         currency: 'ron',
         capture_method: 'automatic',
         automatic_payment_methods: { enabled: true },
-        metadata: { merchantId: 'mrc_stripe_adapter', orderId: 'ord_stripe_adapter' },
+        metadata: {
+          application: 'serverless-order-integration',
+          merchantId: 'mrc_stripe_adapter',
+          orderId: 'ord_stripe_adapter',
+        },
       },
       { idempotencyKey: 'stripe-payment-intent:mrc_stripe_adapter:ord_stripe_adapter' },
     );

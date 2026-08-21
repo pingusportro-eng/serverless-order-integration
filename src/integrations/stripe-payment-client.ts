@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 
 import {
   assertStripePaymentIntentInput,
+  STRIPE_APPLICATION_METADATA_NAMESPACE,
   StripeClientError,
   type CreateStripePaymentIntentInput,
   type StripeClientErrorOptions,
@@ -284,7 +285,11 @@ export function createStripePaymentClient(
             currency: input.amount.currency.toLowerCase(),
             capture_method: 'automatic',
             automatic_payment_methods: { enabled: true },
-            metadata: { merchantId: input.merchantId, orderId: input.orderId },
+            metadata: {
+              application: STRIPE_APPLICATION_METADATA_NAMESPACE,
+              merchantId: input.merchantId,
+              orderId: input.orderId,
+            },
           },
           { idempotencyKey: input.stripeCreationKey },
         );

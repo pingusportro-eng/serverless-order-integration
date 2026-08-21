@@ -39,6 +39,7 @@ export type {
 } from './http/prepare-stripe-payment-intent-handler.js';
 export {
   assertStripePaymentIntentInput,
+  STRIPE_APPLICATION_METADATA_NAMESPACE,
   STRIPE_CLIENT_FAILURE_CODES,
   StripeClientError,
 } from './application/stripe-payment-client.js';
@@ -59,6 +60,29 @@ export type {
   ProcessStripeWebhookResult,
   SupportedStripeWebhookEventType,
 } from './application/process-stripe-webhook.js';
+export {
+  DEFAULT_STRIPE_RECONCILIATION_LIMIT,
+  MAX_STRIPE_RECONCILIATION_LIMIT,
+  previewStripeReconciliation,
+  STRIPE_RECONCILIATION_EXCLUSION_REASONS,
+  STRIPE_RECONCILIATION_PREVIEW_ERROR_CODES,
+  StripeReconciliationPreviewError,
+} from './application/preview-stripe-reconciliation.js';
+export type {
+  PreviewStripeReconciliationCommand,
+  PreviewStripeReconciliationDependencies,
+  StripeReconciliationExcludedEvent,
+  StripeReconciliationExclusionReason,
+  StripeReconciliationPreview,
+  StripeReconciliationPreviewEntry,
+  StripeReconciliationPreviewErrorCode,
+} from './application/preview-stripe-reconciliation.js';
+export type {
+  StripeReconciliationEvent,
+  StripeReconciliationEventPage,
+  StripeReconciliationEventQuery,
+  StripeReconciliationEventSource,
+} from './application/stripe-reconciliation-event-source.js';
 export {
   STRIPE_WEBHOOK_CONSUMER,
   STRIPE_WEBHOOK_OUTCOMES,
