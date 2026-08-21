@@ -83,6 +83,11 @@ export type {
   StripeReconciliationEventQuery,
   StripeReconciliationEventSource,
 } from './application/stripe-reconciliation-event-source.js';
+export { createStripeReconciliationEventSource } from './integrations/stripe-reconciliation-event-source.js';
+export type {
+  CreateStripeReconciliationEventSourceOptions,
+  StripeReconciliationSdkClient,
+} from './integrations/stripe-reconciliation-event-source.js';
 export {
   STRIPE_WEBHOOK_CONSUMER,
   STRIPE_WEBHOOK_OUTCOMES,
