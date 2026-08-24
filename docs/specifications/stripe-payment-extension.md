@@ -623,7 +623,7 @@ still requires a separate bounded cost review and user approval.
 ### Always-local automated tests
 
 - [x] Domain tests cover every payment and order transition.
-- [ ] The Stripe port uses deterministic fakes for success, timeout, decline,
+- [x] The Stripe port uses deterministic fakes for success, timeout, decline,
       action-required, processing, cancellation, and conflicting data.
 - [x] Repository tests prove atomic order and PaymentIntent-mapping writes plus
       atomic webhook event-marker writes.
