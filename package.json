@@ -37,6 +37,7 @@
     "sam:cloud:validate": "SAM_CLI_TELEMETRY=0 sam validate --lint --template-file template.cloud.yaml",
     "sam:local": "npm run dynamodb:bootstrap && npm run sam:build && node scripts/sam/start-local.mjs",
     "sam:validate": "SAM_CLI_TELEMETRY=0 sam validate --lint",
+    "stripe:reconcile": "npm run build --silent && node scripts/stripe/reconcile.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:contracts": "vitest run tests/contracts",

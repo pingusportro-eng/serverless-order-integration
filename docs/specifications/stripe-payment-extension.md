@@ -355,6 +355,15 @@ is 100. `--until` defaults to the preview start time, so a campaign cannot grow
 while it is being reviewed. Exact event IDs may be supplied instead of a time
 range when an operator already has them from logs or the Stripe Dashboard.
 
+```bash
+npm run stripe:reconcile -- preview --event-id <evt_...> [--event-id <evt_...>] [--limit <n>]
+```
+
+The ignored mode-`0600` `.env.development.local` file must also bind the command
+to the reviewed Sandbox account with `STRIPE_ACCOUNT_ID=acct_...`. The preview
+manifest identifies only `serverless-order-integration-local` at DynamoDB Local;
+the preview operation does not open that database or inspect any item.
+
 A candidate must satisfy all of these rules:
 
 - the Stripe event is in test mode and belongs to the expected Stripe account;
