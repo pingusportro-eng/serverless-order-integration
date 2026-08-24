@@ -4,14 +4,143 @@ import {
   applyOrderStatusChange,
   InvalidOrderStatusDetailsError,
   InvalidOrderStatusTransitionError,
+  type OrderStatusChange,
 } from '../../src/domain/order-status-transition.js';
+import { ORDER_STATUSES, type OrderStatus } from '../../src/domain/order-status.js';
+import type { Order } from '../../src/domain/order.js';
 import { createInitialOrderPayment } from '../../src/domain/payment.js';
 import { applyPaymentStatusChange } from '../../src/domain/payment-status-transition.js';
 import { createOrderFixture } from '../fixtures/order.js';
 
 const changedAt = '2026-07-22T10:00:00.000Z';
 
+const ALLOWED_TRANSITIONS = {
+  AWAITING_PAYMENT: ['PENDING_SUBMISSION', 'CANCELLED'],
+  PENDING_SUBMISSION: ['SUBMITTED', 'SUBMISSION_FAILED', 'CANCELLED'],
+  SUBMISSION_FAILED: ['PENDING_SUBMISSION', 'CANCELLED'],
+  SUBMITTED: ['PICKED_UP', 'DELIVERED', 'DELIVERY_FAILED', 'CANCELLED'],
+  PICKED_UP: ['DELIVERED', 'DELIVERY_FAILED'],
+  DELIVERED: [],
+  DELIVERY_FAILED: [],
+  CANCELLED: [],
+} as const satisfies Readonly<Record<OrderStatus, readonly OrderStatus[]>>;
+
+function completedPayment(status: 'SUCCEEDED' | 'CANCELLED') {
+  return applyPaymentStatusChange(
+    createInitialOrderPayment(
+      { amountMinor: 2500, currency: 'RON' },
+      'stripe-payment-intent:mrc_demo:ord_demo',
+      '2026-07-22T09:00:00.000Z',
+    ),
+    { targetStatus: status, stripePaymentIntentId: 'pi_payment_123' },
+    '2026-07-22T09:30:00.000Z',
+  );
+}
+
+function orderForTransition(currentStatus: OrderStatus, targetStatus: OrderStatus): Order {
+  const base = createOrderFixture();
+  const providerAccepted =
+    currentStatus === 'SUBMITTED' ||
+    currentStatus === 'PICKED_UP' ||
+    currentStatus === 'DELIVERED' ||
+    currentStatus === 'DELIVERY_FAILED';
+
+  return createOrderFixture({
+    status: currentStatus,
+    ...(currentStatus === 'AWAITING_PAYMENT'
+      ? { payment: completedPayment(targetStatus === 'CANCELLED' ? 'CANCELLED' : 'SUCCEEDED') }
+      : {}),
+    ...(providerAccepted
+      ? {
+          provider: {
+            ...base.provider,
+            deliveryProviderOrderId: 'provider-matrix',
+            acceptedAt: '2026-07-22T09:30:00.000Z',
+          },
+        }
+      : {}),
+    ...(currentStatus === 'SUBMISSION_FAILED'
+      ? {
+          failure: {
+            stage: 'SUBMISSION' as const,
+            reasonCode: 'PROVIDER_REJECTED',
+            summary: 'The provider rejected the submission.',
+            occurredAt: '2026-07-22T09:30:00.000Z',
+          },
+        }
+      : {}),
+    ...(currentStatus === 'DELIVERY_FAILED'
+      ? {
+          failure: {
+            stage: 'DELIVERY' as const,
+            reasonCode: 'DELIVERY_FAILED',
+            summary: 'The accepted delivery failed.',
+            occurredAt: '2026-07-22T09:30:00.000Z',
+          },
+        }
+      : {}),
+  });
+}
+
+function changeForTransition(targetStatus: OrderStatus): OrderStatusChange {
+  if (targetStatus === 'SUBMITTED') {
+    return { targetStatus, deliveryProviderOrderId: 'provider-matrix' };
+  }
+  if (targetStatus === 'SUBMISSION_FAILED') {
+    return {
+      targetStatus,
+      failure: {
+        stage: 'SUBMISSION',
+        reasonCode: 'PROVIDER_REJECTED',
+        summary: 'The provider rejected the submission.',
+        occurredAt: changedAt,
+      },
+    };
+  }
+  if (targetStatus === 'DELIVERY_FAILED') {
+    return {
+      targetStatus,
+      failure: {
+        stage: 'DELIVERY',
+        reasonCode: 'DELIVERY_FAILED',
+        summary: 'The accepted delivery failed.',
+        occurredAt: changedAt,
+      },
+    };
+  }
+  return { targetStatus };
+}
+
+const ORDER_TRANSITION_CASES = ORDER_STATUSES.flatMap((currentStatus) =>
+  ORDER_STATUSES.map((targetStatus) => ({ currentStatus, targetStatus })),
+);
+
 describe('order status transition', () => {
+  it.each(ORDER_TRANSITION_CASES)(
+    'enforces the complete $currentStatus -> $targetStatus matrix',
+    ({ currentStatus, targetStatus }) => {
+      const order = orderForTransition(currentStatus, targetStatus);
+      const change = changeForTransition(targetStatus);
+
+      if (currentStatus === targetStatus) {
+        expect(applyOrderStatusChange(order, change, changedAt)).toBe(order);
+        return;
+      }
+
+      if (ALLOWED_TRANSITIONS[currentStatus].some((status) => status === targetStatus)) {
+        expect(applyOrderStatusChange(order, change, changedAt)).toMatchObject({
+          status: targetStatus,
+          version: order.version + 1,
+        });
+        return;
+      }
+
+      expect(() => applyOrderStatusChange(order, change, changedAt)).toThrow(
+        InvalidOrderStatusTransitionError,
+      );
+    },
+  );
+
   it('opens delivery only after payment is durably successful', () => {
     const payment = applyPaymentStatusChange(
       createInitialOrderPayment(

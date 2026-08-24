@@ -8,6 +8,7 @@ import {
 import {
   createInitialOrderPayment,
   isTerminalPaymentStatus,
+  PAYMENT_STATUSES,
   type OrderPayment,
   type PaymentStatus,
 } from '../../src/domain/payment.js';
@@ -23,7 +24,43 @@ function initialPayment(): OrderPayment {
   );
 }
 
+const PAYMENT_TARGET_STATUSES = PAYMENT_STATUSES.filter(
+  (status): status is Exclude<PaymentStatus, 'NOT_STARTED'> => status !== 'NOT_STARTED',
+);
+
+const PAYMENT_TRANSITION_CASES = PAYMENT_STATUSES.flatMap((currentStatus) =>
+  PAYMENT_TARGET_STATUSES.map((targetStatus) => ({ currentStatus, targetStatus })),
+);
+
+function paymentWithStatus(status: PaymentStatus): OrderPayment {
+  const payment = initialPayment();
+  return status === 'NOT_STARTED'
+    ? payment
+    : { ...payment, status, stripePaymentIntentId: 'pi_payment_123' };
+}
+
 describe('payment status transition', () => {
+  it.each(PAYMENT_TRANSITION_CASES)(
+    'enforces the complete $currentStatus -> $targetStatus matrix',
+    ({ currentStatus, targetStatus }) => {
+      const payment = paymentWithStatus(currentStatus);
+      const change = { targetStatus, stripePaymentIntentId: 'pi_payment_123' };
+
+      if (isTerminalPaymentStatus(currentStatus) && currentStatus !== targetStatus) {
+        expect(() => applyPaymentStatusChange(payment, change, changedAt)).toThrow(
+          InvalidPaymentStatusTransitionError,
+        );
+        return;
+      }
+
+      const changed = applyPaymentStatusChange(payment, change, changedAt);
+      expect(changed.status).toBe(targetStatus);
+      if (currentStatus === targetStatus) {
+        expect(changed).toBe(payment);
+      }
+    },
+  );
+
   it.each<PaymentStatus>(['SUCCEEDED', 'CANCELLED'])('recognizes %s as terminal', (status) => {
     expect(isTerminalPaymentStatus(status)).toBe(true);
   });
