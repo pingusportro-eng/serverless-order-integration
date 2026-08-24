@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  loadStripeReconciliationManifest,
   loadStripeReconciliationConfiguration,
   parseStripeReconciliationArguments,
   runStripeReconciliationCli,
@@ -60,12 +61,23 @@ describe('Stripe reconciliation preview CLI', () => {
       kind: 'preview',
       command: { kind: 'event_ids', eventIds: ['evt_one', 'evt_two'] },
     });
+    expect(
+      parseStripeReconciliationArguments([
+        'execute',
+        '--campaign',
+        '20260824T071045.974Z-00000000-0000-4000-8000-000000000001',
+      ]),
+    ).toEqual({
+      kind: 'execute',
+      campaignId: '20260824T071045.974Z-00000000-0000-4000-8000-000000000001',
+    });
   });
 
   it.each([
     [['preview'], 'requires --since'],
     [['preview', '--since', '2026-08-20T10:00:00Z', '--event-id', 'evt_one'], 'cannot be combined'],
-    [['execute', '--campaign', 'unsafe'], 'only the read-only preview'],
+    [['execute', '--campaign', 'unsafe'], 'exact generated campaign ID'],
+    [['execute'], 'requires exactly'],
     [['preview', '--since', '2026-08-20T10:00:00Z', '--limit', '1.5'], 'must be an integer'],
   ])('rejects ambiguous or mutating arguments', (arguments_, message) => {
     expect(() => parseStripeReconciliationArguments(arguments_)).toThrow(message);
@@ -173,6 +185,7 @@ describe('Stripe reconciliation preview CLI', () => {
         },
       ],
     });
+    expect(manifest['manifestDigest']).toMatch(/^sha256:[a-f0-9]{64}$/);
     expect(manifestSource).not.toContain(secret);
     expect(manifestSource).not.toContain('whsec_');
     expect(manifestSource).not.toContain('clientSecret');
@@ -183,5 +196,119 @@ describe('Stripe reconciliation preview CLI', () => {
     expect(printed).toContain('EXCLUDE evt_foreign APPLICATION_NAMESPACE_MISMATCH');
     expect(printed).toContain('more matching events');
     expect(printed).toContain('No DynamoDB item was read or changed.');
+  });
+
+  it('loads and executes only the exact unchanged mode-0600 campaign', async () => {
+    const projectRoot = await temporaryProject(
+      ['STRIPE_SECRET_KEY=sk_test_synthetic', 'STRIPE_ACCOUNT_ID=acct_preview123', ''].join('\n'),
+    );
+    const previewCampaign = vi.fn().mockResolvedValue({
+      stripeAccountId: 'acct_preview123',
+      previewedAt: '2026-08-24T07:10:00.000Z',
+      selection: { kind: 'event_ids', eventIds: ['evt_owned'] },
+      entries: [
+        {
+          eventId: 'evt_owned',
+          eventType: 'payment_intent.succeeded',
+          eventCreatedAt: '2026-08-24T07:09:00.000Z',
+          eventFingerprint: 'a'.repeat(64),
+          stripePaymentIntentId: 'pi_owned',
+          merchantId: 'mrc_demo',
+          orderId: 'ord_owned',
+        },
+      ],
+      excluded: [],
+    });
+    const campaignId = '20260824T071000Z-00000000-0000-4000-8000-000000000002';
+    const previewResult = await runStripeReconciliationCli({
+      arguments_: ['preview', '--event-id', 'evt_owned'],
+      projectRoot,
+      previewCampaign,
+      output: { write: vi.fn() },
+      now: () => new Date('2026-08-24T07:10:00.000Z'),
+      uuid: () => '00000000-0000-4000-8000-000000000002',
+    });
+    expect(previewResult?.manifest.campaignId).toBe(campaignId);
+
+    const configuration = await loadStripeReconciliationConfiguration({
+      environmentPath: join(projectRoot, '.env.development.local'),
+    });
+    await expect(
+      loadStripeReconciliationManifest({
+        campaignId,
+        directory: join(projectRoot, '.aws-sam/stripe-reconcile'),
+        configuration,
+      }),
+    ).resolves.toMatchObject({ campaignId, entries: [{ eventId: 'evt_owned' }] });
+
+    const executeCampaign = vi.fn().mockResolvedValue({
+      campaignId,
+      successful: true,
+      outcomes: [
+        {
+          eventId: 'evt_owned',
+          outcome: 'ignored',
+          orderId: 'ord_owned',
+          orderVersion: 3,
+        },
+      ],
+    });
+    let printed = '';
+    const executionResult = await runStripeReconciliationCli({
+      arguments_: ['execute', '--campaign', campaignId],
+      projectRoot,
+      executeCampaign,
+      output: { write: (value: string) => (printed += value) },
+    });
+
+    expect(executeCampaign).toHaveBeenCalledOnce();
+    expect(executionResult).toMatchObject({ execution: { successful: true } });
+    expect(printed).toContain('IGNORED evt_owned');
+    expect(printed).toContain('Summary: applied=0 ignored=1 reconciliation_required=0 failed=0');
+  });
+
+  it('rejects an edited manifest before invoking campaign execution', async () => {
+    const projectRoot = await temporaryProject(
+      ['STRIPE_SECRET_KEY=sk_test_synthetic', 'STRIPE_ACCOUNT_ID=acct_preview123', ''].join('\n'),
+    );
+    const previewCampaign = vi.fn().mockResolvedValue({
+      stripeAccountId: 'acct_preview123',
+      previewedAt: '2026-08-24T07:10:00.000Z',
+      selection: { kind: 'event_ids', eventIds: ['evt_owned'] },
+      entries: [
+        {
+          eventId: 'evt_owned',
+          eventType: 'payment_intent.succeeded',
+          eventCreatedAt: '2026-08-24T07:09:00.000Z',
+          eventFingerprint: 'a'.repeat(64),
+          stripePaymentIntentId: 'pi_owned',
+          merchantId: 'mrc_demo',
+          orderId: 'ord_owned',
+        },
+      ],
+      excluded: [],
+    });
+    const result = await runStripeReconciliationCli({
+      arguments_: ['preview', '--event-id', 'evt_owned'],
+      projectRoot,
+      previewCampaign,
+      output: { write: vi.fn() },
+      now: () => new Date('2026-08-24T07:10:00.000Z'),
+      uuid: () => '00000000-0000-4000-8000-000000000003',
+    });
+    const manifestPath = result?.manifestPath as string;
+    const source = await readFile(manifestPath, 'utf8');
+    await writeFile(manifestPath, source.replace('ord_owned', 'ord_changed'), { mode: 0o600 });
+    const executeCampaign = vi.fn();
+
+    await expect(
+      runStripeReconciliationCli({
+        arguments_: ['execute', '--campaign', result?.manifest.campaignId as string],
+        projectRoot,
+        executeCampaign,
+        output: { write: vi.fn() },
+      }),
+    ).rejects.toThrow('changed after preview');
+    expect(executeCampaign).not.toHaveBeenCalled();
   });
 });

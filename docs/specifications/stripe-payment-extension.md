@@ -377,7 +377,9 @@ The safe manifest contains only the campaign ID, target Stripe account, local
 table identity, fixed time bounds, event ID, event type, event creation time,
 PaymentIntent ID, merchant ID, order ID, and canonical event fingerprint. It
 must never contain a Stripe secret, webhook secret, client secret, raw event
-payload, payment-method data, or card data.
+payload, payment-method data, or card data. A SHA-256 digest over the canonical
+manifest detects an accidental edit between preview and execution; execution
+also requires the ignored manifest to remain a regular mode-`0600` file.
 
 `execute` processes only the exact manifest. Before every mutation it re-fetches
 the event, verifies the Stripe account and test mode again, and requires the

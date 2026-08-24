@@ -77,6 +77,18 @@ export type {
   StripeReconciliationPreviewEntry,
   StripeReconciliationPreviewErrorCode,
 } from './application/preview-stripe-reconciliation.js';
+export {
+  executeStripeReconciliation,
+  STRIPE_RECONCILIATION_EXECUTION_ERROR_CODES,
+  StripeReconciliationExecutionError,
+} from './application/execute-stripe-reconciliation.js';
+export type {
+  ExecuteStripeReconciliationCampaign,
+  ExecuteStripeReconciliationDependencies,
+  StripeReconciliationExecution,
+  StripeReconciliationExecutionErrorCode,
+  StripeReconciliationExecutionOutcome,
+} from './application/execute-stripe-reconciliation.js';
 export type {
   StripeReconciliationEvent,
   StripeReconciliationEventPage,
