@@ -644,12 +644,12 @@ normal pull-request checks.
 ### Opt-in local Stripe exercise
 
 - [x] Success proceeds from `AWAITING_PAYMENT` through provider delivery.
-- [ ] A declined card keeps delivery blocked and then succeeds using the same
+- [x] A declined card keeps delivery blocked and then succeeds using the same
       PaymentIntent.
-- [ ] A 3D Secure test completes through the Payment Element.
-- [ ] Duplicate delivery changes state once.
+- [x] A 3D Secure test completes through the Payment Element.
+- [x] Duplicate delivery changes state once.
 - [x] A temporary webhook outage is recovered with `stripe:reconcile`.
-- [ ] Logs and persisted items contain no secret or card data.
+- [x] Logs and persisted items contain no secret or card data.
 
 ### Separately approved AWS exercise
 
