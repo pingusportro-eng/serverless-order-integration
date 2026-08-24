@@ -648,7 +648,7 @@ normal pull-request checks.
       PaymentIntent.
 - [ ] A 3D Secure test completes through the Payment Element.
 - [ ] Duplicate delivery changes state once.
-- [ ] A temporary webhook outage is recovered with `stripe:reconcile`.
+- [x] A temporary webhook outage is recovered with `stripe:reconcile`.
 - [ ] Logs and persisted items contain no secret or card data.
 
 ### Separately approved AWS exercise
