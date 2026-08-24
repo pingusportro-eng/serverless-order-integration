@@ -186,6 +186,25 @@ describe('Stripe webhook Lambda adapter', () => {
     expect(problemCode(unavailable)).toBe('INTERNAL_ERROR');
   });
 
+  it('rejects an otherwise valid signature outside the replay tolerance', async () => {
+    const rawBody = stripeEvent(
+      'evt_stripe_expired_signature_123',
+      'payment_intent.created',
+      'pi_expired_signature_123',
+    );
+    const expiredSignature = Stripe.webhooks.generateTestHeaderString({
+      payload: rawBody,
+      secret: SIGNING_SECRET,
+      timestamp: TIMESTAMP - 301,
+    });
+
+    const response = await handler()(apiEvent(rawBody, expiredSignature));
+
+    expect(response.statusCode).toBe(400);
+    expect(problemCode(response)).toBe('INVALID_STRIPE_WEBHOOK');
+    expect(stripeClient.retrieveCalls).toEqual([]);
+  });
+
   it('logs a newly durable reconciliation outcome as an error exactly once', async () => {
     const missingOrder = createOrderFixture({ status: 'AWAITING_PAYMENT' });
     const paymentIntent = await stripeClient.createPaymentIntent({

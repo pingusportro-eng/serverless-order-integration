@@ -53,7 +53,7 @@ export function verifyStripeWebhook(input: VerifyStripeWebhookInput): VerifiedSt
       input.signingSecret,
       input.toleranceSeconds,
       undefined,
-      input.receivedAtSeconds,
+      input.receivedAtSeconds === undefined ? undefined : input.receivedAtSeconds * 1000,
     );
   } catch {
     throw new InvalidStripeWebhookError('The Stripe signature or payload is invalid.');

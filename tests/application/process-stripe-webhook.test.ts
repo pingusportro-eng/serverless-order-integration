@@ -219,4 +219,45 @@ describe('processStripeWebhook', () => {
       processStripeWebhook(dependencies, { ...first, eventFingerprint: 'c'.repeat(64) }),
     ).rejects.toBeInstanceOf(StripeEventIdConflictError);
   });
+
+  it('converges safely when two different events race on the same PaymentIntent', async () => {
+    const intent = await createIntent();
+    const dependencies = { repository, stripeClient, now: () => NOW };
+    stripeClient.setPaymentIntentStatus(intent.stripePaymentIntentId, 'SUCCEEDED');
+    const created = command({
+      eventId: 'evt_stripe_concurrent_created_123',
+      eventType: 'payment_intent.created',
+      stripePaymentIntentId: intent.stripePaymentIntentId,
+      eventFingerprint: 'f'.repeat(64),
+    });
+    const succeeded = command({
+      eventId: 'evt_stripe_concurrent_succeeded_123',
+      eventType: 'payment_intent.succeeded',
+      stripePaymentIntentId: intent.stripePaymentIntentId,
+      eventFingerprint: '1'.repeat(64),
+    });
+
+    const results = await Promise.all([
+      processStripeWebhook(dependencies, created),
+      processStripeWebhook(dependencies, succeeded),
+    ]);
+
+    expect(results.map(({ outcome }) => outcome).sort()).toEqual(['applied', 'ignored']);
+    await expect(repository.get(order.merchantId, order.orderId)).resolves.toMatchObject({
+      status: 'PENDING_SUBMISSION',
+      version: 2,
+      payment: {
+        status: 'SUCCEEDED',
+        stripePaymentIntentId: intent.stripePaymentIntentId,
+      },
+    });
+    await expect(processStripeWebhook(dependencies, created)).resolves.toMatchObject({
+      outcome: 'ignored',
+      order: { status: 'PENDING_SUBMISSION', version: 2 },
+    });
+    await expect(processStripeWebhook(dependencies, succeeded)).resolves.toMatchObject({
+      outcome: 'ignored',
+      order: { status: 'PENDING_SUBMISSION', version: 2 },
+    });
+  });
 });
