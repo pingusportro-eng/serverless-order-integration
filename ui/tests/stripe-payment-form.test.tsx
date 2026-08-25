@@ -82,17 +82,58 @@ describe('StripePaymentForm', () => {
   });
 
   it('shows a safe Stripe-declared failure and permits a retry', async () => {
-    const confirmPayment = vi.fn().mockResolvedValue({
-      error: { message: 'Your test card was declined.' },
-    });
+    const confirmPayment = vi
+      .fn()
+      .mockResolvedValueOnce({
+        error: { message: 'Your test card was declined.' },
+      })
+      .mockResolvedValueOnce({
+        paymentIntent: { status: 'succeeded' },
+      });
     runtime.stripe = stripeWithConfirmPayment(confirmPayment);
-    renderForm();
+    const onConfirmed = renderForm();
 
     fireEvent.click(screen.getByRole('button', { name: 'Finish loading fields' }));
     fireEvent.click(screen.getByRole('button', { name: 'Pay 37.42 RON' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Your test card was declined.');
     expect(screen.getByRole('button', { name: 'Pay 37.42 RON' })).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Pay 37.42 RON' }));
+
+    await waitFor(() => {
+      expect(onConfirmed).toHaveBeenCalledWith('SUCCEEDED');
+    });
+    expect(confirmPayment).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('button', { name: 'Payment confirmed' })).toBeDisabled();
+  });
+
+  it('disables confirmation while Stripe has not resolved the request', async () => {
+    let resolveConfirmation:
+      ((result: { readonly paymentIntent: { readonly status: string } }) => void) | undefined;
+    const pendingConfirmation = new Promise<{
+      readonly paymentIntent: { readonly status: string };
+    }>((resolve) => {
+      resolveConfirmation = resolve;
+    });
+    const confirmPayment = vi.fn().mockReturnValue(pendingConfirmation);
+    runtime.stripe = stripeWithConfirmPayment(confirmPayment);
+    const onConfirmed = renderForm();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Finish loading fields' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Pay 37.42 RON' }));
+
+    const confirmingButton = await screen.findByRole('button', {
+      name: 'Confirming with Stripe…',
+    });
+    expect(confirmingButton).toBeDisabled();
+    fireEvent.click(confirmingButton);
+    expect(confirmPayment).toHaveBeenCalledTimes(1);
+
+    resolveConfirmation?.({ paymentIntent: { status: 'succeeded' } });
+    await waitFor(() => {
+      expect(onConfirmed).toHaveBeenCalledWith('SUCCEEDED');
+    });
   });
 
   it('treats a thrown confirmation request as an ambiguous outcome', async () => {

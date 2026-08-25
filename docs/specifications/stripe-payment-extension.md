@@ -634,7 +634,7 @@ still requires a separate bounded cost review and user approval.
 - [x] Stripe creation ambiguity reuses the stable Stripe key.
 - [x] Stripe success followed by a DynamoDB failure is recovered without
       returning an unsafe client secret.
-- [ ] UI component tests cover button states, safe rendering, polling bounds,
+- [x] UI component tests cover button states, safe rendering, polling bounds,
       decline retry, and auth modes.
 - [ ] Unpaid orders never reach the delivery application handler.
 

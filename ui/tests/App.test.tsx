@@ -81,6 +81,14 @@ describe('App', () => {
     }
   });
 
+  it('identifies the Cognito boundary without showing the local bypass warning', () => {
+    render(<App ordersApiClient={client()} authMode="cognito" stripe={null} />);
+
+    expect(screen.queryByText('Local auth bypass')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Cognito is not exercised locally/)).not.toBeInTheDocument();
+    expect(screen.getByText('Cognito')).toBeVisible();
+  });
+
   it('creates an order and advances only the next journey step', async () => {
     const createOrder = vi.fn<OrdersApiClient['createOrder']>().mockResolvedValue(CREATED_ORDER);
     render(
