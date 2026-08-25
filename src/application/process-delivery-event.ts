@@ -124,6 +124,9 @@ export async function processDeliveryEvent(
   if (order.status !== 'PENDING_SUBMISSION') {
     throw new Error('Delivery event is inconsistent with the current order state.');
   }
+  if (order.payment?.status !== 'SUCCEEDED') {
+    throw new Error('Delivery event is inconsistent with the current order payment state.');
+  }
 
   let changedOrder: Order;
   let outcome: 'submitted' | 'submission_failed';

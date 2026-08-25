@@ -12,7 +12,7 @@ import {
   type DeliveryVendorClient,
 } from '../../src/integrations/delivery-vendor-client.js';
 import { createDeliveryWorkerHandler } from '../../src/lambda/delivery-worker.js';
-import { createOrderFixture } from '../fixtures/order.js';
+import { createPaidOrderFixture } from '../fixtures/order.js';
 
 const fixtureUrl = new URL('../fixtures/sqs/delivery-worker-batch.json', import.meta.url);
 const merchantId = asMerchantId('mrc_demo');
@@ -38,7 +38,7 @@ describe('SQS delivery worker', () => {
   it('processes successes and duplicates while returning transient and poison failures', async () => {
     const batch = await readBatch();
     const repository = new InMemoryOrderRepository();
-    const successfulOrder = createOrderFixture({
+    const successfulOrder = createPaidOrderFixture({
       orderId: asOrderId('ord_01JABCDEF0123456789'),
       merchantId,
       provider: {
@@ -46,7 +46,7 @@ describe('SQS delivery worker', () => {
         deliveryProviderSubmissionKey: 'submission_01JABCDEF0123456789',
       },
     });
-    const transientOrder = createOrderFixture({
+    const transientOrder = createPaidOrderFixture({
       orderId: asOrderId('ord_01JABCDEF0123456790'),
       merchantId,
       provider: {
@@ -165,7 +165,7 @@ describe('SQS delivery worker', () => {
     const batch = await readBatch();
     const event = parseDeliveryRequestedEvent(batch.Records[0]?.body ?? '');
     const repository = new InMemoryOrderRepository();
-    const order = createOrderFixture({
+    const order = createPaidOrderFixture({
       orderId: asOrderId(event.aggregateId),
       merchantId,
       provider: {

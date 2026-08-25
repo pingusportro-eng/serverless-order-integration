@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 import { asMerchantId, asOrderId, type Order } from '../../src/domain/order.js';
+import { applyPaymentStatusChange } from '../../src/domain/payment-status-transition.js';
+import { createInitialOrderPayment } from '../../src/domain/payment.js';
 
 export function createOrderFixture(overrides: Partial<Order> = {}): Order {
   const suffix = randomUUID().replaceAll('-', '');
@@ -41,4 +43,22 @@ export function createOrderFixture(overrides: Partial<Order> = {}): Order {
     version: 1,
     ...overrides,
   };
+}
+
+export function createPaidOrderFixture(overrides: Partial<Order> = {}): Order {
+  const order = createOrderFixture(overrides);
+  const initialPayment = createInitialOrderPayment(
+    order.total,
+    `stripe-payment-intent:${order.merchantId}:${order.orderId}`,
+    order.createdAt,
+  );
+  const payment = applyPaymentStatusChange(
+    initialPayment,
+    {
+      targetStatus: 'SUCCEEDED',
+      stripePaymentIntentId: `pi_${order.orderId.slice(4)}`,
+    },
+    order.updatedAt,
+  );
+  return { ...order, payment };
 }

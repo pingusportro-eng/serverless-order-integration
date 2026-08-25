@@ -636,7 +636,7 @@ still requires a separate bounded cost review and user approval.
       returning an unsafe client secret.
 - [x] UI component tests cover button states, safe rendering, polling bounds,
       decline retry, and auth modes.
-- [ ] Unpaid orders never reach the delivery application handler.
+- [x] Unpaid orders never reach the delivery application handler.
 
 These tests use no AWS service and no Stripe network connection. They remain in
 normal pull-request checks.

@@ -10,6 +10,7 @@ import {
   type OrderRepository,
 } from '../../src/application/order-repository.js';
 import { asMerchantId, asOrderId, type Order } from '../../src/domain/order.js';
+import { createInitialOrderPayment } from '../../src/domain/payment.js';
 import type { OrderReadyForSubmissionEvent } from '../../src/events/domain-event.js';
 import {
   VENDOR_SUBMISSION_FAILURE_CODES,
@@ -18,7 +19,7 @@ import {
   type VendorSubmissionFailureCode,
 } from '../../src/integrations/delivery-vendor-client.js';
 import { InMemoryOrderRepository } from '../../src/infrastructure/memory/in-memory-order-repository.js';
-import { createOrderFixture } from '../fixtures/order.js';
+import { createOrderFixture, createPaidOrderFixture } from '../fixtures/order.js';
 
 const VENDOR_FAILURE_CASES = [
   { code: 'TIMEOUT', retryable: true },
@@ -88,7 +89,7 @@ describe('processDeliveryEvent', () => {
   it.each(RETRYABLE_VENDOR_FAILURES)(
     'leaves $code on the retry path without changing the order',
     async ({ code }) => {
-      const order = createOrderFixture();
+      const order = createPaidOrderFixture();
       const saveStatusChange = vi.fn<OrderRepository['saveStatusChange']>(() => Promise.resolve());
       const repository: OrderRepository = {
         create: () => Promise.reject(new Error('not used')),
@@ -122,7 +123,7 @@ describe('processDeliveryEvent', () => {
     'persists $code before acknowledging the delivery event',
     async ({ code }) => {
       const repository = new InMemoryOrderRepository();
-      const order = createOrderFixture();
+      const order = createPaidOrderFixture();
       await repository.create({
         order,
         idempotencyKey: `idempotency-${code.toLowerCase()}`,
@@ -180,7 +181,7 @@ describe('processDeliveryEvent', () => {
   );
 
   it('rejects a missing order', async () => {
-    const order = createOrderFixture();
+    const order = createPaidOrderFixture();
 
     await expect(
       processDeliveryEvent(
@@ -191,7 +192,7 @@ describe('processDeliveryEvent', () => {
   });
 
   it('rejects merchant, delivery-provider-submission-key, and future-version mismatches', async () => {
-    const order = createOrderFixture();
+    const order = createPaidOrderFixture();
     const event = eventFor(order);
     const wrongMerchant = {
       ...event,
@@ -216,7 +217,7 @@ describe('processDeliveryEvent', () => {
   });
 
   it('rejects an actionable event inconsistent with the current state', async () => {
-    const order = createOrderFixture({ status: 'CANCELLED' });
+    const order = createPaidOrderFixture({ status: 'CANCELLED' });
 
     await expect(
       processDeliveryEvent(
@@ -226,9 +227,35 @@ describe('processDeliveryEvent', () => {
     ).rejects.toThrow('inconsistent with the current order state');
   });
 
+  it('does not submit an unpaid order even if its stored status claims it is ready', async () => {
+    const baseOrder = createOrderFixture();
+    const order: Order = {
+      ...baseOrder,
+      payment: createInitialOrderPayment(
+        baseOrder.total,
+        `stripe-payment-intent:${baseOrder.merchantId}:${baseOrder.orderId}`,
+        baseOrder.createdAt,
+      ),
+    };
+    const submitDelivery = vi.fn<DeliveryVendorClient['submitDelivery']>();
+    const saveStatusChange = vi.fn<OrderRepository['saveStatusChange']>();
+    const repository: OrderRepository = {
+      create: () => Promise.reject(new Error('not used')),
+      get: () => Promise.resolve(order),
+      list: () => Promise.reject(new Error('not used')),
+      saveStatusChange,
+    };
+
+    await expect(
+      processDeliveryEvent({ repository, vendorClient: { submitDelivery } }, eventFor(order)),
+    ).rejects.toThrow('inconsistent with the current order payment state');
+    expect(submitDelivery).not.toHaveBeenCalled();
+    expect(saveStatusChange).not.toHaveBeenCalled();
+  });
+
   it('recovers a concurrent version conflict when another worker already progressed the order', async () => {
-    const order = createOrderFixture();
-    const progressedOrder = createOrderFixture({
+    const order = createPaidOrderFixture();
+    const progressedOrder = createPaidOrderFixture({
       ...order,
       status: 'SUBMITTED',
       provider: {
@@ -262,8 +289,8 @@ describe('processDeliveryEvent', () => {
   });
 
   it('does not acknowledge a version conflict with an incompatible newer state', async () => {
-    const order = createOrderFixture();
-    const cancelledOrder = createOrderFixture({
+    const order = createPaidOrderFixture();
+    const cancelledOrder = createPaidOrderFixture({
       ...order,
       status: 'CANCELLED',
       updatedAt: '2026-07-23T11:00:01.000Z',
@@ -294,7 +321,7 @@ describe('processDeliveryEvent', () => {
 
   it('recovers when the vendor accepted but the first database write failed', async () => {
     const innerRepository = new InMemoryOrderRepository();
-    const order = createOrderFixture();
+    const order = createPaidOrderFixture();
     await innerRepository.create({
       order,
       idempotencyKey: 'idempotency-database-recovery',
@@ -359,8 +386,8 @@ describe('processDeliveryEvent', () => {
   });
 
   it('requires reconciliation for an incompatible stale event', async () => {
-    const original = createOrderFixture();
-    const cancelled = createOrderFixture({
+    const original = createPaidOrderFixture();
+    const cancelled = createPaidOrderFixture({
       ...original,
       status: 'CANCELLED',
       version: 2,
@@ -375,7 +402,7 @@ describe('processDeliveryEvent', () => {
   });
 
   it('keeps a version conflict retryable when the competing state cannot be observed', async () => {
-    const order = createOrderFixture({ orderId: asOrderId('ord_01JCONFLICT123456789') });
+    const order = createPaidOrderFixture({ orderId: asOrderId('ord_01JCONFLICT123456789') });
     const repository: OrderRepository = {
       create: () => Promise.reject(new Error('not used')),
       get: () => Promise.resolve(order),
