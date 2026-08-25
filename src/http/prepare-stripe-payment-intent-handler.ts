@@ -80,12 +80,6 @@ export async function handlePrepareStripePaymentIntent(
     });
     const clientSecret = result.stripePaymentIntent.clientSecret;
     const status = result.stripePaymentIntent.status;
-    if (clientSecret === undefined) {
-      throw new StripePaymentIntentContractError('clientSecret');
-    }
-    if (status === 'NOT_STARTED') {
-      throw new StripePaymentIntentContractError('status');
-    }
 
     return successResponse(
       result.outcome === 'created' ? 201 : 200,

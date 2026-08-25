@@ -9,6 +9,7 @@ import {
   type StripeWebhookRepository,
 } from './stripe-webhook-repository.js';
 import type { Order } from '../domain/order.js';
+import type { PaymentStatus } from '../domain/payment.js';
 import { applyOrderStatusChange } from '../domain/order-status-transition.js';
 import { applyPaymentStatusChange } from '../domain/payment-status-transition.js';
 
@@ -57,6 +58,17 @@ type ProposedChange =
   | { readonly outcome: 'IGNORED' }
   | { readonly outcome: 'RECONCILIATION_REQUIRED'; readonly reasonCode: string };
 
+type AutomaticStripePaymentIntentSnapshot = StripePaymentIntentSnapshot & {
+  readonly captureMethod: 'AUTOMATIC';
+  readonly status: PaymentStatus;
+};
+
+function isAutomaticSnapshot(
+  snapshot: StripePaymentIntentSnapshot,
+): snapshot is AutomaticStripePaymentIntentSnapshot {
+  return snapshot.captureMethod === 'AUTOMATIC' && snapshot.status !== 'REQUIRES_CAPTURE';
+}
+
 function sameMoney(order: Order, snapshot: StripePaymentIntentSnapshot): boolean {
   return (
     order.payment?.amount.amountMinor === snapshot.amount.amountMinor &&
@@ -70,7 +82,7 @@ function reconciliation(reasonCode: string): ProposedChange {
 
 function paymentChangedOrder(
   current: Order,
-  snapshot: StripePaymentIntentSnapshot,
+  snapshot: AutomaticStripePaymentIntentSnapshot,
   changedAt: string,
 ): Order {
   if (current.payment === undefined) {
@@ -108,7 +120,7 @@ function paymentChangedOrder(
 
 function statusChangedOrder(
   current: Order,
-  snapshot: StripePaymentIntentSnapshot,
+  snapshot: AutomaticStripePaymentIntentSnapshot,
   changedAt: string,
 ): Order {
   const paymentOrder = paymentChangedOrder(current, snapshot, changedAt);
@@ -137,6 +149,9 @@ function proposeChange(
   const storedIntentId = current.payment?.stripePaymentIntentId;
   if (storedIntentId !== undefined && storedIntentId !== snapshot.stripePaymentIntentId) {
     return reconciliation('PAYMENT_INTENT_MAPPING_CONFLICT');
+  }
+  if (!isAutomaticSnapshot(snapshot)) {
+    return reconciliation('CAPTURE_METHOD_MISMATCH');
   }
 
   if (current.status !== 'AWAITING_PAYMENT') {

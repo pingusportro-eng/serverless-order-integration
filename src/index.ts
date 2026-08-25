@@ -45,9 +45,11 @@ export {
 } from './application/stripe-payment-client.js';
 export type {
   CreateStripePaymentIntentInput,
+  StripeCaptureMethod,
   StripeClientErrorOptions,
   StripeClientFailureCode,
   StripePaymentClient,
+  StripePaymentIntentStatus,
   StripePaymentIntentSnapshot,
 } from './application/stripe-payment-client.js';
 export {

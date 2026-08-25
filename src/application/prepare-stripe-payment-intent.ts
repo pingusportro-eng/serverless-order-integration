@@ -5,6 +5,7 @@ import {
 } from './payment-repository.js';
 import type { StripePaymentClient, StripePaymentIntentSnapshot } from './stripe-payment-client.js';
 import type { MerchantId, Order, OrderId } from '../domain/order.js';
+import type { PaymentStatus } from '../domain/payment.js';
 import { applyPaymentStatusChange } from '../domain/payment-status-transition.js';
 
 export interface PrepareStripePaymentIntentDependencies {
@@ -23,8 +24,14 @@ export interface PrepareStripePaymentIntentCommand {
 export interface PrepareStripePaymentIntentResult {
   readonly outcome: 'created' | 'replayed';
   readonly order: Order;
-  readonly stripePaymentIntent: StripePaymentIntentSnapshot;
+  readonly stripePaymentIntent: PreparedStripePaymentIntentSnapshot;
 }
+
+type PreparedStripePaymentIntentSnapshot = StripePaymentIntentSnapshot & {
+  readonly status: Exclude<PaymentStatus, 'NOT_STARTED'>;
+  readonly captureMethod: 'AUTOMATIC';
+  readonly clientSecret: string;
+};
 
 export class PaymentPreparationNotAllowedError extends Error {
   override readonly name = 'PaymentPreparationNotAllowedError';
@@ -46,10 +53,7 @@ function assertStripeSnapshot(
   order: Order,
   snapshot: StripePaymentIntentSnapshot,
   expectedStripePaymentIntentId?: string,
-): asserts snapshot is StripePaymentIntentSnapshot & {
-  readonly status: Exclude<StripePaymentIntentSnapshot['status'], 'NOT_STARTED'>;
-  readonly clientSecret: string;
-} {
+): asserts snapshot is PreparedStripePaymentIntentSnapshot {
   const payment = order.payment;
   if (payment === undefined) {
     throw new PaymentPreparationNotAllowedError();
@@ -72,7 +76,10 @@ function assertStripeSnapshot(
   ) {
     throw new StripePaymentIntentContractError('amount');
   }
-  if (snapshot.status === 'NOT_STARTED') {
+  if (snapshot.captureMethod !== 'AUTOMATIC') {
+    throw new StripePaymentIntentContractError('captureMethod');
+  }
+  if (snapshot.status === 'NOT_STARTED' || snapshot.status === 'REQUIRES_CAPTURE') {
     throw new StripePaymentIntentContractError('status');
   }
   if (snapshot.clientSecret === undefined || snapshot.clientSecret.length === 0) {
@@ -84,7 +91,7 @@ async function retrieveBoundPaymentIntent(
   dependencies: PrepareStripePaymentIntentDependencies,
   order: Order,
   stripePaymentIntentId: string,
-): Promise<StripePaymentIntentSnapshot> {
+): Promise<PreparedStripePaymentIntentSnapshot> {
   if (order.payment?.stripePaymentIntentId !== stripePaymentIntentId) {
     throw new StripePaymentIntentBindingConflictError();
   }

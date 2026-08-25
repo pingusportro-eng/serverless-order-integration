@@ -5,6 +5,10 @@ import {
   type ProcessStripeWebhookCommand,
 } from '../../src/application/process-stripe-webhook.js';
 import { StripeEventIdConflictError } from '../../src/application/stripe-webhook-repository.js';
+import type {
+  StripeCaptureMethod,
+  StripePaymentIntentStatus,
+} from '../../src/application/stripe-payment-client.js';
 import { createInitialOrderPayment } from '../../src/domain/payment.js';
 import { FakeStripePaymentClient } from '../../src/integrations/fake-stripe-payment-client.js';
 import { InMemoryOrderRepository } from '../../src/infrastructure/memory/in-memory-order-repository.js';
@@ -208,6 +212,53 @@ describe('processStripeWebhook', () => {
       repository.getByStripePaymentIntentId(intent.stripePaymentIntentId),
     ).resolves.toBeUndefined();
   });
+
+  it.each([
+    { captureMethod: 'MANUAL', status: 'REQUIRES_CAPTURE' },
+    { captureMethod: 'AUTOMATIC_ASYNC', status: 'PROCESSING' },
+    { captureMethod: 'UNRECOGNIZED', status: 'REQUIRES_PAYMENT_METHOD' },
+  ] satisfies readonly {
+    captureMethod: StripeCaptureMethod;
+    status: StripePaymentIntentStatus;
+  }[])(
+    'durably classifies $captureMethod capture as reconciliation without releasing delivery',
+    async ({ captureMethod, status }) => {
+      const intent = await createIntent();
+      const stripeClientWithCaptureMismatch = {
+        createPaymentIntent: stripeClient.createPaymentIntent.bind(stripeClient),
+        retrievePaymentIntent: async () => ({
+          ...(await stripeClient.retrievePaymentIntent(intent.stripePaymentIntentId)),
+          captureMethod,
+          status,
+        }),
+      };
+      const mismatched = command({
+        eventId: `evt_stripe_capture_mismatch_${captureMethod.toLowerCase()}`,
+        stripePaymentIntentId: intent.stripePaymentIntentId,
+      });
+      const dependencies = {
+        repository,
+        stripeClient: stripeClientWithCaptureMismatch,
+        now: () => NOW,
+      };
+
+      await expect(processStripeWebhook(dependencies, mismatched)).resolves.toEqual({
+        outcome: 'reconciliation_required',
+        reasonCode: 'CAPTURE_METHOD_MISMATCH',
+        recorded: true,
+        order,
+      });
+      await expect(processStripeWebhook(dependencies, mismatched)).resolves.toMatchObject({
+        outcome: 'reconciliation_required',
+        reasonCode: 'CAPTURE_METHOD_MISMATCH',
+        recorded: false,
+      });
+      await expect(repository.get(order.merchantId, order.orderId)).resolves.toEqual(order);
+      await expect(
+        repository.getByStripePaymentIntentId(intent.stripePaymentIntentId),
+      ).resolves.toBeUndefined();
+    },
+  );
 
   it('rejects the same signed event ID with different raw values', async () => {
     const intent = await createIntent();

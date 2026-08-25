@@ -10,11 +10,15 @@ export interface CreateStripePaymentIntentInput {
   readonly stripeCreationKey: string;
 }
 
+export type StripeCaptureMethod = 'AUTOMATIC' | 'AUTOMATIC_ASYNC' | 'MANUAL' | 'UNRECOGNIZED';
+
+export type StripePaymentIntentStatus = PaymentStatus | 'REQUIRES_CAPTURE';
+
 export interface StripePaymentIntentSnapshot {
   readonly stripePaymentIntentId: string;
-  readonly status: PaymentStatus;
+  readonly status: StripePaymentIntentStatus;
   readonly amount: Money;
-  readonly captureMethod: 'AUTOMATIC';
+  readonly captureMethod: StripeCaptureMethod;
   readonly merchantId: MerchantId;
   readonly orderId: OrderId;
   readonly clientSecret?: string;

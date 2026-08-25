@@ -5,12 +5,13 @@ import {
   STRIPE_APPLICATION_METADATA_NAMESPACE,
   StripeClientError,
   type CreateStripePaymentIntentInput,
+  type StripeCaptureMethod,
   type StripeClientErrorOptions,
   type StripePaymentClient,
+  type StripePaymentIntentStatus,
   type StripePaymentIntentSnapshot,
 } from '../application/stripe-payment-client.js';
 import { asMerchantId, asOrderId } from '../domain/order.js';
-import type { PaymentStatus } from '../domain/payment.js';
 
 interface StripePaymentIntentsApi {
   create(
@@ -41,7 +42,7 @@ function contractMismatch(message: string): StripeClientError {
   return new StripeClientError({ code: 'CONTRACT_MISMATCH', retryable: false, message });
 }
 
-function paymentStatus(status: string): PaymentStatus {
+function paymentStatus(status: string): StripePaymentIntentStatus {
   switch (status) {
     case 'requires_payment_method':
       return 'REQUIRES_PAYMENT_METHOD';
@@ -56,13 +57,26 @@ function paymentStatus(status: string): PaymentStatus {
     case 'canceled':
       return 'CANCELLED';
     case 'requires_capture':
-      throw contractMismatch('Stripe returned a manual-capture PaymentIntent.');
+      return 'REQUIRES_CAPTURE';
     default:
       throw new StripeClientError({
         code: 'INVALID_RESPONSE',
         retryable: true,
         message: 'Stripe returned an unsupported PaymentIntent status.',
       });
+  }
+}
+
+function captureMethod(method: Stripe.PaymentIntent.CaptureMethod): StripeCaptureMethod {
+  switch (method) {
+    case 'automatic':
+      return 'AUTOMATIC';
+    case 'automatic_async':
+      return 'AUTOMATIC_ASYNC';
+    case 'manual':
+      return 'MANUAL';
+    default:
+      return 'UNRECOGNIZED';
   }
 }
 
@@ -80,9 +94,6 @@ export function stripePaymentIntentSnapshot(
 ): StripePaymentIntentSnapshot {
   if (paymentIntent.livemode) {
     throw contractMismatch('A live-mode Stripe PaymentIntent is not allowed in this lab.');
-  }
-  if (paymentIntent.capture_method !== 'automatic') {
-    throw contractMismatch('Stripe PaymentIntent capture mode must be automatic.');
   }
   if (!Number.isSafeInteger(paymentIntent.amount) || paymentIntent.amount <= 0) {
     throw new StripeClientError({
@@ -131,7 +142,7 @@ export function stripePaymentIntentSnapshot(
       amountMinor: paymentIntent.amount,
       currency: paymentIntent.currency.toUpperCase(),
     },
-    captureMethod: 'AUTOMATIC',
+    captureMethod: captureMethod(paymentIntent.capture_method),
     merchantId: asMerchantId(merchantId),
     orderId: asOrderId(orderId),
     ...(paymentIntent.client_secret === null ? {} : { clientSecret: paymentIntent.client_secret }),

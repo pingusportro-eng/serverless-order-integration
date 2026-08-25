@@ -131,10 +131,26 @@ describe('Stripe payment client adapter', () => {
     ['processing', 'PROCESSING'],
     ['succeeded', 'SUCCEEDED'],
     ['canceled', 'CANCELLED'],
+    ['requires_capture', 'REQUIRES_CAPTURE'],
   ] as const)('maps Stripe status %s to %s', (stripeStatus, domainStatus) => {
     expect(stripePaymentIntentSnapshot(paymentIntent({ status: stripeStatus })).status).toBe(
       domainStatus,
     );
+  });
+
+  it.each([
+    ['automatic', 'AUTOMATIC'],
+    ['automatic_async', 'AUTOMATIC_ASYNC'],
+    ['manual', 'MANUAL'],
+    ['future_capture_method', 'UNRECOGNIZED'],
+  ] as const)('preserves Stripe capture method %s as %s', (stripeCaptureMethod, expected) => {
+    expect(
+      stripePaymentIntentSnapshot(
+        paymentIntent({
+          capture_method: stripeCaptureMethod as Stripe.PaymentIntent.CaptureMethod,
+        }),
+      ).captureMethod,
+    ).toBe(expected);
   });
 
   it('keeps only a safe payment failure reason', () => {
@@ -159,16 +175,14 @@ describe('Stripe payment client adapter', () => {
     ).toBe('UNKNOWN_PAYMENT_ERROR');
   });
 
-  it.each([
-    paymentIntent({ status: 'requires_capture' }),
-    paymentIntent({ capture_method: 'manual' }),
-    paymentIntent({ livemode: true }),
-    paymentIntent({ metadata: {} }),
-  ])('rejects a PaymentIntent that violates the reviewed contract', (stripeIntent) => {
-    expect(() => stripePaymentIntentSnapshot(stripeIntent)).toThrow(
-      expect.objectContaining({ code: 'CONTRACT_MISMATCH', retryable: false }),
-    );
-  });
+  it.each([paymentIntent({ livemode: true }), paymentIntent({ metadata: {} })])(
+    'rejects a PaymentIntent that violates the reviewed contract',
+    (stripeIntent) => {
+      expect(() => stripePaymentIntentSnapshot(stripeIntent)).toThrow(
+        expect.objectContaining({ code: 'CONTRACT_MISMATCH', retryable: false }),
+      );
+    },
+  );
 
   it.each([
     paymentIntent({ amount: 0 }),

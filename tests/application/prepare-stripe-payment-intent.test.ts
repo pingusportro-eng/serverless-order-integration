@@ -193,6 +193,31 @@ describe('prepareStripePaymentIntent', () => {
     await expect(repository.get(order.merchantId, order.orderId)).resolves.toEqual(order);
   });
 
+  it('does not persist a PaymentIntent with an unexpected capture method', async () => {
+    const repository = new InMemoryOrderRepository();
+    const stripeClient = new FakeStripePaymentClient();
+    const order = awaitingPaymentOrder();
+    await storeOrder(repository, order);
+    const mismatchedStripeClient = {
+      retrievePaymentIntent: stripeClient.retrievePaymentIntent.bind(stripeClient),
+      createPaymentIntent: async (
+        input: Parameters<typeof stripeClient.createPaymentIntent>[0],
+      ) => ({
+        ...(await stripeClient.createPaymentIntent(input)),
+        captureMethod: 'MANUAL' as const,
+        status: 'REQUIRES_CAPTURE' as const,
+      }),
+    };
+
+    await expect(
+      prepareStripePaymentIntent(
+        { repository, stripeClient: mismatchedStripeClient, now: () => new Date(CHANGED_AT) },
+        command(order),
+      ),
+    ).rejects.toMatchObject({ field: 'captureMethod' });
+    await expect(repository.get(order.merchantId, order.orderId)).resolves.toEqual(order);
+  });
+
   it('rejects an order that is not awaiting an initial payment', async () => {
     const repository = new InMemoryOrderRepository();
     const stripeClient = new FakeStripePaymentClient();

@@ -630,7 +630,7 @@ still requires a separate bounded cost review and user approval.
 - [x] Webhook tests use exact raw bytes and valid, invalid, duplicate, stale,
       out-of-order, and concurrent events.
 - [x] A delayed failure cannot overwrite `SUCCEEDED`.
-- [ ] Automatic-capture mismatch becomes `RECONCILIATION_REQUIRED`.
+- [x] Automatic-capture mismatch becomes `RECONCILIATION_REQUIRED`.
 - [ ] Stripe creation ambiguity reuses the stable Stripe key.
 - [ ] Stripe success followed by a DynamoDB failure is recovered without
       returning an unsafe client secret.
