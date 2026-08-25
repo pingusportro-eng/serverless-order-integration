@@ -632,7 +632,7 @@ still requires a separate bounded cost review and user approval.
 - [x] A delayed failure cannot overwrite `SUCCEEDED`.
 - [x] Automatic-capture mismatch becomes `RECONCILIATION_REQUIRED`.
 - [x] Stripe creation ambiguity reuses the stable Stripe key.
-- [ ] Stripe success followed by a DynamoDB failure is recovered without
+- [x] Stripe success followed by a DynamoDB failure is recovered without
       returning an unsafe client secret.
 - [ ] UI component tests cover button states, safe rendering, polling bounds,
       decline retry, and auth modes.

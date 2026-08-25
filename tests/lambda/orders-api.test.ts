@@ -2,6 +2,10 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from '
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { OrderRepository } from '../../src/application/order-repository.js';
+import type {
+  BindStripePaymentIntentInput,
+  BindStripePaymentIntentResult,
+} from '../../src/application/payment-repository.js';
 import { asMerchantId, type Order } from '../../src/domain/order.js';
 import { createInitialOrderPayment } from '../../src/domain/payment.js';
 import { createOrderCursorCodec } from '../../src/http/order-cursor.js';
@@ -88,6 +92,20 @@ async function storeOrder(repository: InMemoryOrderRepository, order: Order): Pr
       causationId: 'request_lambda_payment_fixture',
     },
   });
+}
+
+class FailFirstPaymentBindingRepository extends InMemoryOrderRepository {
+  private shouldFail = true;
+
+  override async bindStripePaymentIntent(
+    input: BindStripePaymentIntentInput,
+  ): Promise<BindStripePaymentIntentResult> {
+    if (this.shouldFail) {
+      this.shouldFail = false;
+      throw new Error('Synthetic persistence outage after Stripe accepted the request.');
+    }
+    return super.bindStripePaymentIntent(input);
+  }
 }
 
 describe('orders API Lambda adapter', () => {
@@ -203,6 +221,36 @@ describe('orders API Lambda adapter', () => {
       clientSecret: firstBody['clientSecret'],
     });
     expect(stripeClient.createCalls).toHaveLength(1);
+  });
+
+  it('recovers a persisted Stripe success without exposing its client secret on failure', async () => {
+    repository = new FailFirstPaymentBindingRepository();
+    const order = awaitingPaymentOrder();
+    await storeOrder(repository, order);
+    const event = eventFixture({
+      routeKey: 'POST /orders/{orderId}/payment-intents',
+      method: 'POST',
+      path: `/orders/${order.orderId}/payment-intents`,
+      pathParameters: { orderId: order.orderId },
+      headers: { 'x-correlation-id': 'corr_lambda_payment_persistence_recovery' },
+    });
+
+    const failed = await handler()(event);
+    const recovered = await handler()(event);
+    const failedBody = responseBody(failed);
+    const recoveredBody = responseBody(recovered);
+    const recoveredClientSecret = recoveredBody['clientSecret'];
+
+    expect(failed.statusCode).toBe(500);
+    expect(failedBody).toMatchObject({ code: 'INTERNAL_ERROR' });
+    expect(failedBody).not.toHaveProperty('clientSecret');
+    expect(recovered.statusCode).toBe(201);
+    expect(typeof recoveredClientSecret).toBe('string');
+    expect(JSON.stringify(failedBody)).not.toContain(String(recoveredClientSecret));
+    expect(stripeClient.createCalls).toHaveLength(2);
+    expect(stripeClient.createCalls[0]?.stripeCreationKey).toBe(
+      stripeClient.createCalls[1]?.stripeCreationKey,
+    );
   });
 
   it('requires a verified access token before reaching the PaymentIntent route', async () => {
