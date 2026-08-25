@@ -504,6 +504,14 @@ The SPA is a public OAuth client and has no client secret. It enables no
 implicit grant. Tokens remain in browser memory for the learning session.
 Only exact localhost UI origins are permitted by API CORS configuration.
 
+The browser generates a 256-bit PKCE verifier and state value with Web Crypto,
+stores only that temporary transaction in `sessionStorage`, and sends an S256
+challenge to Cognito. On the callback it checks the exact state, redirect URI,
+and a ten-minute transaction lifetime before exchanging the authorization code.
+The access token is never written to browser storage. Refreshing or reopening
+the UI therefore starts another authorization-code flow; Cognito may reuse its
+own managed-login session.
+
 The local lab uses the existing fixed `mrc_demo` identity because SAM local does
 not reproduce API Gateway's Cognito authorizer. The UI must display a prominent
 `LOCAL AUTH BYPASS` banner in that mode. Cognito and JWT enforcement are proven
@@ -534,6 +542,7 @@ VITE_API_BASE_URL
 VITE_STRIPE_PUBLISHABLE_KEY
 VITE_COGNITO_DOMAIN
 VITE_COGNITO_CLIENT_ID
+VITE_COGNITO_REDIRECT_URI
 ```
 
 The learning console presents this state-aware flow:

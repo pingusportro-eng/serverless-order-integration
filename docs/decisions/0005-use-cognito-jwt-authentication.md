@@ -23,6 +23,8 @@ For the deployed MVP, use:
 - One Cognito user pool on the Lite tier
 - One public app client without a client secret
 - Direct user authentication for a small number of synthetic test users
+- Authorization Code + PKCE through a Cognito prefix domain for the browser
+  learning console
 - An API Gateway HTTP API JWT authorizer configured with the user-pool issuer and
   app-client audience
 - Cognito access tokens, not identity tokens, for API authorization
@@ -43,7 +45,7 @@ Do not enable:
 - Cognito machine-to-machine client-credentials grants
 - Cognito Plus or advanced security features
 - SMS messaging
-- A Cognito custom domain or hosted UI
+- A Cognito custom domain
 - Social, SAML, or external OIDC federation
 
 Test passwords and tokens must never be committed, logged, placed in command
@@ -110,4 +112,3 @@ Replace this test-user model when real partner systems require machine identity,
 credential rotation, per-client scopes, or federation. Compare the actual
 identity provider, Cognito machine-to-machine pricing, IAM/SigV4, and a dedicated
 authorization service at that point.
-

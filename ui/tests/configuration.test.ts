@@ -39,6 +39,11 @@ describe('UI configuration', () => {
     ).toEqual({
       apiBaseUrl: 'https://api.example.test',
       authMode: 'cognito',
+      cognito: {
+        clientId: 'client-123',
+        domain: 'https://example.auth.eu-central-1.amazoncognito.com',
+        redirectUri: 'http://localhost:3002/auth/callback',
+      },
       stripePublishableKey: STRIPE_PUBLISHABLE_KEY,
     });
 
@@ -47,6 +52,41 @@ describe('UI configuration', () => {
         VITE_API_BASE_URL: 'https://api.example.test',
         VITE_STRIPE_PUBLISHABLE_KEY: STRIPE_PUBLISHABLE_KEY,
         VITE_COGNITO_DOMAIN: 'https://example.auth.eu-central-1.amazoncognito.com',
+      }),
+    ).toThrow(InvalidUiConfigurationError);
+  });
+
+  it('normalizes reviewed Cognito endpoints', () => {
+    expect(
+      readUiConfiguration({
+        VITE_API_BASE_URL: 'https://api.example.test',
+        VITE_STRIPE_PUBLISHABLE_KEY: STRIPE_PUBLISHABLE_KEY,
+        VITE_COGNITO_DOMAIN: 'https://login.example.test/',
+        VITE_COGNITO_CLIENT_ID: 'client-123',
+        VITE_COGNITO_REDIRECT_URI: 'https://ui.example.test/auth/callback',
+      }),
+    ).toMatchObject({
+      authMode: 'cognito',
+      cognito: {
+        domain: 'https://login.example.test',
+        redirectUri: 'https://ui.example.test/auth/callback',
+      },
+    });
+  });
+
+  it.each([
+    { VITE_COGNITO_DOMAIN: 'http://login.example.test' },
+    { VITE_COGNITO_DOMAIN: 'https://login.example.test/oauth2' },
+    { VITE_COGNITO_REDIRECT_URI: 'http://ui.example.test/auth/callback' },
+    { VITE_COGNITO_REDIRECT_URI: 'javascript:alert(1)' },
+  ])('rejects unsafe Cognito endpoint configuration: %s', (override) => {
+    expect(() =>
+      readUiConfiguration({
+        VITE_API_BASE_URL: 'https://api.example.test',
+        VITE_STRIPE_PUBLISHABLE_KEY: STRIPE_PUBLISHABLE_KEY,
+        VITE_COGNITO_DOMAIN: 'https://login.example.test',
+        VITE_COGNITO_CLIENT_ID: 'client-123',
+        ...override,
       }),
     ).toThrow(InvalidUiConfigurationError);
   });
