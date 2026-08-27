@@ -119,6 +119,11 @@ Parameters:
     MinValue: 100
     MaxValue: 55000
     Description: Cost-reviewed HTTP timeout for one vendor submission attempt.
+  StripeTimeoutMs:
+    Type: Number
+    MinValue: 100
+    MaxValue: 55000
+    Description: Cost-reviewed HTTP timeout for one Stripe API request.
 
 Globals:
   Function:
@@ -472,6 +477,21 @@ Resources:
     Properties:
       StageName: $default
       FailOnWarnings: true
+      CorsConfiguration:
+        AllowOrigins:
+          - http://127.0.0.1:3002
+        AllowHeaders:
+          - Authorization
+          - Content-Type
+          - Idempotency-Key
+          - If-Match
+          - X-Correlation-Id
+        AllowMethods:
+          - GET
+          - POST
+          - PATCH
+          - OPTIONS
+        MaxAge: 600
       DefinitionBody:
         openapi: 3.0.1
         info:
@@ -515,6 +535,8 @@ Resources:
           REQUIRE_ACCESS_TOKEN: 'true'
           REQUIRE_OPERATOR_GROUP: 'true'
           SECRET_PROVIDER: ssm
+          STRIPE_SECRET_KEY_PARAMETER_NAME: !Sub /serverless-order-integration/${EnvironmentName}/stripe/secret-key
+          STRIPE_TIMEOUT_MS: !Ref StripeTimeoutMs
       Policies:
         - Version: '2012-10-17'
           Statement:
@@ -538,6 +560,11 @@ Resources:
                 ForAnyValue:StringEquals:
                   dynamodb:EnclosingOperation:
                     - TransactWriteItems
+            - Sid: ReadStripeSecretKeyParameter
+              Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource: !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/serverless-order-integration/${EnvironmentName}/stripe/secret-key
       Events:
         CreateOrder:
           Type: HttpApi
@@ -559,6 +586,13 @@ Resources:
             ApiId: !Ref SynchronousHttpApi
             Method: GET
             Path: /orders/{orderId}
+            PayloadFormatVersion: '2.0'
+        PreparePaymentIntent:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SynchronousHttpApi
+            Method: POST
+            Path: /orders/{orderId}/payment-intents
             PayloadFormatVersion: '2.0'
         ChangeOrderStatus:
           Type: HttpApi
@@ -779,6 +813,9 @@ Outputs:
   UserPoolIssuer:
     Description: JWT issuer configured on the HTTP API authorizer.
     Value: !Sub https://cognito-idp.${AWS::Region}.${AWS::URLSuffix}/${UserPool}
+  StripeSecretKeyParameterName:
+    Description: Stable Standard SecureString parameter read by the Orders API.
+    Value: !Sub /serverless-order-integration/${EnvironmentName}/stripe/secret-key
   OrdersTableStreamArn:
     Description: DynamoDB Stream consumed by the domain-event publisher.
     Value: !GetAtt OrdersTable.StreamArn

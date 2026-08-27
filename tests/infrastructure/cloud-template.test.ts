@@ -165,8 +165,73 @@ describe('cloud infrastructure', () => {
   });
 
   it('selects SSM as the cloud runtime secret provider', () => {
-    expect(template.Resources['OrdersApiFunction']?.Properties?.['Environment']).toMatchObject({
-      Variables: { SECRET_PROVIDER: 'ssm' },
+    const ordersApi = template.Resources['OrdersApiFunction'];
+
+    expect(ordersApi?.Properties?.['Environment']).toMatchObject({
+      Variables: {
+        SECRET_PROVIDER: 'ssm',
+        STRIPE_SECRET_KEY_PARAMETER_NAME: {
+          'Fn::Sub': '/serverless-order-integration/${EnvironmentName}/stripe/secret-key',
+        },
+        STRIPE_TIMEOUT_MS: { Ref: 'StripeTimeoutMs' },
+      },
+    });
+
+    const policies = ordersApi?.Properties?.['Policies'] as
+      { Statement?: Record<string, unknown>[] }[] | undefined;
+    const stripeParameterAccess = policies?.[0]?.Statement?.find(
+      (statement) => statement['Sid'] === 'ReadStripeSecretKeyParameter',
+    );
+
+    expect(stripeParameterAccess).toEqual({
+      Sid: 'ReadStripeSecretKeyParameter',
+      Effect: 'Allow',
+      Action: ['ssm:GetParameter'],
+      Resource: {
+        'Fn::Sub':
+          'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/serverless-order-integration/${EnvironmentName}/stripe/secret-key',
+      },
+    });
+    expect(JSON.stringify(stripeParameterAccess)).not.toContain('*');
+    expect(template.Outputs['StripeSecretKeyParameterName']).toEqual({
+      Description: 'Stable Standard SecureString parameter read by the Orders API.',
+      Value: {
+        'Fn::Sub': '/serverless-order-integration/${EnvironmentName}/stripe/secret-key',
+      },
+    });
+  });
+
+  it('exposes the authenticated payment route only to the exact local UI origin', () => {
+    expect(template.Resources['SynchronousHttpApi']?.Properties).toMatchObject({
+      CorsConfiguration: {
+        AllowOrigins: ['http://127.0.0.1:3002'],
+        AllowHeaders: [
+          'Authorization',
+          'Content-Type',
+          'Idempotency-Key',
+          'If-Match',
+          'X-Correlation-Id',
+        ],
+        AllowMethods: ['GET', 'POST', 'PATCH', 'OPTIONS'],
+        MaxAge: 600,
+      },
+      Auth: {
+        DefaultAuthorizer: 'CognitoJwtAuthorizer',
+      },
+    });
+
+    const events = template.Resources['OrdersApiFunction']?.Properties?.['Events'] as Record<
+      string,
+      { Type?: string; Properties?: Record<string, unknown> }
+    >;
+    expect(events['PreparePaymentIntent']).toEqual({
+      Type: 'HttpApi',
+      Properties: {
+        ApiId: { Ref: 'SynchronousHttpApi' },
+        Method: 'POST',
+        Path: '/orders/{orderId}/payment-intents',
+        PayloadFormatVersion: '2.0',
+      },
     });
   });
 });

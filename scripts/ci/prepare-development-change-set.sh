@@ -153,7 +153,8 @@ jq \
     {ParameterKey: "FailureMessageRetentionSeconds", ParameterValue: "86400"},
     {ParameterKey: "VendorBaseUrl", ParameterValue: $vendorBaseUrl},
     {ParameterKey: "VendorAuthToken", ParameterValue: $vendorAuthToken},
-    {ParameterKey: "VendorTimeoutMs", ParameterValue: "3000"}
+    {ParameterKey: "VendorTimeoutMs", ParameterValue: "3000"},
+    {ParameterKey: "StripeTimeoutMs", ParameterValue: "5000"}
   ]' >"$parameters_file"
 
 change_set_name="github-${GITHUB_SHA:0:12}-${GITHUB_RUN_ID}"
