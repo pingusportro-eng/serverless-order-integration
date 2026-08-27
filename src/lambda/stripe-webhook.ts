@@ -1,5 +1,6 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { SSMClient } from '@aws-sdk/client-ssm';
 import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyStructuredResultV2,
@@ -14,9 +15,12 @@ import {
 } from '../http/stripe-webhook-handler.js';
 import { problemResponse } from '../http/problem-details.js';
 import { DynamoDbOrderRepository } from '../infrastructure/dynamodb/dynamodb-order-repository.js';
+import { createRuntimeSecretProvider } from '../infrastructure/ssm/runtime-secret-provider.js';
+import { SsmSecureParameterLoader } from '../infrastructure/ssm/ssm-secure-parameter-loader.js';
 import { createStripePaymentClient } from '../integrations/stripe-payment-client.js';
 import { createLogger, type LogSink } from '../observability/logger.js';
 import { createRequestId } from '../observability/request-id.js';
+import { createRetryableInitializer } from './retryable-initializer.js';
 
 const LOCAL_ACCESS_KEY_ID = 'DUMMYIDEXAMPLE';
 const LOCAL_SECRET_ACCESS_KEY = 'DUMMYEXAMPLEKEY';
@@ -152,7 +156,7 @@ export function createStripeWebhookLambdaHandler(
   };
 }
 
-function createDefaultHandler(): StripeWebhookLambdaHandler {
+async function createDefaultHandler(): Promise<StripeWebhookLambdaHandler> {
   const endpoint = process.env['DYNAMODB_ENDPOINT']?.trim();
   const client = DynamoDBDocumentClient.from(
     new DynamoDBClient({
@@ -170,20 +174,28 @@ function createDefaultHandler(): StripeWebhookLambdaHandler {
     { marshallOptions: { removeUndefinedValues: true } },
   );
   const repository = new DynamoDbOrderRepository(client, requireEnvironment('TABLE_NAME'));
+  const secrets = createRuntimeSecretProvider(process.env, secureParameterLoader);
+  const [stripeSecretKey, stripeWebhookSecret] = await Promise.all([
+    secrets.required('STRIPE_SECRET_KEY'),
+    secrets.required('STRIPE_WEBHOOK_SECRET'),
+  ]);
   return createStripeWebhookLambdaHandler({
     repository,
     stripeClient: createStripePaymentClient({
-      apiKey: requireEnvironment('STRIPE_SECRET_KEY'),
+      apiKey: stripeSecretKey,
       timeoutMs: positiveIntegerEnvironment('STRIPE_TIMEOUT_MS'),
     }),
-    signingSecret: requireEnvironment('STRIPE_WEBHOOK_SECRET'),
+    signingSecret: stripeWebhookSecret,
     signatureToleranceSeconds: positiveIntegerEnvironment('STRIPE_WEBHOOK_TOLERANCE_SECONDS'),
   });
 }
 
-let defaultHandler: StripeWebhookLambdaHandler | undefined;
+const secureParameterLoader = new SsmSecureParameterLoader(
+  new SSMClient({ region: process.env['AWS_REGION'] ?? 'eu-central-1' }),
+);
+const getDefaultHandler = createRetryableInitializer(createDefaultHandler);
 
 export const handler: StripeWebhookLambdaHandler = async (event, context) => {
-  defaultHandler ??= createDefaultHandler();
+  const defaultHandler = await getDefaultHandler();
   return defaultHandler(event, context);
 };

@@ -1,5 +1,6 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient } from '@aws-sdk/lib-dynamodb';
+import { SSMClient } from '@aws-sdk/client-ssm';
 import type {
   APIGatewayProxyEventV2,
   APIGatewayProxyStructuredResultV2,
@@ -18,9 +19,12 @@ import { handlePrepareStripePaymentIntent } from '../http/prepare-stripe-payment
 import { problemResponse } from '../http/problem-details.js';
 import type { HttpResponse } from '../http/response.js';
 import { DynamoDbOrderRepository } from '../infrastructure/dynamodb/dynamodb-order-repository.js';
+import { createRuntimeSecretProvider } from '../infrastructure/ssm/runtime-secret-provider.js';
+import { SsmSecureParameterLoader } from '../infrastructure/ssm/ssm-secure-parameter-loader.js';
 import { createStripePaymentClient } from '../integrations/stripe-payment-client.js';
 import { createLogger, type LogSink } from '../observability/logger.js';
 import { createRequestId } from '../observability/request-id.js';
+import { createRetryableInitializer } from './retryable-initializer.js';
 
 const LOCAL_ACCESS_KEY_ID = 'DUMMYIDEXAMPLE';
 const LOCAL_SECRET_ACCESS_KEY = 'DUMMYEXAMPLEKEY';
@@ -340,7 +344,7 @@ export function createOrdersApiHandler(dependencies: OrdersApiDependencies): Ord
   };
 }
 
-function createDefaultHandler(): OrdersApiHandler {
+async function createDefaultHandler(): Promise<OrdersApiHandler> {
   const endpoint = process.env['DYNAMODB_ENDPOINT']?.trim();
   const client = DynamoDBDocumentClient.from(
     new DynamoDBClient({
@@ -359,7 +363,10 @@ function createDefaultHandler(): OrdersApiHandler {
   );
 
   const repository = new DynamoDbOrderRepository(client, requireEnvironment('TABLE_NAME'));
-  const stripeSecretKey = process.env['STRIPE_SECRET_KEY']?.trim();
+  const stripeSecretKey = await createRuntimeSecretProvider(
+    process.env,
+    secureParameterLoader,
+  ).optional('STRIPE_SECRET_KEY');
 
   return createOrdersApiHandler({
     repository,
@@ -381,9 +388,12 @@ function createDefaultHandler(): OrdersApiHandler {
   });
 }
 
-let defaultHandler: OrdersApiHandler | undefined;
+const secureParameterLoader = new SsmSecureParameterLoader(
+  new SSMClient({ region: process.env['AWS_REGION'] ?? 'eu-central-1' }),
+);
+const getDefaultHandler = createRetryableInitializer(createDefaultHandler);
 
 export const handler: OrdersApiHandler = async (event, context) => {
-  defaultHandler ??= createDefaultHandler();
+  const defaultHandler = await getDefaultHandler();
   return defaultHandler(event, context);
 };

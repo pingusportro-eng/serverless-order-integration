@@ -514,6 +514,7 @@ Resources:
           CURSOR_SIGNING_SECRET: !Ref CursorSigningSecret
           REQUIRE_ACCESS_TOKEN: 'true'
           REQUIRE_OPERATOR_GROUP: 'true'
+          SECRET_PROVIDER: ssm
       Policies:
         - Version: '2012-10-17'
           Statement:

@@ -59,6 +59,7 @@ Resources:
           CURSOR_SIGNING_SECRET: !Ref CursorSigningSecret
           REQUIRE_ACCESS_TOKEN: 'false'
           REQUIRE_OPERATOR_GROUP: 'false'
+          SECRET_PROVIDER: environment
           STRIPE_SECRET_KEY: ''
           STRIPE_TIMEOUT_MS: '5000'
       Events:
@@ -139,6 +140,7 @@ Resources:
         Variables:
           TABLE_NAME: !Ref OrdersTableName
           DYNAMODB_ENDPOINT: !Ref DynamoDbEndpoint
+          SECRET_PROVIDER: environment
           STRIPE_SECRET_KEY: ''
           STRIPE_TIMEOUT_MS: '5000'
           STRIPE_WEBHOOK_SECRET: ''

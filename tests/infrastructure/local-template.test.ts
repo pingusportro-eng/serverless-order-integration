@@ -46,6 +46,7 @@ describe('local SAM payment infrastructure', () => {
       Path: '/webhooks/stripe',
     });
     expect(environment?.Variables).toMatchObject({
+      SECRET_PROVIDER: 'environment',
       STRIPE_SECRET_KEY: '',
       STRIPE_WEBHOOK_SECRET: '',
       STRIPE_WEBHOOK_TOLERANCE_SECONDS: '300',

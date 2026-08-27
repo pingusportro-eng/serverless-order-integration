@@ -163,4 +163,10 @@ describe('cloud infrastructure', () => {
       },
     });
   });
+
+  it('selects SSM as the cloud runtime secret provider', () => {
+    expect(template.Resources['OrdersApiFunction']?.Properties?.['Environment']).toMatchObject({
+      Variables: { SECRET_PROVIDER: 'ssm' },
+    });
+  });
 });
