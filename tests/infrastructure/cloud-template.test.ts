@@ -29,7 +29,7 @@ const customTags: ScalarTag[] = [
   },
 ];
 
-describe('cloud messaging infrastructure', () => {
+describe('cloud infrastructure', () => {
   let template: CloudFormationTemplate;
 
   beforeAll(async () => {
@@ -127,6 +127,40 @@ describe('cloud messaging infrastructure', () => {
             '{"eventName":["INSERT","MODIFY"],"dynamodb":{"NewImage":{"entityType":{"S":["ORDER"]}}}}',
         },
       ],
+    });
+  });
+
+  it('configures a public Cognito client for Authorization Code and PKCE', () => {
+    expect(template.Resources['UserPoolDomain']).toEqual({
+      Type: 'AWS::Cognito::UserPoolDomain',
+      DeletionPolicy: 'Delete',
+      UpdateReplacePolicy: 'Delete',
+      Properties: {
+        Domain: {
+          'Fn::Sub': 'serverless-order-integration-${AWS::AccountId}-${EnvironmentName}',
+        },
+        ManagedLoginVersion: 1,
+        UserPoolId: { Ref: 'UserPool' },
+      },
+    });
+    expect(template.Resources['UserPoolClient']).toMatchObject({
+      Type: 'AWS::Cognito::UserPoolClient',
+      Properties: {
+        UserPoolId: { Ref: 'UserPool' },
+        GenerateSecret: false,
+        AllowedOAuthFlowsUserPoolClient: true,
+        AllowedOAuthFlows: ['code'],
+        AllowedOAuthScopes: ['openid'],
+        CallbackURLs: ['http://127.0.0.1:3002/auth/callback'],
+        LogoutURLs: ['http://127.0.0.1:3002/'],
+        SupportedIdentityProviders: ['COGNITO'],
+      },
+    });
+    expect(template.Outputs['UserPoolDomainUrl']).toEqual({
+      Description: 'Cognito prefix-domain origin used by the browser PKCE flow.',
+      Value: {
+        'Fn::Sub': 'https://${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com',
+      },
     });
   });
 });

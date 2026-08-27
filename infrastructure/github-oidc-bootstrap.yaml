@@ -303,11 +303,14 @@ Resources:
                   - cognito-idp:CreateGroup
                   - cognito-idp:CreateUserPool
                   - cognito-idp:CreateUserPoolClient
+                  - cognito-idp:CreateUserPoolDomain
                   - cognito-idp:DeleteGroup
                   - cognito-idp:DeleteUserPool
                   - cognito-idp:DeleteUserPoolClient
+                  - cognito-idp:DeleteUserPoolDomain
                   - cognito-idp:DescribeUserPool
                   - cognito-idp:DescribeUserPoolClient
+                  - cognito-idp:DescribeUserPoolDomain
                   - cognito-idp:GetGroup
                   - cognito-idp:ListGroups
                   - cognito-idp:ListTagsForResource
@@ -318,6 +321,7 @@ Resources:
                   - cognito-idp:UpdateGroup
                   - cognito-idp:UpdateUserPool
                   - cognito-idp:UpdateUserPoolClient
+                  - cognito-idp:UpdateUserPoolDomain
                 Resource: '*'
                 Condition:
                   StringEquals:

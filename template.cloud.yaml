@@ -228,6 +228,17 @@ Resources:
     Properties:
       UserPoolId: !Ref UserPool
       GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+      AllowedOAuthScopes:
+        - openid
+      CallbackURLs:
+        - http://127.0.0.1:3002/auth/callback
+      LogoutURLs:
+        - http://127.0.0.1:3002/
+      SupportedIdentityProviders:
+        - COGNITO
       PreventUserExistenceErrors: ENABLED
       EnableTokenRevocation: true
       ExplicitAuthFlows:
@@ -240,6 +251,15 @@ Resources:
         AccessToken: hours
         IdToken: hours
         RefreshToken: days
+
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Domain: !Sub serverless-order-integration-${AWS::AccountId}-${EnvironmentName}
+      ManagedLoginVersion: 1
+      UserPoolId: !Ref UserPool
 
   OperatorsGroup:
     Type: AWS::Cognito::UserPoolGroup
@@ -752,6 +772,9 @@ Outputs:
   UserPoolClientId:
     Description: Public Cognito app client ID used to obtain test access tokens.
     Value: !Ref UserPoolClient
+  UserPoolDomainUrl:
+    Description: Cognito prefix-domain origin used by the browser PKCE flow.
+    Value: !Sub https://${UserPoolDomain}.auth.${AWS::Region}.amazoncognito.com
   UserPoolIssuer:
     Description: JWT issuer configured on the HTTP API authorizer.
     Value: !Sub https://cognito-idp.${AWS::Region}.${AWS::URLSuffix}/${UserPool}

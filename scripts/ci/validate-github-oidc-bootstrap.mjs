@@ -234,6 +234,36 @@ assert.deepEqual(
   ],
   'API Gateway provisioning must include explicit stage tag lifecycle permissions.',
 );
+assert.deepEqual(
+  executionApiPolicy.PolicyDocument.Statement.find(
+    (statement) => statement.Sid === 'ManageApplicationUserPool',
+  ).Action,
+  [
+    'cognito-idp:CreateGroup',
+    'cognito-idp:CreateUserPool',
+    'cognito-idp:CreateUserPoolClient',
+    'cognito-idp:CreateUserPoolDomain',
+    'cognito-idp:DeleteGroup',
+    'cognito-idp:DeleteUserPool',
+    'cognito-idp:DeleteUserPoolClient',
+    'cognito-idp:DeleteUserPoolDomain',
+    'cognito-idp:DescribeUserPool',
+    'cognito-idp:DescribeUserPoolClient',
+    'cognito-idp:DescribeUserPoolDomain',
+    'cognito-idp:GetGroup',
+    'cognito-idp:ListGroups',
+    'cognito-idp:ListTagsForResource',
+    'cognito-idp:ListUserPoolClients',
+    'cognito-idp:ListUserPools',
+    'cognito-idp:TagResource',
+    'cognito-idp:UntagResource',
+    'cognito-idp:UpdateGroup',
+    'cognito-idp:UpdateUserPool',
+    'cognito-idp:UpdateUserPoolClient',
+    'cognito-idp:UpdateUserPoolDomain',
+  ],
+  'Cognito provisioning must include the reviewed prefix-domain lifecycle only.',
+);
 const executionMessagingPolicy = executionRole.Policies.find(
   (policy) => policy.PolicyName === 'ManageApplicationMessagingAndLogs',
 );
