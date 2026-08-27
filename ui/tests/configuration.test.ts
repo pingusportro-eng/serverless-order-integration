@@ -42,7 +42,7 @@ describe('UI configuration', () => {
       cognito: {
         clientId: 'client-123',
         domain: 'https://example.auth.eu-central-1.amazoncognito.com',
-        redirectUri: 'http://localhost:3002/auth/callback',
+        redirectUri: 'http://127.0.0.1:3002/auth/callback',
       },
       stripePublishableKey: STRIPE_PUBLISHABLE_KEY,
     });

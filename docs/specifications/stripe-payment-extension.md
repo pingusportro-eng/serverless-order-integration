@@ -31,7 +31,7 @@ reviewed contract for the next implementation slices.
 | Delivery handoff | `order.ready_for_submission`, not `order.created`, reaches the delivery queue. |
 | Secrets | Local ignored files and AWS SSM Standard `SecureString` parameters using `alias/aws/ssm`. |
 | Browser authentication | Cognito classic hosted UI with Authorization Code and PKCE in the cloud; an explicit local bypass for `mrc_demo`. |
-| UI | A separate React and TypeScript application under `ui/`, served on `localhost:3002`. |
+| UI | A separate React and TypeScript application under `ui/`, served on `127.0.0.1:3002`. |
 | Local feedback | One `local:lab` command exercises the application locally without deploying AWS resources. |
 | Cloud webhooks | The cloud lab temporarily registers and later deletes its Stripe Sandbox webhook endpoint. |
 | Recovery | Stripe retries transient webhook failures; an operator command reconciles deliveries missed beyond that window. |
@@ -496,13 +496,14 @@ the classic hosted UI:
 
 ```text
 Authorization Code + PKCE
-callback: http://localhost:3002/auth/callback
-logout:   http://localhost:3002/
+callback: http://127.0.0.1:3002/auth/callback
+logout:   http://127.0.0.1:3002/
 ```
 
 The SPA is a public OAuth client and has no client secret. It enables no
 implicit grant. Tokens remain in browser memory for the learning session.
-Only exact localhost UI origins are permitted by API CORS configuration.
+Only the exact `http://127.0.0.1:3002` UI origin is permitted by API CORS
+configuration.
 
 The browser generates a 256-bit PKCE verifier and state value with Web Crypto,
 stores only that temporary transaction in `sessionStorage`, and sends an S256

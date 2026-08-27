@@ -18,7 +18,7 @@ export interface CognitoUiConfiguration extends UiConfigurationBase {
 
 export type UiConfiguration = LocalUiConfiguration | CognitoUiConfiguration;
 
-const DEFAULT_COGNITO_REDIRECT_URI = 'http://localhost:3002/auth/callback';
+const DEFAULT_COGNITO_REDIRECT_URI = 'http://127.0.0.1:3002/auth/callback';
 
 function stripePublishableKey(environment: Readonly<Record<string, unknown>>): string {
   const value = optionalString(environment, 'VITE_STRIPE_PUBLISHABLE_KEY');
@@ -105,7 +105,7 @@ function cognitoRedirectUri(value: string): string {
     parsed.hash.length > 0
   ) {
     throw new InvalidUiConfigurationError(
-      'VITE_COGNITO_REDIRECT_URI must use HTTPS, or HTTP on localhost, and must not contain credentials, a query, or a fragment.',
+      'VITE_COGNITO_REDIRECT_URI must use HTTPS, or HTTP on a local loopback host, and must not contain credentials, a query, or a fragment.',
     );
   }
   return parsed.href;

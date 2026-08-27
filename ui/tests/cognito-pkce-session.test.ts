@@ -11,7 +11,7 @@ import {
 const CONFIGURATION = {
   domain: 'https://example.auth.eu-central-1.amazoncognito.com',
   clientId: 'client-123',
-  redirectUri: 'http://localhost:3002/auth/callback',
+  redirectUri: 'http://127.0.0.1:3002/auth/callback',
 };
 const NOW = Date.parse('2026-08-25T10:00:00.000Z');
 
@@ -55,7 +55,7 @@ async function startedTransaction(): Promise<{
   readonly storage: MemoryStorage;
   readonly state: string;
 }> {
-  const browser = browserFixture('http://localhost:3002/');
+  const browser = browserFixture('http://127.0.0.1:3002/');
   await authenticateWithCognito(CONFIGURATION, browser);
   const authorizationUrl = new URL(String(browser.navigate.mock.calls[0]?.[0]));
   return { storage: browser.storage, state: authorizationUrl.searchParams.get('state') ?? '' };
@@ -63,7 +63,7 @@ async function startedTransaction(): Promise<{
 
 describe('Cognito Authorization Code + PKCE session', () => {
   it('stores a temporary verifier and redirects with an S256 challenge', async () => {
-    const browser = browserFixture('http://localhost:3002/');
+    const browser = browserFixture('http://127.0.0.1:3002/');
 
     await expect(authenticateWithCognito(CONFIGURATION, browser)).resolves.toEqual({
       kind: 'redirecting',
