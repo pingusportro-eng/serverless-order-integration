@@ -167,6 +167,7 @@ const expectedGeneratedLambdaRoleArns = [
   'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-integration-dev-*',
   'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-OrdersApiFunctionRole-*',
   'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-VendorWebhookFunctionRole-*',
+  'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-StripeWebhookFunctionRole-*',
   'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-StreamPublisherFunctionRole-*',
   'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-StreamPublisherFunctionRo-*',
   'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/serverless-order-*-DeliveryWorkerFunctionRole-*',
@@ -201,6 +202,7 @@ const expectedGeneratedLambdaFunctionArns = [
   'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-integration-dev-*',
   'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-*-OrdersApiFunction-*',
   'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-*-VendorWebhookFunction-*',
+  'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-*-StripeWebhookFunction-*',
   'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-*-StreamPublisherFunction-*',
   'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:serverless-order-*-DeliveryWorkerFunction-*',
 ].map((arn) => ({ 'Fn::Sub': arn }));

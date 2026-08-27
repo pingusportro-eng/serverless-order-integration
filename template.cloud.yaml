@@ -124,6 +124,12 @@ Parameters:
     MinValue: 100
     MaxValue: 55000
     Description: Cost-reviewed HTTP timeout for one Stripe API request.
+  StripeWebhookToleranceSeconds:
+    Type: Number
+    Default: 300
+    MinValue: 30
+    MaxValue: 900
+    Description: Maximum accepted difference between a Stripe signature and server time.
 
 Globals:
   Function:
@@ -305,6 +311,19 @@ Resources:
     UpdateReplacePolicy: Delete
     Properties:
       LogGroupName: !Sub /aws/serverless-order-integration/${AWS::StackName}/vendor-webhook
+      RetentionInDays: !Ref LogRetentionDays
+      Tags:
+        - Key: Project
+          Value: serverless-order-integration
+        - Key: Environment
+          Value: !Ref EnvironmentName
+
+  StripeWebhookLogGroup:
+    Type: AWS::Logs::LogGroup
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      LogGroupName: !Sub /aws/serverless-order-integration/${AWS::StackName}/stripe-webhook
       RetentionInDays: !Ref LogRetentionDays
       Tags:
         - Key: Project
@@ -664,6 +683,69 @@ Resources:
         Sourcemap: true
         Target: es2022
 
+  StripeWebhookFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: .
+      Handler: stripe-webhook.handler
+      Description: Public Stripe webhook protected by signature verification and durable deduplication.
+      LoggingConfig:
+        LogFormat: Text
+        LogGroup: !Ref StripeWebhookLogGroup
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref OrdersTable
+          SECRET_PROVIDER: ssm
+          STRIPE_SECRET_KEY_PARAMETER_NAME: !Sub /serverless-order-integration/${EnvironmentName}/stripe/secret-key
+          STRIPE_TIMEOUT_MS: !Ref StripeTimeoutMs
+          STRIPE_WEBHOOK_SECRET_PARAMETER_NAME: !Sub /serverless-order-integration/${EnvironmentName}/stripe/webhook-secret
+          STRIPE_WEBHOOK_TOLERANCE_SECONDS: !Ref StripeWebhookToleranceSeconds
+      Policies:
+        - Version: '2012-10-17'
+          Statement:
+            - Sid: ReadStripeWebhookState
+              Effect: Allow
+              Action:
+                - dynamodb:GetItem
+              Resource: !GetAtt OrdersTable.Arn
+            - Sid: RecordStripeWebhook
+              Effect: Allow
+              Action:
+                - dynamodb:ConditionCheckItem
+                - dynamodb:PutItem
+                - dynamodb:UpdateItem
+              Resource: !GetAtt OrdersTable.Arn
+              Condition:
+                ForAnyValue:StringEquals:
+                  dynamodb:EnclosingOperation:
+                    - TransactWriteItems
+            - Sid: ReadStripeWebhookParameters
+              Effect: Allow
+              Action:
+                - ssm:GetParameter
+              Resource:
+                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/serverless-order-integration/${EnvironmentName}/stripe/secret-key
+                - !Sub arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/serverless-order-integration/${EnvironmentName}/stripe/webhook-secret
+      Events:
+        StripeWebhook:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref SynchronousHttpApi
+            Method: POST
+            Path: /webhooks/stripe
+            PayloadFormatVersion: '2.0'
+            Auth:
+              Authorizer: NONE
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        EntryPoints:
+          - src/lambda/stripe-webhook.ts
+        Format: cjs
+        Minify: true
+        Sourcemap: true
+        Target: es2022
+
   StreamPublisherFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -814,8 +896,11 @@ Outputs:
     Description: JWT issuer configured on the HTTP API authorizer.
     Value: !Sub https://cognito-idp.${AWS::Region}.${AWS::URLSuffix}/${UserPool}
   StripeSecretKeyParameterName:
-    Description: Stable Standard SecureString parameter read by the Orders API.
+    Description: Stable Standard SecureString parameter read by the payment Lambdas.
     Value: !Sub /serverless-order-integration/${EnvironmentName}/stripe/secret-key
+  StripeWebhookSecretParameterName:
+    Description: Ephemeral Standard SecureString parameter read by the Stripe webhook.
+    Value: !Sub /serverless-order-integration/${EnvironmentName}/stripe/webhook-secret
   OrdersTableStreamArn:
     Description: DynamoDB Stream consumed by the domain-event publisher.
     Value: !GetAtt OrdersTable.StreamArn

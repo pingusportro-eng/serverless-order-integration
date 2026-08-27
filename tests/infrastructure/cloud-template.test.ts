@@ -194,7 +194,7 @@ describe('cloud infrastructure', () => {
     });
     expect(JSON.stringify(stripeParameterAccess)).not.toContain('*');
     expect(template.Outputs['StripeSecretKeyParameterName']).toEqual({
-      Description: 'Stable Standard SecureString parameter read by the Orders API.',
+      Description: 'Stable Standard SecureString parameter read by the payment Lambdas.',
       Value: {
         'Fn::Sub': '/serverless-order-integration/${EnvironmentName}/stripe/secret-key',
       },
@@ -231,6 +231,96 @@ describe('cloud infrastructure', () => {
         Method: 'POST',
         Path: '/orders/{orderId}/payment-intents',
         PayloadFormatVersion: '2.0',
+      },
+    });
+  });
+
+  it('routes raw Stripe webhooks to a public, least-privilege Lambda', () => {
+    const webhook = template.Resources['StripeWebhookFunction'];
+
+    expect(template.Resources['StripeWebhookLogGroup']).toEqual({
+      Type: 'AWS::Logs::LogGroup',
+      DeletionPolicy: 'Delete',
+      UpdateReplacePolicy: 'Delete',
+      Properties: {
+        LogGroupName: {
+          'Fn::Sub': '/aws/serverless-order-integration/${AWS::StackName}/stripe-webhook',
+        },
+        RetentionInDays: { Ref: 'LogRetentionDays' },
+        Tags: [
+          { Key: 'Project', Value: 'serverless-order-integration' },
+          { Key: 'Environment', Value: { Ref: 'EnvironmentName' } },
+        ],
+      },
+    });
+    expect(webhook).toMatchObject({
+      Type: 'AWS::Serverless::Function',
+      Properties: {
+        Handler: 'stripe-webhook.handler',
+        LoggingConfig: {
+          LogFormat: 'Text',
+          LogGroup: { Ref: 'StripeWebhookLogGroup' },
+        },
+        Environment: {
+          Variables: {
+            TABLE_NAME: { Ref: 'OrdersTable' },
+            SECRET_PROVIDER: 'ssm',
+            STRIPE_SECRET_KEY_PARAMETER_NAME: {
+              'Fn::Sub': '/serverless-order-integration/${EnvironmentName}/stripe/secret-key',
+            },
+            STRIPE_TIMEOUT_MS: { Ref: 'StripeTimeoutMs' },
+            STRIPE_WEBHOOK_SECRET_PARAMETER_NAME: {
+              'Fn::Sub': '/serverless-order-integration/${EnvironmentName}/stripe/webhook-secret',
+            },
+            STRIPE_WEBHOOK_TOLERANCE_SECONDS: { Ref: 'StripeWebhookToleranceSeconds' },
+          },
+        },
+      },
+    });
+
+    const events = webhook?.Properties?.['Events'] as Record<
+      string,
+      { Type?: string; Properties?: Record<string, unknown> }
+    >;
+    expect(events['StripeWebhook']).toEqual({
+      Type: 'HttpApi',
+      Properties: {
+        ApiId: { Ref: 'SynchronousHttpApi' },
+        Method: 'POST',
+        Path: '/webhooks/stripe',
+        PayloadFormatVersion: '2.0',
+        Auth: { Authorizer: 'NONE' },
+      },
+    });
+
+    const policies = webhook?.Properties?.['Policies'] as
+      { Statement?: Record<string, unknown>[] }[] | undefined;
+    const statements = policies?.[0]?.Statement;
+    expect(statements?.map((statement) => statement['Sid'])).toEqual([
+      'ReadStripeWebhookState',
+      'RecordStripeWebhook',
+      'ReadStripeWebhookParameters',
+    ]);
+    expect(statements?.[2]).toEqual({
+      Sid: 'ReadStripeWebhookParameters',
+      Effect: 'Allow',
+      Action: ['ssm:GetParameter'],
+      Resource: [
+        {
+          'Fn::Sub':
+            'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/serverless-order-integration/${EnvironmentName}/stripe/secret-key',
+        },
+        {
+          'Fn::Sub':
+            'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/serverless-order-integration/${EnvironmentName}/stripe/webhook-secret',
+        },
+      ],
+    });
+    expect(JSON.stringify(statements?.[2])).not.toContain('*');
+    expect(template.Outputs['StripeWebhookSecretParameterName']).toEqual({
+      Description: 'Ephemeral Standard SecureString parameter read by the Stripe webhook.',
+      Value: {
+        'Fn::Sub': '/serverless-order-integration/${EnvironmentName}/stripe/webhook-secret',
       },
     });
   });
