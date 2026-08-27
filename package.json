@@ -59,6 +59,7 @@
   "dependencies": {
     "@aws-sdk/client-dynamodb": "3.1091.0",
     "@aws-sdk/client-sns": "3.1091.0",
+    "@aws-sdk/client-ssm": "3.1091.0",
     "@aws-sdk/lib-dynamodb": "3.1091.0",
     "@aws-sdk/util-dynamodb": "3.996.7",
     "stripe": "22.4.0"
