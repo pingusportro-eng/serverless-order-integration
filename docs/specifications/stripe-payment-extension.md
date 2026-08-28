@@ -670,6 +670,11 @@ normal pull-request checks.
 
 ### Separately approved AWS exercise
 
+The exact resource inventory, workload ceiling, cost estimate, stop conditions,
+and evidence procedure are recorded in the
+[Stripe cloud acceptance review](../infrastructure/stripe-cloud-acceptance-review.md).
+That review is a preflight artifact and does not authorize a deployment.
+
 - [ ] Cognito Authorization Code + PKCE protects authenticated routes.
 - [ ] API Gateway preserves the raw webhook body for signature verification.
 - [ ] Payment success produces `order.ready_for_submission` through DynamoDB
