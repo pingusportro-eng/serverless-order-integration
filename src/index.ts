@@ -98,6 +98,18 @@ export type {
   StripeReconciliationEventSource,
 } from './application/stripe-reconciliation-event-source.js';
 export { createStripeReconciliationEventSource } from './integrations/stripe-reconciliation-event-source.js';
+export {
+  createStripeWebhookEndpointManager,
+  StripeWebhookEndpointManagerError,
+} from './integrations/stripe-webhook-endpoint-manager.js';
+export type {
+  CreateStripeWebhookEndpointManagerOptions,
+  DeleteStripeWebhookEndpointResult,
+  PreparedStripeWebhookEndpoint,
+  StripeWebhookEndpointManager,
+  StripeWebhookEndpointManagerErrorCode,
+  StripeWebhookEndpointSdkClient,
+} from './integrations/stripe-webhook-endpoint-manager.js';
 export type {
   CreateStripeReconciliationEventSourceOptions,
   StripeReconciliationSdkClient,
