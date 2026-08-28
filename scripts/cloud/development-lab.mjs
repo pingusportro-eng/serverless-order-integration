@@ -20,6 +20,11 @@ import {
   cleanupStripeWebhookLifecycle,
   prepareStripeWebhookLifecycle,
 } from './stripe-webhook-lifecycle.mjs';
+import {
+  createCloudUiConfiguration,
+  createCloudUiProcessEnvironment,
+  stripePublishableKeyFromLocalEnvironment,
+} from './cloud-ui-configuration.mjs';
 
 const projectRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const accountId = '454921778743';
@@ -38,13 +43,16 @@ const artifactPrefix = 'serverless-order-integration-dev/';
 const stateDirectory = join(projectRoot, '.aws-sam', 'cloud-lab');
 const statePath = join(stateDirectory, 'state.json');
 const secretPath = join(stateDirectory, 'secrets.json');
+const browserCredentialsPath = join(stateDirectory, 'cognito-browser-credentials.txt');
 const tokenPath = join(stateDirectory, 'operator-token.txt');
 const headerPath = join(stateDirectory, 'operator-headers.txt');
 const orderPath = join(stateDirectory, 'order.json');
 const responsePath = join(stateDirectory, 'response.json');
 const vendorLogPath = join(stateDirectory, 'vendor.log');
 const tunnelLogPath = join(stateDirectory, 'cloudflared.log');
+const uiLogPath = join(stateDirectory, 'ui.log');
 const lockPath = join(stateDirectory, 'supervisor.lock');
+const uiEnvironmentPath = join(projectRoot, 'ui', '.env.local');
 const maximumHttpRequests = 20;
 
 let shutdownRequested = false;
@@ -258,6 +266,38 @@ async function ownedTunnelObservation(savedProcess) {
   return { ...observation, healthy: health.healthy };
 }
 
+async function uiHealth(url) {
+  if (typeof url !== 'string') {
+    return false;
+  }
+  const result = await command(
+    'curl',
+    [
+      '--silent',
+      '--show-error',
+      '--output',
+      '/dev/null',
+      '--write-out',
+      '%{http_code}',
+      '--connect-timeout',
+      '2',
+      '--max-time',
+      '5',
+      `${url}/`,
+    ],
+    { allowFailure: true },
+  );
+  return result.code === 0 && result.stdout === '200';
+}
+
+async function ownedUiObservation(savedProcess) {
+  const observation = processObservation(savedProcess);
+  if (!observation.running || !observation.commandMatches) {
+    return observation;
+  }
+  return { ...observation, healthy: await uiHealth(savedProcess.localUrl) };
+}
+
 async function acquireLock() {
   await ensureStateDirectory();
   try {
@@ -417,6 +457,22 @@ function loadLocalEnvironment() {
     fail('.env.development.local must contain a VENDOR_AUTH_TOKEN of at least 32 characters');
   }
   return { vendorToken };
+}
+
+function loadUiEnvironment() {
+  if (!existsSync(uiEnvironmentPath)) {
+    fail('ui/.env.local is missing');
+  }
+  const mode = statSync(uiEnvironmentPath).mode & 0o777;
+  if (mode !== 0o600) {
+    fail(`ui/.env.local must use mode 0600, received ${mode.toString(8)}`);
+  }
+  const values = parseEnv(readFileSync(uiEnvironmentPath, 'utf8'));
+  try {
+    return { stripePublishableKey: stripePublishableKeyFromLocalEnvironment(values) };
+  } catch (error) {
+    fail(error instanceof Error ? error.message : String(error));
+  }
 }
 
 async function setGitHubEnvironmentSecret(name, value) {
@@ -1028,6 +1084,107 @@ async function cleanupStripeWebhook(state) {
   return updatedState;
 }
 
+function reviewedCloudUiConfiguration(stack, state, uiEnvironment) {
+  return createCloudUiConfiguration({
+    apiUrl: state.apiUrl,
+    cognitoDomain: stack.outputs.UserPoolDomainUrl,
+    cognitoClientId: stack.outputs.UserPoolClientId,
+    stripePublishableKey: uiEnvironment.stripePublishableKey,
+  });
+}
+
+async function waitForUi(savedProcess) {
+  for (let attempt = 1; attempt <= 120; attempt += 1) {
+    const observation = processObservation(savedProcess);
+    if (!observation.running || !observation.commandMatches) {
+      fail(`Cloud UI stopped during startup; see ${uiLogPath}`);
+    }
+    if (await uiHealth(savedProcess.localUrl)) {
+      return;
+    }
+    await sleep(250);
+  }
+  fail(`Cloud UI was not ready within 30 seconds; see ${uiLogPath}`);
+}
+
+async function startCloudUi(configuration) {
+  await ensureStateDirectory();
+  const existingSize = existsSync(uiLogPath) ? statSync(uiLogPath).size : 0;
+  writeFileSync(
+    uiLogPath,
+    `${existingSize > 0 ? '\n' : ''}--- cloud UI start ${new Date().toISOString()} ---\n`,
+    { flag: 'a', mode: 0o600 },
+  );
+  const processId = spawnDetached(
+    'npm',
+    ['run', 'dev', '--workspace', 'ui'],
+    createCloudUiProcessEnvironment(process.env, configuration.environment),
+    uiLogPath,
+  );
+  return {
+    pid: processId,
+    commandFragment: 'npm run dev --workspace ui',
+    localUrl: configuration.localUrl,
+    configurationFingerprint: configuration.fingerprint,
+  };
+}
+
+async function prepareCloudUi(stack, state, uiEnvironment) {
+  const configuration = reviewedCloudUiConfiguration(stack, state, uiEnvironment);
+  const decision = decideOwnedProcess(state.ui, await ownedUiObservation(state.ui));
+  if (decision.action === 'blocked') {
+    fail(decision.reason);
+  }
+  if (
+    decision.action === 'reuse' &&
+    state.ui.configurationFingerprint === configuration.fingerprint
+  ) {
+    print(`Cloud UI: reusing lab-owned ${state.ui.localUrl}.`);
+    return state;
+  }
+
+  if (state.ui !== undefined) {
+    await stopOwnedProcess(state.ui, 'Cloud UI');
+    const withoutUi = { ...state };
+    delete withoutUi.ui;
+    await saveState(withoutUi);
+    return await startAndRecordCloudUi(withoutUi, configuration);
+  }
+
+  return await startAndRecordCloudUi(state, configuration);
+}
+
+async function startAndRecordCloudUi(state, configuration) {
+  if (await uiHealth(configuration.localUrl)) {
+    fail(`port 3002 already serves an unowned HTTP application at ${configuration.localUrl}`);
+  }
+  const ui = await startCloudUi(configuration);
+  let updated = { ...state, ui };
+  await saveState(updated);
+  try {
+    await waitForUi(ui);
+  } catch (error) {
+    await stopOwnedProcess(ui, 'Failed Cloud UI');
+    updated = { ...updated };
+    delete updated.ui;
+    await saveState(updated);
+    throw error;
+  }
+  print(`Cloud UI: ${ui.localUrl}`);
+  return updated;
+}
+
+async function cleanupCloudUi(state) {
+  if (state.ui === undefined) {
+    return state;
+  }
+  await stopOwnedProcess(state.ui, 'Cloud UI');
+  const updated = { ...state };
+  delete updated.ui;
+  await saveState(updated);
+  return updated;
+}
+
 async function createOperator(stack, state) {
   const userPoolId = stack.outputs.UserPoolId;
   const clientId = stack.outputs.UserPoolClientId;
@@ -1077,6 +1234,10 @@ async function createOperator(stack, state) {
   await writeFile(headerPath, `Authorization: Bearer ${token}\nContent-Type: application/json\n`, {
     mode: 0o600,
   });
+  await writeFile(browserCredentialsPath, `Username: ${username}\nPassword: ${password}\n`, {
+    mode: 0o600,
+  });
+  await chmod(browserCredentialsPath, 0o600);
   await writeFile(
     orderPath,
     `${JSON.stringify(
@@ -1143,17 +1304,20 @@ function printReady(state) {
   const idempotency = 'cookbook-order-001';
   print('');
   print('AWS LAB READY');
+  print('PAYMENT LAB READY');
   print('');
   print(`AWS account:        ${accountId}`);
   print(`Region:             ${region}`);
   print(`Stack:              ${stackName}`);
   print(`API:                ${state.apiUrl}`);
+  print(`UI:                 ${state.ui.localUrl}`);
   print(`Create order:       POST ${state.apiUrl}/orders`);
   print(`Stripe webhook:     ${state.apiUrl}/webhooks/stripe`);
   print(`Stripe endpoint:    ${state.stripeWebhook.endpointId}`);
   print(`Mock vendor local:  ${state.vendor.localUrl}`);
   print(`Mock vendor public: ${state.tunnel.publicUrl}`);
   print('Mock scenario:      success');
+  print(`Cognito credentials: ${browserCredentialsPath}`);
   print('');
   print('From a second terminal, either run:');
   print('  npm run cloud:order:create');
@@ -1237,8 +1401,17 @@ async function destroyCloudAndLocal(state, head) {
   print('VERIFIED TEARDOWN STARTED');
   let cloudDestroyed = false;
   let teardownComplete = false;
+  let uiCleanupError;
   let stripeCleanupError;
   try {
+    try {
+      state = await cleanupCloudUi(state);
+    } catch (error) {
+      uiCleanupError = error;
+      process.stderr.write(
+        `${error instanceof Error ? error.message : String(error)} Continuing with external and AWS teardown.\n`,
+      );
+    }
     try {
       state = await cleanupStripeWebhook(state);
     } catch (error) {
@@ -1260,22 +1433,27 @@ async function destroyCloudAndLocal(state, head) {
     await stopOwnedProcess(state.tunnel, 'Quick Tunnel');
     await stopOwnedProcess(state.vendor, 'Mock vendor');
     await Promise.all([
+      rm(browserCredentialsPath, { force: true }),
       rm(tokenPath, { force: true }),
       rm(headerPath, { force: true }),
       rm(secretPath, { force: true }),
       rm(responsePath, { force: true }),
     ]);
-    if (stripeCleanupError !== undefined) {
+    const cleanupErrors = [uiCleanupError, stripeCleanupError].filter(
+      (error) => error !== undefined,
+    );
+    if (cleanupErrors.length > 0) {
       const cleanupState = {
         phase: 'cleanup-required',
         cleanupRequiredAt: new Date().toISOString(),
         stackName,
         stackAbsent: true,
         artifactPrefixEmpty: true,
+        ...(state.ui === undefined ? {} : { ui: state.ui }),
         ...(state.stripeWebhook === undefined ? {} : { stripeWebhook: state.stripeWebhook }),
       };
       await saveState(cleanupState);
-      throw stripeCleanupError;
+      throw new AggregateError(cleanupErrors, 'One or more pre-cloud cleanup boundaries failed.');
     }
     const destroyedState = {
       phase: 'destroyed',
@@ -1292,6 +1470,7 @@ async function destroyCloudAndLocal(state, head) {
     print('Application stack:   absent');
     print('Deployment artifacts: empty');
     print('Temporary user:      removed with Cognito pool');
+    print('Cloud UI:            stopped');
     print('Stripe endpoint:     absent');
     print('Webhook secret:      absent');
     print('Stripe API key:      retained in Standard SSM');
@@ -1339,6 +1518,7 @@ async function deploy() {
     await assertIdentityAndBudget();
     head = await assertGitHubAndGit();
     const localEnvironment = loadLocalEnvironment();
+    const uiEnvironment = loadUiEnvironment();
     const secrets = await loadOrCreateLabSecrets();
     const webhookSecretDigest = createHash('sha256')
       .update(secrets.webhookSigningSecret)
@@ -1378,6 +1558,7 @@ async function deploy() {
     await saveState(state);
     state = await activateStripeWebhook(stack, state);
     state = await restartVendorWithWebhook(state, localEnvironment, secrets);
+    state = await prepareCloudUi(stack, state, uiEnvironment);
     state = { ...state, phase: 'active' };
     await saveState(state);
     printReady(state);
@@ -1397,7 +1578,10 @@ async function deploy() {
   } finally {
     if (
       head !== undefined &&
-      (cloudMayExist || state.tunnel !== undefined || state.vendor !== undefined)
+      (cloudMayExist ||
+        state.tunnel !== undefined ||
+        state.vendor !== undefined ||
+        state.ui !== undefined)
     ) {
       try {
         await destroyCloudAndLocal(state, head);
@@ -1478,6 +1662,7 @@ async function status() {
   for (const [label, savedProcess] of [
     ['Mock vendor', state.vendor],
     ['Quick Tunnel', state.tunnel],
+    ['Cloud UI', state.ui],
   ]) {
     const observation = processObservation(savedProcess);
     const decision = decideOwnedProcess(savedProcess, observation);

@@ -509,9 +509,16 @@ The cloud lab is deliberately project-specific. It expects:
   environment;
 - `cloudflared`, `curl`, `dig`, `gh`, `git`, Node.js, npm, and the AWS CLI;
 - a clean `master` branch whose current commit is pushed to `origin/master`;
-  and
 - `.env.development.local` with mode `0600` and a
-  `VENDOR_AUTH_TOKEN` containing at least 32 characters.
+  `VENDOR_AUTH_TOKEN` containing at least 32 characters; and
+- `ui/.env.local` with mode `0600` and the Stripe Sandbox publishable key:
+
+  ```dotenv
+  VITE_STRIPE_PUBLISHABLE_KEY=pk_test_...
+  ```
+
+The publishable key is intentionally browser-visible. Stripe secret keys and
+webhook signing secrets never enter the UI process environment.
 
 Authenticate the GitHub CLI once if necessary:
 
@@ -543,14 +550,21 @@ lab. It then:
    deployed API;
 10. stores and verifies its temporary signing secret in Standard SSM without
     printing it;
-11. reconnects the mock vendor to the deployed signed-webhook endpoint; and
-12. prints `AWS LAB READY` with the API, Stripe webhook, and vendor endpoints.
+11. reconnects the mock vendor to the deployed signed-webhook endpoint;
+12. starts or safely reuses the lab-owned React UI on
+    `http://127.0.0.1:3002`, using only reviewed public API, Cognito PKCE, and
+    Stripe publishable configuration; and
+13. prints `AWS LAB READY` and `PAYMENT LAB READY` with the UI, API, Stripe
+    webhook, vendor endpoints, and the local Cognito-credential file path.
 
 There is no later `deploy` prompt. Prepare and execute remain separate GitHub
 operations with an exact change-set guard, but the authenticated supervisor
 advances them automatically. The deployment can therefore be left unattended
-until `AWS LAB READY` appears, provided the terminal, computer, and network
-remain active.
+until `PAYMENT LAB READY` appears, provided the terminal, computer, and network
+remain active. Open the printed UI URL. When Cognito redirects to its hosted
+login page, read the temporary username and password from the printed
+`.aws-sam/cloud-lab/cognito-browser-credentials.txt` path. That file is mode
+`0600`, is not committed, and is deleted during verified teardown.
 
 The supervisor then remains in the foreground as a live, safely redacted vendor
 exchange console. From a second terminal, submit a generated synthetic order:
@@ -565,7 +579,7 @@ CloudWatch investigation. The supervisor console shows the worker-to-vendor
 request, vendor response, and signed vendor-to-API webhook exchanges without
 printing secrets or order addresses.
 
-Inspect the lab supervisor, stack, API, vendor, and tunnel state without
+Inspect the lab supervisor, stack, API, UI, vendor, and tunnel state without
 changing them:
 
 ```bash
@@ -578,15 +592,16 @@ Press `Ctrl+C` once in the original deployment console when the learning
 session is finished. This requests teardown; it does not abruptly terminate
 the supervisor. The current operation first settles, then the supervisor:
 
-1. deletes and verifies absence of the temporary lab-owned Stripe endpoint;
-2. deletes and verifies absence of its temporary SSM signing-secret parameter;
-3. dispatches and monitors the GitHub `destroy` operation;
-4. verifies that the application stack is absent;
-5. verifies that the project deployment-artifact prefix is empty;
-6. removes the temporary Cognito user with the stack;
-7. stops only the tunnel and mock-vendor processes it owns;
-8. deletes its temporary local credentials and signing material; and
-9. prints `AWS LAB DESTROYED` with the verified final state.
+1. stops only the React UI process it owns so no new browser work can start;
+2. deletes and verifies absence of the temporary lab-owned Stripe endpoint;
+3. deletes and verifies absence of its temporary SSM signing-secret parameter;
+4. dispatches and monitors the GitHub `destroy` operation;
+5. verifies that the application stack is absent;
+6. verifies that the project deployment-artifact prefix is empty;
+7. removes the temporary Cognito user with the stack;
+8. stops only the tunnel and mock-vendor processes it owns;
+9. deletes its temporary local credentials and signing material; and
+10. prints `AWS LAB DESTROYED` with the verified final state.
 
 Wait for that final message before closing the terminal. A second interrupt is
 ignored while cleanup is running.

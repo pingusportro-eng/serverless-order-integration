@@ -10,7 +10,7 @@
   "scripts": {
     "build": "tsc --noEmit && vite build",
     "check": "npm run typecheck && npm run test:coverage && npm run build",
-    "dev": "vite --host 127.0.0.1 --port 3002",
+    "dev": "vite --host 127.0.0.1 --port 3002 --strictPort",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",

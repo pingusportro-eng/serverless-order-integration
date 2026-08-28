@@ -620,14 +620,17 @@ deployed, its orchestrator:
 3. creates a temporary Stripe Sandbox webhook endpoint for the exact event
    allowlist;
 4. writes its new signing secret to Standard SSM `SecureString`;
-5. starts the local UI and reports `PAYMENT LAB READY`; and
+5. starts the local UI with only reviewed public API, Cognito PKCE, and Stripe
+   publishable configuration, writes temporary browser-login credentials to a
+   mode-`0600` ignored file, and reports `PAYMENT LAB READY`; and
 6. refuses to report readiness if any boundary is unavailable.
 
-Verified teardown stops new UI work, deletes the temporary Stripe endpoint,
-stops owned local processes, destroys the AWS stack, and verifies both Stripe
-and AWS cleanup. The reusable Stripe test API key may remain in SSM; the obsolete
-webhook signing secret is deleted. Incomplete cleanup preserves recovery state
-and reports an explicit command rather than silently claiming success.
+Verified teardown stops new UI work first, deletes the temporary Stripe
+endpoint, stops owned local processes, destroys the AWS stack, deletes the
+temporary browser credentials, and verifies both Stripe and AWS cleanup. The
+reusable Stripe test API key may remain in SSM; the obsolete webhook signing
+secret is deleted. Incomplete cleanup preserves recovery state and reports an
+explicit command rather than silently claiming success.
 
 No cloud exercise is authorized merely by this specification. Each real AWS run
 still requires a separate bounded cost review and user approval.
