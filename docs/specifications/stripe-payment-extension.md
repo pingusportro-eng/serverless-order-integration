@@ -470,7 +470,11 @@ References:
 - The Orders API Lambda may read the Stripe key needed for creation.
 - The Stripe webhook Lambda may read the signing secret and Stripe key needed
   for current-state retrieval.
-- Values are cached within warm Lambda execution environments.
+- The stable Stripe API key is cached within warm Lambda execution
+  environments.
+- The rotating webhook signing secret is read from SSM for every webhook
+  invocation, so replacing the temporary Stripe endpoint cannot leave a warm
+  Lambda validating against an obsolete secret.
 - Parameter names, not values, may appear in CloudFormation configuration.
 
 Deployment validation rejects:

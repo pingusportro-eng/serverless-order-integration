@@ -19,7 +19,7 @@
     "cloud:destroy": "node scripts/cloud/development-lab.mjs destroy",
     "cloud:order:create": "node scripts/cloud/development-lab.mjs create-order",
     "cloud:status": "node scripts/cloud/development-lab.mjs status",
-    "deployment:validate": "node --check scripts/cloud/development-lab.mjs && node --check scripts/cloud/development-lab-state.mjs && node scripts/ci/validate-github-oidc-bootstrap.mjs && bash -n scripts/ci/prepare-development-change-set.sh scripts/ci/execute-development-change-set.sh scripts/ci/smoke-development-stack.sh scripts/ci/destroy-development-stack.sh",
+    "deployment:validate": "node --check scripts/cloud/development-lab.mjs && node --check scripts/cloud/development-lab-state.mjs && node --check scripts/cloud/stripe-webhook-lifecycle.mjs && node scripts/ci/validate-github-oidc-bootstrap.mjs && bash -n scripts/ci/prepare-development-change-set.sh scripts/ci/execute-development-change-set.sh scripts/ci/smoke-development-stack.sh scripts/ci/destroy-development-stack.sh",
     "dynamodb:bootstrap": "npm run dynamodb:start && bash scripts/dynamodb/bootstrap-local.sh",
     "dynamodb:reset": "docker compose down --volumes",
     "dynamodb:start": "docker compose up --detach --wait dynamodb-local",

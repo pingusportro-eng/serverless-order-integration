@@ -1,11 +1,14 @@
 import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import Stripe from 'stripe';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { createInitialOrderPayment } from '../../src/domain/payment.js';
 import { FakeStripePaymentClient } from '../../src/integrations/fake-stripe-payment-client.js';
 import { InMemoryOrderRepository } from '../../src/infrastructure/memory/in-memory-order-repository.js';
-import { createStripeWebhookLambdaHandler } from '../../src/lambda/stripe-webhook.js';
+import {
+  createRotatingStripeWebhookLambdaHandler,
+  createStripeWebhookLambdaHandler,
+} from '../../src/lambda/stripe-webhook.js';
 import { createOrderFixture } from '../fixtures/order.js';
 
 const SIGNING_SECRET = 'whsec_stripe_test_signing_secret_123456789';
@@ -145,6 +148,32 @@ describe('Stripe webhook Lambda adapter', () => {
     const rejected = await handler()(changedAfterSigning);
     expect(rejected.statusCode).toBe(400);
     expect(problemCode(rejected)).toBe('INVALID_STRIPE_WEBHOOK');
+  });
+
+  it('resolves the rotating signing secret for every warm invocation', async () => {
+    const nextSecret = 'whsec_stripe_rotated_signing_secret_987654321';
+    const resolveSigningSecret = vi
+      .fn<() => Promise<string>>()
+      .mockResolvedValueOnce(SIGNING_SECRET)
+      .mockResolvedValueOnce(nextSecret);
+    const rotatingHandler = createRotatingStripeWebhookLambdaHandler({
+      repository,
+      stripeClient,
+      resolveSigningSecret,
+      signatureToleranceSeconds: 300,
+      now: () => NOW,
+    });
+    const firstBody = stripeEvent('evt_before_rotation', 'charge.succeeded', 'pi_before_rotation');
+    const secondBody = stripeEvent('evt_after_rotation', 'charge.succeeded', 'pi_after_rotation');
+    const secondSignature = Stripe.webhooks.generateTestHeaderString({
+      payload: secondBody,
+      secret: nextSecret,
+      timestamp: TIMESTAMP,
+    });
+
+    expect((await rotatingHandler(apiEvent(firstBody))).statusCode).toBe(204);
+    expect((await rotatingHandler(apiEvent(secondBody, secondSignature))).statusCode).toBe(204);
+    expect(resolveSigningSecret).toHaveBeenCalledTimes(2);
   });
 
   it('uses retrieved Stripe success as authority and releases the order for delivery', async () => {

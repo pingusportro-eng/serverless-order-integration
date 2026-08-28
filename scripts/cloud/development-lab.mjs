@@ -16,6 +16,10 @@ import {
   decideStackAction,
   isStableStackStatus,
 } from './development-lab-state.mjs';
+import {
+  cleanupStripeWebhookLifecycle,
+  prepareStripeWebhookLifecycle,
+} from './stripe-webhook-lifecycle.mjs';
 
 const projectRoot = dirname(dirname(dirname(fileURLToPath(import.meta.url))));
 const accountId = '454921778743';
@@ -25,6 +29,9 @@ const repository = 'pingusportro-eng/serverless-order-integration';
 const workflow = 'deploy-development.yaml';
 const branch = 'master';
 const stackName = 'serverless-order-integration-dev';
+const environmentName = 'dev';
+const stripeSecretKeyParameterName = '/serverless-order-integration/dev/stripe/secret-key';
+const stripeWebhookSecretParameterName = '/serverless-order-integration/dev/stripe/webhook-secret';
 const budgetName = 'My Zero-Spend Budget';
 const artifactBucket = 'soi-artifacts-454921778743-eu-central-1';
 const artifactPrefix = 'serverless-order-integration-dev/';
@@ -909,6 +916,118 @@ async function awsJsonInput(service, operation, value, extra = []) {
   }
 }
 
+async function readSecureParameter(name) {
+  const result = await aws(
+    ['ssm', 'get-parameter', '--name', name, '--with-decryption', '--output', 'json'],
+    { allowFailure: true },
+  );
+  if (result.code !== 0) {
+    if (result.stderr.includes('ParameterNotFound')) {
+      return undefined;
+    }
+    fail(`could not read secure SSM parameter ${name}`);
+  }
+  const value = parseJson(result.stdout, `SSM parameter ${name}`).Parameter?.Value;
+  if (typeof value !== 'string' || value.length === 0) {
+    fail(`SSM parameter ${name} did not contain a value`);
+  }
+  return value;
+}
+
+async function putSecureParameter(name, value) {
+  await awsJsonInput('ssm', 'put-parameter', {
+    Name: name,
+    Value: value,
+    Type: 'SecureString',
+    KeyId: 'alias/aws/ssm',
+    Tier: 'Standard',
+    Overwrite: true,
+  });
+}
+
+async function deleteParameter(name) {
+  const result = await aws(['ssm', 'delete-parameter', '--name', name], {
+    allowFailure: true,
+  });
+  if (result.code === 0) {
+    return 'deleted';
+  }
+  if (result.stderr.includes('ParameterNotFound')) {
+    return 'absent';
+  }
+  fail(`could not delete SSM parameter ${name}`);
+}
+
+function stripeParameterStore() {
+  return {
+    putSecureString: putSecureParameter,
+    readSecureString: readSecureParameter,
+    deleteParameter,
+  };
+}
+
+async function stripeEndpointManager() {
+  const apiKey = await readSecureParameter(stripeSecretKeyParameterName);
+  if (apiKey === undefined || !apiKey.startsWith('sk_test_')) {
+    fail(`SSM parameter ${stripeSecretKeyParameterName} must contain a Stripe Sandbox key`);
+  }
+  const { createStripeWebhookEndpointManager } =
+    await import('../../dist/integrations/stripe-webhook-endpoint-manager.js');
+  return createStripeWebhookEndpointManager({
+    apiKey,
+    timeoutMs: 5000,
+    environmentName,
+  });
+}
+
+function assertStripeParameterOutputs(stack) {
+  if (stack.outputs.StripeSecretKeyParameterName !== stripeSecretKeyParameterName) {
+    fail('the deployed Stripe secret-key parameter output is not the reviewed name');
+  }
+  if (stack.outputs.StripeWebhookSecretParameterName !== stripeWebhookSecretParameterName) {
+    fail('the deployed Stripe webhook-secret parameter output is not the reviewed name');
+  }
+}
+
+async function activateStripeWebhook(stack, state) {
+  assertStripeParameterOutputs(stack);
+  const endpointManager = await stripeEndpointManager();
+  let updatedState = state;
+  const prepared = await prepareStripeWebhookLifecycle({
+    endpointManager,
+    parameterStore: stripeParameterStore(),
+    webhookUrl: `${state.apiUrl}/webhooks/stripe`,
+    webhookSecretParameterName: stripeWebhookSecretParameterName,
+    saveRecovery: async (stripeWebhook) => {
+      updatedState = { ...updatedState, stripeWebhook };
+      await saveState(updatedState);
+    },
+  });
+  print(`Stripe Sandbox webhook endpoint ready: ${prepared.endpointId}`);
+  return updatedState;
+}
+
+async function cleanupStripeWebhook(state) {
+  if (state.stripeWebhook === undefined) {
+    return state;
+  }
+  const endpointManager = await stripeEndpointManager();
+  let updatedState = state;
+  await cleanupStripeWebhookLifecycle({
+    endpointManager,
+    parameterStore: stripeParameterStore(),
+    recovery: state.stripeWebhook,
+    webhookSecretParameterName: stripeWebhookSecretParameterName,
+    clearRecovery: async () => {
+      updatedState = { ...updatedState };
+      delete updatedState.stripeWebhook;
+      await saveState(updatedState);
+    },
+  });
+  print('Temporary Stripe webhook endpoint and signing-secret parameter are absent.');
+  return updatedState;
+}
+
 async function createOperator(stack, state) {
   const userPoolId = stack.outputs.UserPoolId;
   const clientId = stack.outputs.UserPoolClientId;
@@ -1030,6 +1149,8 @@ function printReady(state) {
   print(`Stack:              ${stackName}`);
   print(`API:                ${state.apiUrl}`);
   print(`Create order:       POST ${state.apiUrl}/orders`);
+  print(`Stripe webhook:     ${state.apiUrl}/webhooks/stripe`);
+  print(`Stripe endpoint:    ${state.stripeWebhook.endpointId}`);
   print(`Mock vendor local:  ${state.vendor.localUrl}`);
   print(`Mock vendor public: ${state.tunnel.publicUrl}`);
   print('Mock scenario:      success');
@@ -1115,7 +1236,18 @@ async function destroyCloudAndLocal(state, head) {
   print('');
   print('VERIFIED TEARDOWN STARTED');
   let cloudDestroyed = false;
+  let teardownComplete = false;
+  let stripeCleanupError;
   try {
+    try {
+      state = await cleanupStripeWebhook(state);
+    } catch (error) {
+      stripeCleanupError = error;
+      process.stderr.write(
+        `${error instanceof Error ? error.message : String(error)} Continuing with AWS teardown.\n`,
+      );
+    }
+
     const stack = await describeStack();
     const artifacts = await deploymentArtifacts();
     if (stack === undefined && artifacts.length === 0) {
@@ -1133,6 +1265,18 @@ async function destroyCloudAndLocal(state, head) {
       rm(secretPath, { force: true }),
       rm(responsePath, { force: true }),
     ]);
+    if (stripeCleanupError !== undefined) {
+      const cleanupState = {
+        phase: 'cleanup-required',
+        cleanupRequiredAt: new Date().toISOString(),
+        stackName,
+        stackAbsent: true,
+        artifactPrefixEmpty: true,
+        ...(state.stripeWebhook === undefined ? {} : { stripeWebhook: state.stripeWebhook }),
+      };
+      await saveState(cleanupState);
+      throw stripeCleanupError;
+    }
     const destroyedState = {
       phase: 'destroyed',
       destroyedAt: new Date().toISOString(),
@@ -1141,21 +1285,30 @@ async function destroyCloudAndLocal(state, head) {
       artifactPrefixEmpty: true,
     };
     await saveState(destroyedState);
+    teardownComplete = true;
     print('');
     print('AWS LAB DESTROYED');
     print('');
     print('Application stack:   absent');
     print('Deployment artifacts: empty');
     print('Temporary user:      removed with Cognito pool');
+    print('Stripe endpoint:     absent');
+    print('Webhook secret:      absent');
+    print('Stripe API key:      retained in Standard SSM');
     print('Quick Tunnel:        stopped');
     print('Mock vendor:         stopped');
     print('Retained app cost:   $0 expected');
   } finally {
-    if (!cloudDestroyed) {
+    if (!teardownComplete) {
       print('');
       print('TEARDOWN INCOMPLETE');
-      print('Owned local processes and recovery state were preserved.');
-      print('Run npm run cloud:destroy when connectivity is restored.');
+      print('Recovery state was preserved for another cleanup attempt.');
+      print(
+        cloudDestroyed
+          ? 'The AWS stack is absent; Stripe or local cleanup still requires verification.'
+          : 'AWS or local cleanup still requires verification.',
+      );
+      print('Run npm run cloud:destroy when the failing boundary is available.');
     }
   }
 }
@@ -1223,6 +1376,7 @@ async function deploy() {
     state = await createOperator(stack, state);
     state = { ...state, phase: 'activating' };
     await saveState(state);
+    state = await activateStripeWebhook(stack, state);
     state = await restartVendorWithWebhook(state, localEnvironment, secrets);
     state = { ...state, phase: 'active' };
     await saveState(state);
@@ -1332,6 +1486,7 @@ async function status() {
   if (typeof state.apiUrl === 'string') {
     print(`API: ${state.apiUrl}`);
   }
+  print(`Stripe endpoint: ${state.stripeWebhook?.endpointId ?? 'absent from recovery state'}`);
 }
 
 async function destroy() {
@@ -1354,9 +1509,12 @@ async function destroy() {
   }
   await acquireLock();
   try {
-    await Promise.all(['aws', 'git'].map(requireCommand));
+    await Promise.all(['aws', 'git', 'npm'].map(requireCommand));
     await assertIdentityAndBudget();
     const head = (await command('git', ['rev-parse', 'HEAD'])).stdout;
+    if (state.stripeWebhook !== undefined) {
+      await command('npm', ['run', 'build', '--silent']);
+    }
     await destroyCloudAndLocal(state, head);
   } finally {
     await releaseLock();

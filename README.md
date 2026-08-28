@@ -539,8 +539,12 @@ lab. It then:
 6. prints the exact non-executing CloudFormation change set;
 7. validates and automatically dispatches `execute` for that exact change set;
 8. creates a temporary Cognito operator and local authorization header;
-9. reconnects the mock vendor to the deployed signed-webhook endpoint; and
-10. prints `AWS LAB READY` with the API and vendor endpoints.
+9. replaces any stale lab-owned Stripe Sandbox webhook with one targeting the
+   deployed API;
+10. stores and verifies its temporary signing secret in Standard SSM without
+    printing it;
+11. reconnects the mock vendor to the deployed signed-webhook endpoint; and
+12. prints `AWS LAB READY` with the API, Stripe webhook, and vendor endpoints.
 
 There is no later `deploy` prompt. Prepare and execute remain separate GitHub
 operations with an exact change-set guard, but the authenticated supervisor
@@ -574,13 +578,15 @@ Press `Ctrl+C` once in the original deployment console when the learning
 session is finished. This requests teardown; it does not abruptly terminate
 the supervisor. The current operation first settles, then the supervisor:
 
-1. dispatches and monitors the GitHub `destroy` operation;
-2. verifies that the application stack is absent;
-3. verifies that the project deployment-artifact prefix is empty;
-4. removes the temporary Cognito user with the stack;
-5. stops only the tunnel and mock-vendor processes it owns;
-6. deletes its temporary local credentials and signing material; and
-7. prints `AWS LAB DESTROYED` with the verified final state.
+1. deletes and verifies absence of the temporary lab-owned Stripe endpoint;
+2. deletes and verifies absence of its temporary SSM signing-secret parameter;
+3. dispatches and monitors the GitHub `destroy` operation;
+4. verifies that the application stack is absent;
+5. verifies that the project deployment-artifact prefix is empty;
+6. removes the temporary Cognito user with the stack;
+7. stops only the tunnel and mock-vendor processes it owns;
+8. deletes its temporary local credentials and signing material; and
+9. prints `AWS LAB DESTROYED` with the verified final state.
 
 Wait for that final message before closing the terminal. A second interrupt is
 ignored while cleanup is running.
@@ -596,6 +602,10 @@ If the original supervisor is still active, this command asks it to begin the
 same verified teardown and tells the operator to watch the original terminal.
 If the supervisor is gone, the command uses the permission-limited recovery
 state under `.aws-sam/cloud-lab/` to complete and verify cleanup directly.
+If Stripe is temporarily unavailable, teardown still removes the bounded AWS
+stack and preserves only the safe endpoint ID needed for a later cleanup retry.
+The reusable Stripe Sandbox API key remains in Standard SSM; the temporary
+webhook secret does not.
 
 Only one supervisor can own the lab at a time. A later run safely reuses healthy
 lab-owned processes and matching cloud state, replaces stale owned processes,
