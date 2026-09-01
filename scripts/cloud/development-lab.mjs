@@ -1115,15 +1115,16 @@ async function startCloudUi(configuration) {
     `${existingSize > 0 ? '\n' : ''}--- cloud UI start ${new Date().toISOString()} ---\n`,
     { flag: 'a', mode: 0o600 },
   );
+  const viteExecutable = join(projectRoot, 'node_modules', 'vite', 'bin', 'vite.js');
   const processId = spawnDetached(
-    'npm',
-    ['run', 'dev', '--workspace', 'ui'],
+    process.execPath,
+    [viteExecutable, '--host', '127.0.0.1', '--port', '3002', '--strictPort'],
     createCloudUiProcessEnvironment(process.env, configuration.environment),
     uiLogPath,
   );
   return {
     pid: processId,
-    commandFragment: 'npm run dev --workspace ui',
+    commandFragment: 'node_modules/vite/bin/vite.js',
     localUrl: configuration.localUrl,
     configurationFingerprint: configuration.fingerprint,
   };
