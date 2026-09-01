@@ -1118,7 +1118,15 @@ async function startCloudUi(configuration) {
   const viteExecutable = join(projectRoot, 'node_modules', 'vite', 'bin', 'vite.js');
   const processId = spawnDetached(
     process.execPath,
-    [viteExecutable, '--host', '127.0.0.1', '--port', '3002', '--strictPort'],
+    [
+      viteExecutable,
+      join(projectRoot, 'ui'),
+      '--host',
+      '127.0.0.1',
+      '--port',
+      '3002',
+      '--strictPort',
+    ],
     createCloudUiProcessEnvironment(process.env, configuration.environment),
     uiLogPath,
   );

@@ -111,5 +111,6 @@ describe('cloud UI configuration', () => {
     expect(source).toContain("['Cloud UI', state.ui]");
     expect(source).toContain("commandFragment: 'node_modules/vite/bin/vite.js'");
     expect(source).not.toContain("commandFragment: 'npm run dev --workspace ui'");
+    expect(source).toContain("join(projectRoot, 'ui'),");
   });
 });
